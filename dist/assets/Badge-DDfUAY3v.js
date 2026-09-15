@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime--AOyvnT1.js";var t=e();function n({label:e,color:n}){return(0,t.jsx)(`span`,{className:`inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-[11px] font-bold leading-none tracking-tight`,style:{backgroundColor:`${n}14`,borderColor:`${n}4D`,color:n},children:e})}export{n as t};

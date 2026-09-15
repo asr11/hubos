@@ -1,0 +1,1 @@
+function e(e){let t=String(e??``).trim().toLowerCase();return t===`admin`||t===`superadmin`||t===`ceo`}function t(t,n,r){return n?e(r)?!0:t.assigneeId===n||t.createdBy===n:!1}export{t};

@@ -1,0 +1,242 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return request.auth.uid;
+    }
+
+    /** תפקיד מ-users/{request.auth.uid} — get אחד; אם אין role תקין מחזירים '' */
+    function myRole() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? userRoleFromDoc()
+        : '';
+    }
+
+    function userRoleFromDoc() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return u.data.keys().hasAny(['role']) && u.data.role is string ? u.data.role : '';
+    }
+
+    /**
+     * מנהל: מסמך users/{request.auth.uid} עם שדה role — 'admin' או 'superadmin' (כולל וריאנטי רישיות).
+     * ה-UID הוא מזהה Firebase Auth בלבד, לא כתובת אימייל.
+     */
+    function isAdmin() {
+      let r = myRole();
+      return r == 'admin' || r == 'superadmin' ||
+        r == 'Admin' || r == 'Superadmin' ||
+        r == 'ADMIN' || r == 'SUPERADMIN';
+    }
+
+    function isSelf(userId) {
+      return signedIn() && me() == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create: if isAdmin() || (
+        isSelf(userId) &&
+        !(request.resource.data.role in ['admin', 'superadmin'])
+      );
+      allow update: if isAdmin() || (
+        isSelf(userId) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'avatar',
+          'color',
+          'email',
+          'monthlyWorkHours',
+          'scheduleDayStart',
+          'scheduleDayEnd',
+          'scheduleBreakMinutes'
+        ])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if signedIn() && (
+        isAdmin() ||
+        resource.data.assigneeId == me() ||
+        resource.data.createdBy == me()
+      );
+      allow create: if signedIn() && request.resource.data.createdBy == me();
+      allow update, delete: if signedIn() && (
+        isAdmin() ||
+        resource.data.assigneeId == me() ||
+        resource.data.createdBy == me()
+      );
+
+      match /activity/{activityId} {
+        allow read, write: if signedIn();
+      }
+      match /taskNotes/{noteId} {
+        allow read, write: if signedIn();
+      }
+    }
+
+    /** פגישות — כמו שאר אוספי ה-Hub (צוות פנימי); סינון תצוגה באפליקציה */
+    match /meetings/{meetingId} {
+      allow read, write: if signedIn();
+    }
+
+    /**
+     * שאילתות collectionGroup על taskNotes (ראו useTasks.tsx) — חייב כלל recursive;
+     * ה-match המקונן tasks/.../taskNotes לא מספיק ל-collectionGroup.
+     */
+    match /{path=**}/taskNotes/{noteId} {
+      allow read, write: if signedIn();
+    }
+
+    match /activityLogs/{activityId} {
+      allow read: if signedIn() && (isAdmin() || resource.data.userId == me());
+      allow create: if signedIn() && (isAdmin() || request.resource.data.userId == me());
+      allow update, delete: if isAdmin();
+    }
+
+    /**
+     * אינטגרציית Clockify — רק אדמין (מפתח API).
+     * workspaceId זמין גם לעובדים דרך attendanceConfig/settings (ללא מפתח).
+     */
+    match /attendanceConfig/clockify {
+      allow read, write: if isAdmin();
+    }
+
+    match /attendanceConfig/settings {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /attendanceConfig/{configId} {
+      allow read, write: if false;
+    }
+
+    /** לידים — עדכון מצד הלקוח חייב ללא ערכי `undefined` (Firestore דוחה). */
+    match /leads/{leadId} {
+      allow read, write: if signedIn();
+    }
+
+    /** Hub collections: signed-in read/write (wildcard name docId avoids id/path typing issues in the rules compiler). */
+    match /clients/{docId} {
+      allow read, write: if signedIn();
+    }
+    match /projects/{docId} {
+      allow read, write: if signedIn();
+    }
+    match /hourlyServices/{serviceId} {
+      allow read, write: if signedIn();
+      match /entries/{entryId} {
+        allow read, write: if signedIn();
+      }
+    }
+    /** דוח שעות ציבורי ללקוח — גישה רק עם טוקן בקישור */
+    match /hourlyServicesPublic/{shareToken} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if signedIn();
+    }
+    match /{path=**}/entries/{entryId} {
+      allow read, write: if signedIn();
+    }
+    match /suppliers/{docId} {
+      allow read, write: if signedIn();
+    }
+    match /campaigns/{docId} {
+      allow read, write: if signedIn();
+    }
+    match /invoices/{docId} {
+      allow read, write: if signedIn();
+    }
+
+    /** עסקאות (ריטיינר / חד־פעמי) — תשלומים בפועל נרשמים כ־invoices עם dealId */
+    match /deals/{docId} {
+      allow read, write: if signedIn();
+    }
+
+    /** תשלומי עמלה לסוכנים — אחרי תקבול מהלקוח */
+    match /agentCommissionPayments/{docId} {
+      allow read, write: if signedIn();
+    }
+    match /collectionTracking/{docId} {
+      allow read, write: if signedIn();
+    }
+    match /financeIncomes/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeExpenses/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeExpenseTypes/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeImportRules/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeCashflowState/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeCashflowBalanceSnapshots/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeGiRecurringPayments/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeGiRetainers/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeCashflowExpectedExpenses/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeCashflowVatEstimates/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /financeFixedExpenseCatalog/{docId} {
+      allow read, write: if isAdmin();
+    }
+    match /hostingRecords/{docId} {
+      allow read, write: if signedIn();
+    }
+    match /domainRecords/{docId} {
+      allow read, write: if signedIn();
+    }
+    match /docs/{docId} {
+      allow read, write: if signedIn();
+    }
+    match /recurringTaskTemplates/{docId} {
+      allow read, write: if signedIn();
+    }
+
+    /**
+     * כספת סיסמאות (passwords_vault)
+     *
+     * קריאה: כל משתמש מחובר — מונע כשלי permission-denied עם שאילתות מורכבות / isAdmin + get().
+     * עדכון: כל משתמש מחובר (updatedBy חייב להיות ה-UID שלו).
+     * מחיקה: מנהלים בלבד.
+     * סינון מי רואה מה נשאר באפליקציה: עובדים משתמשים ב-array-contains על visibleUserIds;
+     * מנהלים טוענים את כל האוסף. חשוב: משתמש טכני יכול לקרוא את כל המסמכים דרך ה-SDK — פרויקט פנימי בלבד.
+     */
+    match /passwords_vault/{entryId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (
+        isAdmin() ||
+        (
+          request.resource.data.updatedBy == me() &&
+          request.resource.data.visibleUserIds is list &&
+          request.auth.uid in request.resource.data.visibleUserIds
+        )
+      );
+      allow update: if signedIn() && request.resource.data.updatedBy == me();
+      allow delete: if signedIn() && isAdmin();
+    }
+
+    /**
+     * אין catch-all רקורסיבי: הוא התנגש עם כספת (מספר match על אותו מסמך) וגרם ל-permission-denied
+     * למשתמשים שאינם אדמין. כל האוספים בשימוש האפליקציה מפורשים למעלה — אוסף חדש ידרוש כאן match.
+     */
+  }
+}

@@ -1,0 +1,239 @@
+import { hubFetch } from '../lib/hubFetch'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
+import { deleteTasksAndDocsForProject } from '../lib/firestoreCascades'
+import { stripUndefined } from '../lib/stripUndefined'
+import { toastFsError, toastFsSuccess } from '../lib/fsToast'
+import { useHubStore } from '../store/useStore'
+import { useTasks } from './useTasks'
+import type { Project, Task } from '../types'
+
+/** ב-Firestore נשמר `projectKind` (לא `type`) — מתאים לממשק Project.type */
+function mapProjectUpdateForFirestore(
+  data: Partial<Project>,
+): Record<string, unknown> {
+  const { type, ...rest } = data
+  const cleaned = stripUndefined(rest as Record<string, unknown>)
+  if (type !== undefined) {
+    cleaned.projectKind = type
+  }
+  return cleaned
+}
+
+/** מסמך create בלבד — ללא spread של אובייקט טופס (מונע ערכים לא נתמכים ב-Firestore) */
+function buildProjectCreateDoc(
+  data: Omit<Project, 'id' | 'createdAt' | 'taskCount' | 'doneCount'>,
+): Record<string, unknown> {
+  const docData: Record<string, unknown> = {
+    name: data.name,
+    projectKind: data.type,
+    status: data.status,
+    priority: data.priority,
+    ownerId: data.ownerId,
+    color: data.color,
+    taskCount: 0,
+    doneCount: 0,
+    createdAt: new Date().toISOString(),
+  }
+  const billing = data.projectType ?? 'one-time'
+  docData.projectType = billing
+  if (billing === 'retainer') {
+    const sd = data.startDate?.slice(0, 10) ?? ''
+    docData.startDate = sd
+    docData.dueDate = sd || data.dueDate
+    docData.retainerLog = Array.isArray(data.retainerLog) ? data.retainerLog : []
+  } else {
+    docData.dueDate = data.dueDate
+  }
+  const trimmedClient = data.clientId?.trim()
+  if (trimmedClient) {
+    docData.clientId = trimmedClient
+  }
+  const trimmedSupplier = data.supplierId?.trim()
+  if (trimmedSupplier) {
+    docData.supplierId = trimmedSupplier
+  }
+  if (
+    data.manualProgressPercent != null &&
+    typeof data.manualProgressPercent === 'number' &&
+    !Number.isNaN(data.manualProgressPercent)
+  ) {
+    docData.manualProgressPercent = Math.min(
+      100,
+      Math.max(0, Math.round(data.manualProgressPercent)),
+    )
+  }
+  const desc = data.description?.trim()
+  if (desc) docData.description = desc
+  return docData
+}
+
+function recomputeProjects(projects: Project[], tasks: Task[]): Project[] {
+  if (!Array.isArray(projects)) return []
+  const taskList = Array.isArray(tasks) ? tasks : []
+  return projects.map((p) => {
+    const ts = taskList.filter((t) => t?.projectId === p?.id)
+    return {
+      ...p,
+      taskCount: ts.length,
+      doneCount: ts.filter((t) => t?.status === 'done').length,
+    }
+  })
+}
+
+type ProjectsContextValue = {
+  projects: Project[]
+  loading: boolean
+  error: Error | null
+  addProject: (
+    data: Omit<Project, 'id' | 'createdAt' | 'taskCount' | 'doneCount'>,
+  ) => Promise<string | null>
+  updateProject: (id: string, data: Partial<Project>) => Promise<boolean>
+  deleteProject: (id: string) => Promise<void>
+}
+
+const ProjectsContext = createContext<ProjectsContextValue | null>(null)
+
+export function ProjectsProvider({ children }: { children: ReactNode }) {
+  const { tasks } = useTasks()
+  const [rawProjects, setRawProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const projects = useMemo(
+    () => recomputeProjects(rawProjects, tasks),
+    [rawProjects, tasks],
+  )
+
+  useEffect(() => {
+    setLoading(true)
+    const fetchProjects = async () => {
+      try {
+        const res = await hubFetch('/api/projects')
+        if (!res.ok) throw new Error('Failed to fetch')
+        const data = await res.json()
+        setRawProjects(Array.isArray(data) ? data : [])
+        setLoading(false)
+        setError(null)
+      } catch (err) {
+        console.error('projects fetch', err)
+        toastFsError('שגיאה בטעינת פרויקטים', err, 'projects fetch')
+        setError(err instanceof Error ? err : new Error(String(err)))
+        setLoading(false)
+      }
+    }
+    fetchProjects()
+  }, [])
+
+  const addProject = useCallback(
+    async (data: Omit<Project, 'id' | 'createdAt' | 'taskCount' | 'doneCount'>) => {
+      try {
+        const res = await hubFetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildProjectCreateDoc(data))
+        })
+        if (!res.ok) throw new Error('Failed to add project')
+        const created = await res.json()
+        const refId = created.id || 'temp-id'
+        const optimistic: Project = {
+          id: refId,
+          name: data.name,
+          description: data.description,
+          type: data.type,
+          projectType: data.projectType ?? 'one-time',
+          retainerAmount: data.retainerAmount,
+          subContractor: data.subContractor,
+          startDate: data.startDate,
+          retainerLog: data.retainerLog,
+          clientId: data.clientId,
+          supplierId: data.supplierId,
+          status: data.status,
+          priority: data.priority,
+          dueDate: data.dueDate,
+          ownerId: data.ownerId,
+          color: data.color,
+          taskCount: 0,
+          doneCount: 0,
+          manualProgressPercent: data.manualProgressPercent,
+          createdAt: new Date().toISOString(),
+        }
+        setRawProjects((prev) => {
+          if (prev.some((p) => p.id === optimistic.id)) return prev
+          return [...prev, optimistic]
+        })
+        toastFsSuccess('הפרויקט נוסף בהצלחה')
+        return refId
+      } catch (e) {
+        toastFsError('שגיאה בשמירת הפרויקט', e, 'addProject')
+        return null
+      }
+    },
+    [],
+  )
+
+  const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
+    try {
+      await hubFetch('/api/projects/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mapProjectUpdateForFirestore(data)) })
+      setRawProjects((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                ...data,
+              }
+            : p,
+        ),
+      )
+      toastFsSuccess('הפרויקט עודכן')
+      return true
+    } catch (e) {
+      toastFsError('שגיאה בעדכון הפרויקט', e, 'updateProject')
+      return false
+    }
+  }, [])
+
+  const deleteProject = useCallback(async (id: string) => {
+    try {
+      await deleteTasksAndDocsForProject(id)
+      await hubFetch('/api/projects/' + id, { method: 'DELETE' })
+      setRawProjects((prev) => prev.filter((p) => p.id !== id))
+      const sel = useHubStore.getState().selectedProjectId
+      if (sel === id) useHubStore.getState().setSelectedProject(null)
+      toastFsSuccess('הפרויקט נמחק')
+    } catch (e) {
+      toastFsError('שגיאה במחיקת הפרויקט', e, 'deleteProject')
+    }
+  }, [])
+
+  const value = useMemo(
+    () => ({
+      projects,
+      loading,
+      error,
+      addProject,
+      updateProject,
+      deleteProject,
+    }),
+    [projects, loading, error, addProject, updateProject, deleteProject],
+  )
+
+  return (
+    <ProjectsContext.Provider value={value}>
+      {children}
+    </ProjectsContext.Provider>
+  )
+}
+
+export function useProjects(): ProjectsContextValue {
+  const ctx = useContext(ProjectsContext)
+  if (!ctx) throw new Error('useProjects חייב להיות בתוך ProjectsProvider')
+  return ctx
+}

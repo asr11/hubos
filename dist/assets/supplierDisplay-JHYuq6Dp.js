@@ -1,0 +1,1 @@
+var e=`לא ברשימה`;function t(e){let t=new Map;for(let n of e){let e=n.id.trim();e&&t.set(e,n.name)}return t}function n(e,t){let n=typeof e==`string`?e.trim():``;if(n)return t.get(n)??`לא ברשימה`}export{n,t as r,e as t};

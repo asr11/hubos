@@ -1,0 +1,1 @@
+{"version":3,"file":"morningExpenseSync.d.ts","sourceRoot":"","sources":["../../src/lib/morningExpenseSync.ts"],"names":[],"mappings":"AA+MA,MAAM,MAAM,eAAe,GAAG;IAC5B,EAAE,EAAE,IAAI,CAAA;IACR,OAAO,EAAE,MAAM,CAAA;IACf,mBAAmB,EAAE,MAAM,CAAA;IAC3B,QAAQ,EAAE,MAAM,CAAA;IAChB,UAAU,EAAE,MAAM,CAAA;CACnB,CAAA;AAED,wBAAsB,mBAAmB,IAAI,OAAO,CAAC,eAAe,CAAC,CAKpE"}
