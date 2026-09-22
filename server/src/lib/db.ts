@@ -164,6 +164,31 @@ export function initLocalDatabase() {
     CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
     CREATE INDEX IF NOT EXISTS idx_system_logs_type ON system_logs(event_type, id DESC);
     CREATE INDEX IF NOT EXISTS idx_ssh_checks_domain ON ssh_checks(domain_name, last_check DESC);
+
+    -- 15. טבלת לוגים של סוכני ה-AI (AI Agent Logs)
+    CREATE TABLE IF NOT EXISTS ai_agent_logs (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      prompt_tokens INTEGER DEFAULT 0,
+      completion_tokens INTEGER DEFAULT 0,
+      execution_time_ms INTEGER DEFAULT 0,
+      estimated_cost_usd REAL DEFAULT 0,
+      business_value_score INTEGER DEFAULT 0,
+      context_summary TEXT
+    );
+
+    -- 16. Digital CEO Actions Ledger
+    CREATE TABLE IF NOT EXISTS ceo_actions (
+      action_id TEXT PRIMARY KEY,
+      action_type TEXT NOT NULL,
+      status TEXT NOT NULL,
+      reasoning TEXT,
+      proposed_payload JSON,
+      ledger JSON DEFAULT '[]',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `)
 }
 

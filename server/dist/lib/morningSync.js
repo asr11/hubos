@@ -309,9 +309,6 @@ export async function syncClients() {
  */
 export async function runMorningSync(options) {
     const startedAt = Date.now();
-    const db = getAdminDb();
-    if (!db)
-        throw new Error('Firebase Admin not configured');
     const creds = await loadMorningCredentials();
     if (!creds)
         throw new Error('Morning credentials not configured');
@@ -350,6 +347,7 @@ export async function runMorningSync(options) {
       ON CONFLICT(id) DO UPDATE SET data = excluded.data
     `);
         const getStmt = db.prepare('SELECT data FROM generic_documents WHERE collection = ? AND id = ?');
+        const deleteStmt = db.prepare('DELETE FROM generic_documents WHERE collection = ? AND id = ?');
         db.transaction(() => {
             for (const m of slice) {
                 const newId = GI_DOC_PREFIX + m.greenInvoiceId;
@@ -402,7 +400,7 @@ export async function runMorningSync(options) {
                 const rowData2 = getStmt.get(CLIENTS_COLLECTION, newId);
                 const existingData2 = rowData2 ? JSON.parse(rowData2.data) : {};
                 const mergedData2 = { ...existingData2, ...row };
-                insertStmt.run(newId, CLIENTS_COLLECTION, JSON.stringify(mergedData2));
+                insertStmt.run(newId, INCOMES_COLLECTION, JSON.stringify(mergedData2));
                 imported += 1;
             }
         })();

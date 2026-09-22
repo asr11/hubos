@@ -2,11 +2,16 @@ import type { FastifyInstance } from 'fastify'
 import { requireAuth } from '../middleware/requireAuth.js'
 
 import { syncReadonlyMaterialsFromMorning } from '../lib/syncReadonlyMaterials.js'
-
 import { registerDomainRecord, checkSshConnectivity } from '../lib/domainSshMonitor.js'
 import { createQuoteRecord, signQuoteRecord, getQuoteRecord } from '../lib/quoteSignModule.js'
+import { registerVaultRoutes } from './vault.js'
+import { registerCeoActionsRoutes } from './ceoActions.js'
 
 export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
+  // Register specific modules
+  await registerVaultRoutes(app)
+  await registerCeoActionsRoutes(app)
+  
   app.get('/api/me', { preHandler: requireAuth }, async (req) => ({
     ok: true,
     uid: req.authUser!.uid,

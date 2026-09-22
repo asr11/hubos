@@ -14,6 +14,7 @@ const AgentBusinessPage = lazy(() => import('./pages/agent/AgentBusinessPage').t
 const AgentFinancePage = lazy(() => import('./pages/agent/AgentFinancePage').then(m => ({ default: m.AgentFinancePage })))
 const AgentsAdmin = lazy(() => import('./pages/AgentsAdmin').then(m => ({ default: m.AgentsAdmin })))
 const AgentsNeuralNetwork = lazy(() => import('./pages/AgentsNeuralNetwork').then(m => ({ default: m.AgentsNeuralNetwork })))
+const AiEfficiencyDashboard = lazy(() => import('./pages/AiEfficiencyDashboard').then(m => ({ default: m.AiEfficiencyDashboard })))
 const Clients = lazy(() => import('./pages/Clients').then(m => ({ default: m.Clients })))
 const Collections = lazy(() => import('./pages/Collections').then(m => ({ default: m.Collections })))
 import { Dashboard } from './pages/Dashboard'
@@ -44,6 +45,7 @@ const HourlyServiceDetail = lazy(() => import('./pages/HourlyServiceDetail').the
 const HourlyServiceShare = lazy(() => import('./pages/HourlyServiceShare').then(m => ({ default: m.HourlyServiceShare })))
 const Attendance = lazy(() => import('./pages/Attendance').then(m => ({ default: m.Attendance })))
 const Vault = lazy(() => import('./pages/Vault').then(m => ({ default: m.Vault })))
+const DigitalCeo = lazy(() => import('./pages/DigitalCeo').then(m => ({ default: m.DigitalCeo })))
 
 export default function App() {
   return (
@@ -201,8 +203,24 @@ export default function App() {
                       </RequireAdmin>
                     }
                   />
+                  <Route
+                    path="ai-roi"
+                    element={
+                      <RequireAdmin>
+                        <AiEfficiencyDashboard />
+                      </RequireAdmin>
+                    }
+                  />
                   <Route path="attendance" element={<Attendance />} />
                   <Route path="vault" element={<Vault />} />
+                  <Route
+                    path="ceo"
+                    element={
+                      <RequireAdmin>
+                        <DigitalCeo />
+                      </RequireAdmin>
+                    }
+                  />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
               </Route>

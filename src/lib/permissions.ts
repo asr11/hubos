@@ -25,6 +25,7 @@ const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   '/hourly-services': ['ceo', 'admin', 'project_manager'],
   '/vault': ['ceo', 'admin', 'project_manager'],
   '/users': ['ceo', 'admin'],
+  '/ceo': ['ceo', 'admin'],
   '/agents-admin': ['ceo', 'admin'],
   '/agents-neural-network': ['ceo', 'admin'],
   '/prompt-library': ['ceo', 'admin', 'project_manager'],

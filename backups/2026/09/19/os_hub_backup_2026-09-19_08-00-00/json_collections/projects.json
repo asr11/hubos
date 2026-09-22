@@ -1,0 +1,1082 @@
+[
+  {
+    "name": "nitzan-group.com",
+    "domain": "nitzan-group.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.228Z",
+    "id": "proj_0jdq04g5q"
+  },
+  {
+    "name": "betondaruch.co.il",
+    "domain": "betondaruch.co.il",
+    "clientName": "מאומת (3 מקורות)",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.191Z",
+    "id": "proj_0l03cxj09"
+  },
+  {
+    "name": "walla.co.il",
+    "domain": "walla.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.251Z",
+    "id": "proj_1gdr68xwp"
+  },
+  {
+    "name": "sela-group.co.il",
+    "domain": "sela-group.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.243Z",
+    "id": "proj_20my0r8pf"
+  },
+  {
+    "name": "oriontecheng.com",
+    "domain": "oriontecheng.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.234Z",
+    "id": "proj_25w31cu0e"
+  },
+  {
+    "name": "inter.net",
+    "domain": "inter.net",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.210Z",
+    "id": "proj_2p5ichnty"
+  },
+  {
+    "name": "gsl.co.il",
+    "domain": "gsl.co.il",
+    "clientName": "ג'י אס אל פתרונות בהנדסת קרקע",
+    "clientId": "gi_0fc6bfe7-b564-4f82-b8e7-f7679b0afd43",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.207Z",
+    "id": "proj_2qegymh2c"
+  },
+  {
+    "name": "013net.net",
+    "domain": "013net.net",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.176Z",
+    "id": "proj_2sn7m5lhz"
+  },
+  {
+    "name": "-sp7.co.il",
+    "domain": "-sp7.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.165Z",
+    "id": "proj_310zer64u"
+  },
+  {
+    "name": "adv-marker.co.il",
+    "domain": "adv-marker.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות - תשתית HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.179Z",
+    "id": "proj_35g25wfql"
+  },
+  {
+    "name": "novaproject.co.il",
+    "domain": "novaproject.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.228Z",
+    "id": "proj_3922t6bt8"
+  },
+  {
+    "name": "idsf.co.il",
+    "domain": "idsf.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.210Z",
+    "id": "proj_3b2x6uwfm"
+  },
+  {
+    "name": "1x2totogal.co.il",
+    "domain": "1x2totogal.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.176Z",
+    "id": "proj_3ctocyvd2"
+  },
+  {
+    "name": "sp7.co.il",
+    "domain": "sp7.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.246Z",
+    "id": "proj_49exxvleb"
+  },
+  {
+    "name": "misgav-group.com",
+    "domain": "misgav-group.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות - תשתית HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.224Z",
+    "id": "proj_4j811do9m"
+  },
+  {
+    "name": "moniyotplus.co.il",
+    "domain": "moniyotplus.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.224Z",
+    "id": "proj_4pavmy7p3"
+  },
+  {
+    "name": "www.yadmerapa.co.il",
+    "domain": "www.yadmerapa.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות - תשתית HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.253Z",
+    "id": "proj_4xmclhp12"
+  },
+  {
+    "name": "opmold.com",
+    "domain": "opmold.com",
+    "clientName": "\"אופל מולד בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.234Z",
+    "id": "proj_51rtin0pl"
+  },
+  {
+    "name": "hotmail.com",
+    "domain": "hotmail.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.208Z",
+    "id": "proj_5ejigtexi"
+  },
+  {
+    "name": "012.net",
+    "domain": "012.net",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.176Z",
+    "id": "proj_60axkk4c0"
+  },
+  {
+    "name": "domains.livedns.co.il",
+    "domain": "domains.livedns.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.202Z",
+    "id": "proj_6glrk3ivx"
+  },
+  {
+    "name": "metal-tech.co.il",
+    "domain": "metal-tech.co.il",
+    "clientName": "מטל-טק בע''מ",
+    "clientId": "gi_8349efe9-1caa-41b4-9722-63b4c3b81e35",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.224Z",
+    "id": "proj_6zxrn550c"
+  },
+  {
+    "name": "theskyspirit.co.il",
+    "domain": "theskyspirit.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות - תשתית HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.248Z",
+    "id": "proj_7rbtnzv6w"
+  },
+  {
+    "name": "console.firebase.google.com",
+    "domain": "console.firebase.google.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.198Z",
+    "id": "proj_80fn3tx3t"
+  },
+  {
+    "name": "shneor.co.il",
+    "domain": "shneor.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.244Z",
+    "id": "proj_815k77k6h"
+  },
+  {
+    "name": "nyc-law.co.il",
+    "domain": "nyc-law.co.il",
+    "clientName": "\"כהן שי ונוח ירון-משרד עו\"\"ד\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.230Z",
+    "id": "proj_933foi491"
+  },
+  {
+    "name": "walla.com",
+    "domain": "walla.com",
+    "clientName": "\"פרדי תעשיות רהיטים בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.252Z",
+    "id": "proj_980fq3yjg"
+  },
+  {
+    "name": "ashtrombgu.co.il",
+    "domain": "ashtrombgu.co.il",
+    "clientName": "מאומת (3 מקורות)",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.184Z",
+    "id": "proj_a3ms2jfq3"
+  },
+  {
+    "name": "adexpertsmedia.com",
+    "domain": "adexpertsmedia.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.177Z",
+    "id": "proj_adlqkgf17"
+  },
+  {
+    "name": "yahoo.com",
+    "domain": "yahoo.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.253Z",
+    "id": "proj_afcomg0fw"
+  },
+  {
+    "name": "server.hub.co.il",
+    "domain": "server.hub.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות - תשתית HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.244Z",
+    "id": "proj_agzv8u0ka"
+  },
+  {
+    "name": "segment-yg.com",
+    "domain": "segment-yg.com",
+    "clientName": "\"סגמנט י.ג. פיתוח עסקים בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-5 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.243Z",
+    "id": "proj_b56dhhwzv"
+  },
+  {
+    "name": "yarimi.co.il",
+    "domain": "yarimi.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.253Z",
+    "id": "proj_b79g6pmtj"
+  },
+  {
+    "name": "merutz.co.il",
+    "domain": "merutz.co.il",
+    "clientName": "\"מרוץ ש.א. הקריות בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-5 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.223Z",
+    "id": "proj_bf83u2lqb"
+  },
+  {
+    "name": "fredi-f.co.il",
+    "domain": "fredi-f.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.205Z",
+    "id": "proj_blc7up62g"
+  },
+  {
+    "name": "rl-cpa.co.il",
+    "domain": "rl-cpa.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.238Z",
+    "id": "proj_bmpb3u467"
+  },
+  {
+    "name": "soilteam.co.il",
+    "domain": "soilteam.co.il",
+    "clientName": "\"צוות קרקע בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.246Z",
+    "id": "proj_buzwozj1e"
+  },
+  {
+    "name": "tr-design.co.il",
+    "domain": "tr-design.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.250Z",
+    "id": "proj_c755ufl2r"
+  },
+  {
+    "name": "carmiela.co.il",
+    "domain": "carmiela.co.il",
+    "clientName": "מאומת (3 מקורות)",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.196Z",
+    "id": "proj_c7n2c3e42"
+  },
+  {
+    "name": "technocoin.co.il",
+    "domain": "technocoin.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.248Z",
+    "id": "proj_c80kaa0ta"
+  },
+  {
+    "name": "vogues.co.il",
+    "domain": "vogues.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.251Z",
+    "id": "proj_cow4ejt5o"
+  },
+  {
+    "name": "nachlat-avot.co.il",
+    "domain": "nachlat-avot.co.il",
+    "clientName": "\"נחלת אבות (ג.ז. פיצולי נחלות) בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-5 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.228Z",
+    "id": "proj_cty1xcuqk"
+  },
+  {
+    "name": "rent-it.co.il",
+    "domain": "rent-it.co.il",
+    "clientName": "\"רנט איט - ריט מגורים בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.238Z",
+    "id": "proj_d7svf4foi"
+  },
+  {
+    "name": "mymoment.co.il",
+    "domain": "mymoment.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.226Z",
+    "id": "proj_dh6d0h0t4"
+  },
+  {
+    "name": "greenlime.co.il",
+    "domain": "greenlime.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.206Z",
+    "id": "proj_dzyctgndl"
+  },
+  {
+    "name": "srever.hub.co.il",
+    "domain": "srever.hub.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.246Z",
+    "id": "proj_ektpzkqz3"
+  },
+  {
+    "name": "s-schwartz.co.il",
+    "domain": "s-schwartz.co.il",
+    "clientName": "S. Schwartz Ltd",
+    "clientId": "gi_55bd41a7-fa29-4423-a94b-68387d2bd1f1",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.240Z",
+    "id": "proj_esptcr20v"
+  },
+  {
+    "name": "msitech.co.il",
+    "domain": "msitech.co.il",
+    "clientName": "\"מדידות טכנולוגיות ניטור מתקדמות בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.226Z",
+    "id": "proj_f4mrfaovi"
+  },
+  {
+    "name": "netvision.net",
+    "domain": "netvision.net",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.228Z",
+    "id": "proj_fa7fs1qo2"
+  },
+  {
+    "name": "revitalarc.co.il",
+    "domain": "revitalarc.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.238Z",
+    "id": "proj_fkbnda87n"
+  },
+  {
+    "name": "rehinet.co.il",
+    "domain": "rehinet.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.236Z",
+    "id": "proj_fmdez7dzt"
+  },
+  {
+    "name": "zhg.co.il",
+    "domain": "zhg.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.254Z",
+    "id": "proj_fmjwz3gp6"
+  },
+  {
+    "name": "dntrade.co.il",
+    "domain": "dntrade.co.il",
+    "clientName": "\"דן טרייד קריות בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.202Z",
+    "id": "proj_fvmwwaw3u"
+  },
+  {
+    "name": "dantex.co.il",
+    "domain": "dantex.co.il",
+    "clientName": "מאומת (3 מקורות)",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.200Z",
+    "id": "proj_fvpgfuayi"
+  },
+  {
+    "name": "hub.co.il",
+    "domain": "hub.co.il",
+    "clientName": "S. Schwartz Ltd",
+    "clientId": "gi_55bd41a7-fa29-4423-a94b-68387d2bd1f1",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.209Z",
+    "id": "proj_gfmu5xznd"
+  },
+  {
+    "name": "baicher.com",
+    "domain": "baicher.com",
+    "clientName": "מאומת (3 מקורות)",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.187Z",
+    "id": "proj_gvwhzwhh6"
+  },
+  {
+    "name": "sagsoget.co.il",
+    "domain": "sagsoget.co.il",
+    "clientName": "\"סגסוגת בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.241Z",
+    "id": "proj_h02649mxo"
+  },
+  {
+    "name": "i-peleg.com",
+    "domain": "i-peleg.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.209Z",
+    "id": "proj_h0edsm31a"
+  },
+  {
+    "name": "barkan-eng.co.il",
+    "domain": "barkan-eng.co.il",
+    "clientName": "\"ברקן הנדסה בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-5 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.189Z",
+    "id": "proj_hvphpw631"
+  },
+  {
+    "name": "lorenzo-cafe.com",
+    "domain": "lorenzo-cafe.com",
+    "clientName": "\"לורנצו קפה בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.219Z",
+    "id": "proj_hzabuiicx"
+  },
+  {
+    "name": "candyshop.co.il",
+    "domain": "candyshop.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות - תשתית HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.194Z",
+    "id": "proj_hzsxk4ymw"
+  },
+  {
+    "name": "asnin.com",
+    "domain": "asnin.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.184Z",
+    "id": "proj_ifqbf9bq1"
+  },
+  {
+    "name": "mag-or.com",
+    "domain": "mag-or.com",
+    "clientName": "\"מאג אור טכנולוגיות מתקדמות בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-5 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.221Z",
+    "id": "proj_igc04jl0b"
+  },
+  {
+    "name": "console.green-api.com",
+    "domain": "console.green-api.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.198Z",
+    "id": "proj_ilgw6rm72"
+  },
+  {
+    "name": "yung-etgar.com",
+    "domain": "yung-etgar.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.253Z",
+    "id": "proj_jjn21k4tw"
+  },
+  {
+    "name": "kingsnooker.co.il",
+    "domain": "kingsnooker.co.il",
+    "clientName": "מאומת (3 מקורות)",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.213Z",
+    "id": "proj_jk8doovvr"
+  },
+  {
+    "name": "noashalev.com",
+    "domain": "noashalev.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.228Z",
+    "id": "proj_k9nhybwlk"
+  },
+  {
+    "name": "rehitea.co.il",
+    "domain": "rehitea.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.236Z",
+    "id": "proj_kcecef7t7"
+  },
+  {
+    "name": "dash.cloudflare.com",
+    "domain": "dash.cloudflare.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.201Z",
+    "id": "proj_llnqt8z9r"
+  },
+  {
+    "name": "hashmal.net",
+    "domain": "hashmal.net",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.208Z",
+    "id": "proj_lr0celglb"
+  },
+  {
+    "name": "bayitplus.co.il",
+    "domain": "bayitplus.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.189Z",
+    "id": "proj_lwys6d7zf"
+  },
+  {
+    "name": "fanianpro.co.il",
+    "domain": "fanianpro.co.il",
+    "clientName": "\"פניאן שיווק פרוייקטים בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-5 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.205Z",
+    "id": "proj_lx3trdakd"
+  },
+  {
+    "name": "serve.hub.co.il",
+    "domain": "serve.hub.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.243Z",
+    "id": "proj_mp010ap1t"
+  },
+  {
+    "name": "yadmerapa.co.il",
+    "domain": "yadmerapa.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות - תשתית HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.253Z",
+    "id": "proj_n2a1het2b"
+  },
+  {
+    "name": "imn.co.il",
+    "domain": "imn.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.210Z",
+    "id": "proj_nsalyhnxh"
+  },
+  {
+    "name": "candyimporter.com",
+    "domain": "candyimporter.com",
+    "clientName": "יבואני הממתקים ב.מ. בע״מ",
+    "clientId": "gi_5b23296f-d6e4-4d97-9f5f-32427f87c7f3",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.194Z",
+    "id": "proj_nwirs82r0"
+  },
+  {
+    "name": "liba-fs.co.il",
+    "domain": "liba-fs.co.il",
+    "clientName": "\"ליבה ג.א. סוכנות לביטוח פנסיוני (2024) בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.215Z",
+    "id": "proj_oz501ppiv"
+  },
+  {
+    "name": "lavilaw.net",
+    "domain": "lavilaw.net",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.213Z",
+    "id": "proj_p3j11njas"
+  },
+  {
+    "name": "www.greeninvoice.co.il",
+    "domain": "www.greeninvoice.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.252Z",
+    "id": "proj_pamm321tb"
+  },
+  {
+    "name": "t-bm.co.il",
+    "domain": "t-bm.co.il",
+    "clientName": "מאומת (3 מקורות)",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.248Z",
+    "id": "proj_pb6y9w2fw"
+  },
+  {
+    "name": "013.net",
+    "domain": "013.net",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.176Z",
+    "id": "proj_q30mhr9nm"
+  },
+  {
+    "name": "zahav.net",
+    "domain": "zahav.net",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.254Z",
+    "id": "proj_q6of8m6fk"
+  },
+  {
+    "name": "collectnpay.com",
+    "domain": "collectnpay.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.198Z",
+    "id": "proj_qdnanwa45"
+  },
+  {
+    "name": "london-ltd.co.il",
+    "domain": "london-ltd.co.il",
+    "clientName": "\"לונדון ייזום ובנין בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.217Z",
+    "id": "proj_qmqdcslcl"
+  },
+  {
+    "name": "kondocpa.co.il",
+    "domain": "kondocpa.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.213Z",
+    "id": "proj_rfcv5t7hm"
+  },
+  {
+    "name": "hanassi99.co.il",
+    "domain": "hanassi99.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.208Z",
+    "id": "proj_ridoludad"
+  },
+  {
+    "name": "ohadzaid.co.il",
+    "domain": "ohadzaid.co.il",
+    "clientName": "מאומת (3 מקורות)",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.233Z",
+    "id": "proj_rlj1uk5w8"
+  },
+  {
+    "name": "e-m.co.il",
+    "domain": "e-m.co.il",
+    "clientName": "אפרתי מדפיס",
+    "clientId": "gi_0f713790-f5e6-47c7-8d0a-128dae6c39ce",
+    "status": "OBSERVED (מאומת ב-5 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.203Z",
+    "id": "proj_s2x47lofi"
+  },
+  {
+    "name": "tof-haderech.co.il",
+    "domain": "tof-haderech.co.il",
+    "clientName": "מאומת (3 מקורות)",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-3 מקורות)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.250Z",
+    "id": "proj_t2s11jcft"
+  },
+  {
+    "name": "icloud.com",
+    "domain": "icloud.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.210Z",
+    "id": "proj_t3rtb7cib"
+  },
+  {
+    "name": "mishkaney-amram.co.il",
+    "domain": "mishkaney-amram.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.224Z",
+    "id": "proj_tczue3f56"
+  },
+  {
+    "name": "beit-habridge.com",
+    "domain": "beit-habridge.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.189Z",
+    "id": "proj_tuxwb6n1x"
+  },
+  {
+    "name": "oevents.co.il",
+    "domain": "oevents.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.231Z",
+    "id": "proj_u0g2mdj3j"
+  },
+  {
+    "name": "outlook.com",
+    "domain": "outlook.com",
+    "clientName": "אוהד זייד",
+    "clientId": "gi_31148320-e90d-4a1a-8a89-17fc18aadc4a",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.236Z",
+    "id": "proj_u3bzj7dib"
+  },
+  {
+    "name": "kiryathayovel.co.il",
+    "domain": "kiryathayovel.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.213Z",
+    "id": "proj_uhtza1es7"
+  },
+  {
+    "name": "evenlian.com",
+    "domain": "evenlian.com",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.203Z",
+    "id": "proj_v7j8quksv"
+  },
+  {
+    "name": "shilat-bakery.co.il",
+    "domain": "shilat-bakery.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"UNVERIFIED (Cloudflare Proxy - Origin לא ידוע",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.244Z",
+    "id": "proj_vgae5135t"
+  },
+  {
+    "name": "ashtrom.co.il",
+    "domain": "ashtrom.co.il",
+    "clientName": "\"אשטרום - חברה לפיתוח והשקעות בע\"\"מ\"",
+    "clientId": "",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.181Z",
+    "id": "proj_vov9uf4ic"
+  },
+  {
+    "name": "kellercpa.co.il",
+    "domain": "kellercpa.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.210Z",
+    "id": "proj_wu7fxhukz"
+  },
+  {
+    "name": "bezeqint.net",
+    "domain": "bezeqint.net",
+    "clientName": "\"בטון דרוך למזרח התיכון בע\"\"מ\"",
+    "clientId": "",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.192Z",
+    "id": "proj_ww9nbmtvp"
+  },
+  {
+    "name": "brandsplus.co.il",
+    "domain": "brandsplus.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "ARCHIVED (DNS לא מגיב - דומיין מת/פג תוקף)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.192Z",
+    "id": "proj_xdm3u0nxf"
+  },
+  {
+    "name": "gmail.com",
+    "domain": "gmail.com",
+    "clientName": "mascot",
+    "clientId": "gi_1d5bbd30-4550-495c-8b4b-b06fa12fb2a9",
+    "status": "IGNORED (דומיין חיצוני/אימייל - לא נכס HUB)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.206Z",
+    "id": "proj_xmlvt5t9m"
+  },
+  {
+    "name": "adida.co.il",
+    "domain": "adida.co.il",
+    "clientName": "עדידה בית הספר למקצועות היופי",
+    "clientId": "gi_ae85c557-f28b-4c84-abc5-f7f91f15c9c9",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.179Z",
+    "id": "proj_xwjuunqqa"
+  },
+  {
+    "name": "av-re.co.il",
+    "domain": "av-re.co.il",
+    "clientName": "אוונגרד",
+    "clientId": "gi_c32e6cf6-4344-477f-a1f6-e852de8bbfc9",
+    "status": "OBSERVED (מאומת ב-5 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.185Z",
+    "id": "proj_y0iiqyumu"
+  },
+  {
+    "name": "zoth.co.il",
+    "domain": "zoth.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.254Z",
+    "id": "proj_yas051o4g"
+  },
+  {
+    "name": "ofek-tech.co.il",
+    "domain": "ofek-tech.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.231Z",
+    "id": "proj_ybeji1zd7"
+  },
+  {
+    "name": "clickon.co.il",
+    "domain": "clickon.co.il",
+    "clientName": "לא בטוח",
+    "clientId": "",
+    "status": "\"CHURNED (IP חיצוני",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.198Z",
+    "id": "proj_yfku00hkb"
+  },
+  {
+    "name": "clalit.org",
+    "domain": "clalit.org",
+    "clientName": "כללית",
+    "clientId": "gi_18212ca0-fc61-45e4-8bcc-8cb2536019f6",
+    "status": "OBSERVED (מאומת ב-4 מקורות כולל Morning)",
+    "source": "master_ssot_csv",
+    "importedAt": "2026-09-15T19:15:41.197Z",
+    "id": "proj_zwv2kye7w"
+  }
+]

@@ -32,8 +32,8 @@ services:
     # Exposed on the host so the server's reverse proxy (nginx, outside Docker) can route
     # pos.hub.co.il/api/... to this container - previously only reachable from other containers
     # on bakrayot-proxy, which is exactly why /api/bot-data 404'd when called from the internet.
-    ports:
-      - "127.0.0.1:8787:8787"
+    # ports:
+    #  - "127.0.0.1:8787:8787"
     # Supplier invoice files. A named volume (not a container path) so the documents
     # survive image rebuilds - losing them would break the accountant package.
     volumes:
@@ -63,7 +63,7 @@ services:
         VITE_GREEN_INVOICE_URL: ${VITE_GREEN_INVOICE_URL:-}
         VITE_ENABLE_FIRESTORE_SEED: ${VITE_ENABLE_FIRESTORE_SEED:-false}
     ports:
-      - "127.0.0.1:3002:80"
+      - "127.0.0.1:8787:80"
     restart: unless-stopped
     networks:
       - bakrayot-proxy

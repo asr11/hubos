@@ -13,13 +13,19 @@ import { registerNeuralAgentsRoutes } from './routes/neuralAgentsApi.js'
 import { registerAuthRoutes } from './routes/auth.js'
 import { registerUsersRoutes } from './routes/users.js'
 import { registerCrudRoutes } from './routes/crud.js'
-
+import { registerAiLogsRoutes } from './routes/ai-logs.js'
 import { initLocalDatabase, logSystemEvent, seedSuperAdmin } from './lib/db.js'
+import { startAutonomyEngine } from './jobs/index.js'
 
 export async function buildApp() {
   initLocalDatabase()
   seedSuperAdmin()
   logSystemEvent('SYSTEM_START', 'SERVER', 'SQLite local database initialized successfully')
+  
+  if (env.isDev && process.env.DISABLE_AUTONOMY !== 'true') {
+    startAutonomyEngine(5 * 60 * 1000); // 5 minutes
+  }
+
 
   const app = Fastify({
     logger: {
@@ -47,6 +53,7 @@ export async function buildApp() {
   await registerAuthRoutes(app)
   await registerUsersRoutes(app)
   await registerCrudRoutes(app)
+  await registerAiLogsRoutes(app)
 
   app.setNotFoundHandler((_req, reply) => {
     reply.code(404).send({ ok: false, error: 'not_found', message: 'נתיב לא קיים' })

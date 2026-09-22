@@ -448,7 +448,10 @@ export function Layout() {
                   }
                 >
                   {can('/users') && <NavSubLink to="/users" label="משתמשים" />}
-                  {can('/agents-admin') && <NavSubLink to="/agents" label="סוכני מכירות (AI)" />}
+                  {can('/agents') && <NavSubLink to="/agents" label="סוכנים חכמים (Agents)" />}
+                  {can('/agents/network') && <NavSubLink to="/agents/network" label="רשת סוכנים (Network)" />}
+                  {can('/ceo') && <NavSubLink to="/ceo" label="Digital CEO" />}
+                  {can('/ai-roi') && <NavSubLink to="/ai-roi" label="AI יחס המרה ויעילות" />}
                 </NavExpandableGroup>
               )}
             </nav>

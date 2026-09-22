@@ -1,0 +1,19 @@
+[
+  {
+    "syncState": {
+      "lastSyncAt": "2026-09-14T12:59:38.394Z",
+      "lastFromDate": "2026-02-01",
+      "lastToDate": "2026-09-14",
+      "lastFetched": 197,
+      "lastImported": 191,
+      "lastRemoved": 6,
+      "lastUnmatchedClients": 6,
+      "lastClientsFetched": 285,
+      "lastClientsCreated": 0,
+      "lastClientsUpdated": 285,
+      "lastClientsActive": 76,
+      "lastClientsInactive": 209
+    },
+    "id": "morning"
+  }
+]
