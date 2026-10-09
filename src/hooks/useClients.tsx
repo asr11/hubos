@@ -189,6 +189,10 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
     [clients, loading, error, addClient, updateClient, deleteClient],
   )
 
+  if (error) {
+    throw new Error('שגיאת תקשורת במסד נתונים: ' + error.message)
+  }
+
   return (
     <ClientsContext.Provider value={value}>{children}</ClientsContext.Provider>
   )

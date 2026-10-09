@@ -2312,3 +2312,29 @@
   "total_incomes": 442,
   "total_expenses": 165
 }
+{
+  "status": "success",
+  "timestamp": "2026-10-09_14-00-01",
+  "backup_path": "/home/asr11/02_HUB_Dev/os.hub.co.il/backups/2026/10/09/os_hub_backup_2026-10-09_14-00-01",
+  "master_excel": "/home/asr11/02_HUB_Dev/os.hub.co.il/backups/2026/10/09/os_hub_backup_2026-10-09_14-00-01/master_excel/os_hub_master_backup_2026-10-09_14-00-01.xlsx",
+  "collections_count": 9,
+  "total_clients": 285,
+  "total_leads": 0,
+  "total_tasks": 0,
+  "total_projects": 108,
+  "total_incomes": 1752,
+  "total_expenses": 165
+}
+{
+  "status": "success",
+  "timestamp": "2026-10-09_15-00-00",
+  "backup_path": "/home/asr11/02_HUB_Dev/os.hub.co.il/backups/2026/10/09/os_hub_backup_2026-10-09_15-00-00",
+  "master_excel": "/home/asr11/02_HUB_Dev/os.hub.co.il/backups/2026/10/09/os_hub_backup_2026-10-09_15-00-00/master_excel/os_hub_master_backup_2026-10-09_15-00-00.xlsx",
+  "collections_count": 9,
+  "total_clients": 285,
+  "total_leads": 0,
+  "total_tasks": 0,
+  "total_projects": 108,
+  "total_incomes": 1752,
+  "total_expenses": 165
+}

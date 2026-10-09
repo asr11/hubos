@@ -720,8 +720,6 @@ export interface Client {
   city?: string
   /** הערות פנימיות על העסק */
   businessNotes?: string
-  /** יתרת חוב פתוחה מהכנסות (תשלום חלקי) — ₪ */
-  financeBalance?: number
   /** מזהה הלקוח בחשבונית ירוקה — כשסונכרן משם */
   greenInvoiceId?: string
   /** מקור הלקוח — 'green_invoice' = סונכרן מחשבונית ירוקה */

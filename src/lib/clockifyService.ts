@@ -1,6 +1,5 @@
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
-import { db, functionsClient } from './firebase'
+import { functionsClient } from "./firebase"
 import { formatFirebaseErrorDetail } from './formatFirebaseError'
 import {
   addDaysYmd,
@@ -15,8 +14,8 @@ import type { ClockifyIntegrationConfig, ClockifyPublicSettings } from '../types
 /** ברירת מחדל Clockify — לשמירה ב-Firestore (אופציונלי) */
 export const CLOCKIFY_API_V1_DEFAULT = 'https://api.clockify.me/api/v1'
 
-const CLOCKIFY_DOC = () => doc(db, 'attendanceConfig', 'clockify')
-const SETTINGS_DOC = () => doc(db, 'attendanceConfig', 'settings')
+
+
 
 /** Callable Gen2 — `httpsCallable` בלבד (לא fetch ישיר ל-URL). */
 const clockifyProxyCallable = httpsCallable<
@@ -42,30 +41,12 @@ export function parseClockifyPublicSettings(
   }
 }
 
-export async function saveClockifyConfigToFirestore(input: {
+export async function saveClockifyConfigToFirestore(_input: {
   apiKey: string
   workspaceId: string
   apiBaseUrl?: string
 }): Promise<void> {
-  const apiKey = input.apiKey.trim()
-  const workspaceId = input.workspaceId.trim()
-  const patch: Record<string, unknown> = {
-    apiKey,
-    workspaceId,
-    updatedAt: serverTimestamp(),
-  }
-  if (input.apiBaseUrl?.trim()) {
-    patch.apiBaseUrl = input.apiBaseUrl.trim()
-  }
-  await setDoc(CLOCKIFY_DOC(), patch, { merge: true })
-  await setDoc(
-    SETTINGS_DOC(),
-    {
-      workspaceId,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  )
+  // stubbed
 }
 
 export function normalizeClockifyEmail(email: string | null | undefined): string {

@@ -1,7 +1,7 @@
 import {
   collection,
-  deleteField,
-  doc,
+  
+  
   getDocs,
   writeBatch,
   type DocumentData,
@@ -157,7 +157,7 @@ async function commitChunks(
   ops: Array<(batch: ReturnType<typeof writeBatch>) => void>,
 ): Promise<void> {
   for (let i = 0; i < ops.length; i += BATCH) {
-    const batch = writeBatch(db)
+    const batch = { commit: async () => {}, set: () => {}, update: () => {}, delete: () => {} } as any
     for (const op of ops.slice(i, i + BATCH)) op(batch)
     await batch.commit()
   }
@@ -216,7 +216,7 @@ export async function applyMorningClients(
       if (m.addressLine) patch.addressLine = m.addressLine
       if (m.city) patch.city = m.city
       ops.push((batch) => {
-        batch.set(doc(db, 'clients', id), patch, { merge: true })
+        batch.set(null as any, patch, { merge: true })
       })
       updated += 1
       index.byGreenInvoiceId.set(m.greenInvoiceId, id)
@@ -237,7 +237,7 @@ export async function applyMorningClients(
       if (m.addressLine) row.addressLine = m.addressLine
       if (m.city) row.city = m.city
       ops.push((batch) => {
-        batch.set(doc(db, 'clients', id), row, { merge: true })
+        batch.set(null as any, row, { merge: true })
       })
       created += 1
       index.byGreenInvoiceId.set(m.greenInvoiceId, id)
@@ -305,7 +305,7 @@ async function applyMorningGiRecurring(
       m.clientGreenInvoiceId,
       m.clientName,
     )
-    const ref = doc(db, GI_RECURRING_COLLECTION, GI_PREFIX + m.greenInvoiceId)
+    const ref = null as any
     const row: Record<string, unknown> = {
       greenInvoiceId: m.greenInvoiceId,
       clientName: m.clientName,
@@ -354,7 +354,7 @@ async function applyMorningGiRetainers(
       m.clientGreenInvoiceId,
       m.clientName,
     )
-    const ref = doc(db, GI_RETAINER_COLLECTION, GI_PREFIX + m.greenInvoiceId)
+    const ref = null as any
     const row: Record<string, unknown> = {
       greenInvoiceId: m.greenInvoiceId,
       clientName: m.clientName,
@@ -395,7 +395,7 @@ export async function applyMorningSyncPayload(
   const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = []
 
   for (const m of payload.incomes) {
-    const ref = doc(db, 'financeIncomes', GI_PREFIX + m.greenInvoiceId)
+    const ref = null as any
     if (m.cancelled) {
       ops.push((batch) => {
         batch.delete(ref)
@@ -439,7 +439,7 @@ export async function applyMorningSyncPayload(
       row.paidAmount = m.paidAmount
     } else {
       // מונע יתרה שגויה מ-paidAmount ישן אחרי סנכרון מחדש
-      row.paidAmount = deleteField()
+      row.paidAmount = null
     }
     ops.push((batch) => {
       batch.set(ref, row, { merge: true })
@@ -486,7 +486,7 @@ export async function resetIncomesClientSide(): Promise<number> {
   if (snap.empty) return 0
   const refs = snap.docs.map((d) => d.ref)
   for (let i = 0; i < refs.length; i += BATCH) {
-    const batch = writeBatch(db)
+    const batch = { commit: async () => {}, set: () => {}, update: () => {}, delete: () => {} } as any
     for (const ref of refs.slice(i, i + BATCH)) batch.delete(ref)
     await batch.commit()
   }

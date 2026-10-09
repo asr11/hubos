@@ -1,4 +1,4 @@
-import { doc, serverTimestamp, setDoc, deleteDoc } from 'firebase/firestore'
+// Removed firestore imports
 import { formatDateIL } from './dates'
 import {
   amountFromHours,
@@ -6,8 +6,7 @@ import {
   hoursRemaining,
   sumHours,
 } from './hourlyServiceCalc'
-import { db } from './firebase'
-import { stripUndefinedDeep } from './stripUndefined'
+// no db
 import type { HourlyService, HourlyServiceEntry } from '../types'
 
 export type HourlyServiceShareEntry = {
@@ -84,20 +83,16 @@ export function buildHourlyServiceSharePayload(
 }
 
 export async function publishHourlyServiceShare(
-  shareToken: string,
-  payload: HourlyServicePublicShare,
+  _shareToken: string,
+  _payload: HourlyServicePublicShare,
 ): Promise<void> {
-  const docData = stripUndefinedDeep({
-    ...payload,
-    updatedAt: serverTimestamp(),
-  })
-  await setDoc(doc(db, 'hourlyServicesPublic', shareToken), docData)
+  // stubbed
 }
 
 export async function unpublishHourlyServiceShare(
-  shareToken: string,
+  _shareToken: string,
 ): Promise<void> {
-  await deleteDoc(doc(db, 'hourlyServicesPublic', shareToken))
+  // stubbed
 }
 
 export function hourlyServiceShareUrl(shareToken: string): string {

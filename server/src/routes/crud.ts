@@ -11,14 +11,37 @@ function safeParseJson(data: string): Record<string, unknown> {
   }
 }
 
+async function fetchAll(stmt: any, ...params: any[]) {
+  const bound = params.length > 0 && typeof stmt.bind === 'function' ? stmt.bind(...params) : stmt;
+  const res = await bound.all();
+  return (res && Array.isArray(res.results)) ? res.results : (Array.isArray(res) ? res : []);
+}
+
+async function fetchFirst(stmt: any, ...params: any[]) {
+  const bound = params.length > 0 && typeof stmt.bind === 'function' ? stmt.bind(...params) : stmt;
+  let res;
+  if (typeof bound.first === 'function') {
+    res = await bound.first();
+  } else if (typeof bound.get === 'function') {
+    res = await bound.get();
+  }
+  return res;
+}
+
+async function executeRun(stmt: any, ...params: any[]) {
+  const bound = params.length > 0 && typeof stmt.bind === 'function' ? stmt.bind(...params) : stmt;
+  return await bound.run();
+}
+
 export async function registerCrudRoutes(app: FastifyInstance): Promise<void> {
   // Get all documents for a collection
   app.get('/api/:collection', { preHandler: requireAuth }, async (req, _reply) => {
     const { collection } = req.params as { collection: string }
     const stmt = db.prepare('SELECT id, data FROM generic_documents WHERE collection = ?')
-    let rows = stmt.all(collection) as { id: string; data: string }[]
+    let rows = (await fetchAll(stmt, collection)) as { id: string; data: string }[]
     if (rows.length === 0 && collection === 'financeIncomes') {
-      rows = stmt.all('invoices') as { id: string; data: string }[]
+      const stmtInvoices = db.prepare('SELECT id, data FROM generic_documents WHERE collection = ?')
+      rows = (await fetchAll(stmtInvoices, 'invoices')) as { id: string; data: string }[]
     }
     const results = rows.map(r => ({ id: r.id, ...safeParseJson(r.data) }))
     return results
@@ -28,9 +51,10 @@ export async function registerCrudRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/:collection/:id', { preHandler: requireAuth }, async (req, reply) => {
     const { collection, id } = req.params as { collection: string; id: string }
     const stmt = db.prepare('SELECT data FROM generic_documents WHERE collection = ? AND id = ?')
-    let row = stmt.get(collection, id) as { data: string } | undefined
+    let row = (await fetchFirst(stmt, collection, id)) as { data: string } | undefined
     if (!row && collection === 'financeIncomes') {
-      row = stmt.get('invoices', id) as { data: string } | undefined
+      const stmtInvoices = db.prepare('SELECT data FROM generic_documents WHERE collection = ? AND id = ?')
+      row = (await fetchFirst(stmtInvoices, 'invoices', id)) as { data: string } | undefined
     }
     if (!row) {
       reply.code(404).send({ error: 'Not found' })
@@ -50,7 +74,7 @@ export async function registerCrudRoutes(app: FastifyInstance): Promise<void> {
     delete dataToSave.id
     
     const stmt = db.prepare('INSERT INTO generic_documents (id, collection, data) VALUES (?, ?, ?)')
-    stmt.run(id, collection, JSON.stringify(dataToSave))
+    await executeRun(stmt, id, collection, JSON.stringify(dataToSave))
     return { id, ...dataToSave }
   })
 
@@ -68,7 +92,7 @@ export async function registerCrudRoutes(app: FastifyInstance): Promise<void> {
       VALUES (?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET data = excluded.data
     `)
-    stmt.run(id, collection, JSON.stringify(dataToSave))
+    await executeRun(stmt, id, collection, JSON.stringify(dataToSave))
     return { id, ...dataToSave }
   })
   
@@ -79,7 +103,7 @@ export async function registerCrudRoutes(app: FastifyInstance): Promise<void> {
     
     // Get existing
     const getStmt = db.prepare('SELECT data FROM generic_documents WHERE collection = ? AND id = ?')
-    const row = getStmt.get(collection, id) as { data: string } | undefined
+    const row = (await fetchFirst(getStmt, collection, id)) as { data: string } | undefined
     
     let dataToSave = { ...body }
     delete dataToSave.id
@@ -93,7 +117,7 @@ export async function registerCrudRoutes(app: FastifyInstance): Promise<void> {
       VALUES (?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET data = excluded.data
     `)
-    stmt.run(id, collection, JSON.stringify(dataToSave))
+    await executeRun(stmt, id, collection, JSON.stringify(dataToSave))
     return { id, ...dataToSave }
   })
 
@@ -101,7 +125,7 @@ export async function registerCrudRoutes(app: FastifyInstance): Promise<void> {
   app.delete('/api/:collection/:id', { preHandler: requireAuth }, async (req, _reply) => {
     const { collection, id } = req.params as { collection: string; id: string }
     const stmt = db.prepare('DELETE FROM generic_documents WHERE collection = ? AND id = ?')
-    stmt.run(collection, id)
+    await executeRun(stmt, collection, id)
     return { success: true }
   })
 }

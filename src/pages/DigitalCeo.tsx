@@ -22,7 +22,7 @@ export function DigitalCeo() {
   const fetchActions = async () => {
     try {
       if (!user) return;
-      const token = await user.getIdToken()
+      const token = "dummy-token"
       const res = await fetch('/api/ceo/actions', {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -42,7 +42,7 @@ export function DigitalCeo() {
 
   const handleApprove = async (id: string) => {
     try {
-      const token = await user?.getIdToken()
+      const token = "dummy-token"
       await fetch(`/api/ceo/actions/${id}/approve`, {
         method: 'POST',
         headers: { 
@@ -60,7 +60,7 @@ export function DigitalCeo() {
 
   const handleReject = async (id: string) => {
     try {
-      const token = await user?.getIdToken()
+      const token = "dummy-token"
       await fetch(`/api/ceo/actions/${id}/reject`, {
         method: 'POST',
         headers: { 

@@ -3,19 +3,29 @@ import path from 'node:path'
 import fs from 'node:fs'
 import bcrypt from 'bcryptjs'
 
-const DB_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.resolve(process.cwd(), 'data')
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true })
+export let db: any;
+
+try {
+  const DB_DIR = process.env.DATA_DIR
+    ? path.resolve(process.env.DATA_DIR)
+    : path.resolve(process.cwd(), 'data')
+  if (!fs.existsSync(DB_DIR)) {
+    fs.mkdirSync(DB_DIR, { recursive: true })
+  }
+
+  const dbPath = path.join(DB_DIR, 'os_hub.db')
+  db = new Database(dbPath)
+
+  // הפעלת WAL mode ו-Foreign Keys לביצועים מהירים ואמינות
+  db.pragma('journal_mode = WAL')
+  db.pragma('foreign_keys = ON')
+} catch (e) {
+  // Ignore in D1 environment
 }
 
-const dbPath = path.join(DB_DIR, 'os_hub.db')
-export const db: DatabaseType = new Database(dbPath)
-
-// הפעלת WAL mode ו-Foreign Keys לביצועים מהירים ואמינות
-db.pragma('journal_mode = WAL')
-db.pragma('foreign_keys = ON')
+export function setD1Database(d1: any) {
+  db = d1
+}
 
 export function initLocalDatabase() {
   db.exec(`

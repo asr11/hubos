@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { deleteField } from 'firebase/firestore'
+
 import { useClients } from '../hooks/useClients'
 import { useProjects } from '../hooks/useProjects'
 import { useSuppliers } from '../hooks/useSuppliers'
@@ -230,17 +230,17 @@ export function Campaigns() {
       kind: editKind,
       platform: editPlatform,
       status: editStatus,
-      budget: editBudget.trim() ? budgetNum : deleteField(),
-      startDate: editStartDate.trim() ? editStartDate.trim() : deleteField(),
-      endDate: editEndDate.trim() ? editEndDate.trim() : deleteField(),
-      clientId: editClientId.trim() ? editClientId.trim() : deleteField(),
-      projectId: editProjectId.trim() ? editProjectId.trim() : deleteField(),
-      supplierId: editSupplierId.trim() ? editSupplierId.trim() : deleteField(),
+      budget: editBudget.trim() ? budgetNum : null,
+      startDate: editStartDate.trim() ? editStartDate.trim() : null,
+      endDate: editEndDate.trim() ? editEndDate.trim() : null,
+      clientId: editClientId.trim() ? editClientId.trim() : null,
+      projectId: editProjectId.trim() ? editProjectId.trim() : null,
+      supplierId: editSupplierId.trim() ? editSupplierId.trim() : null,
       performerUserId: shouldPickPerformerForEdit
         ? editPerformerUserId.trim()
           ? editPerformerUserId.trim()
-          : deleteField()
-        : deleteField(),
+          : null
+        : null,
     }
     await updateCampaign(editingId, patch as Partial<Campaign>)
     closeEdit()

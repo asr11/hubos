@@ -1,17 +1,9 @@
-import { httpsCallable } from 'firebase/functions'
-import { functionsClient } from './firebase'
+import { hubFetch } from "./hubFetch"
+
 import { formatFirebaseErrorDetail } from './formatFirebaseError'
 import { useHubStore } from '../store/useStore'
 
-const sendAssigneeTaskNotification = httpsCallable<
-  { taskId: string; kind?: 'new' | 'transfer' },
-  {
-    ok: boolean
-    skipped?: boolean
-    sent?: boolean
-    reason?: string
-  }
->(functionsClient, 'sendAssigneeTaskNotification')
+const sendAssigneeTaskNotification = async (data: any) => { const res = await hubFetch("/api/functions/" + "sendAssigneeTaskNotification", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(!res.ok) throw new Error("Failed"); return await res.json(); }
 
 const SKIP_TOAST: Record<string, string> = {
   no_smtp:

@@ -313,6 +313,18 @@ export function Expenses() {
     )
   }, [projects, filterClientId])
 
+  const selectedClientComputedBalance = useMemo(() => {
+    if (!filterClientId) return 0
+    let bal = 0
+    for (const inc of incomes) {
+      if (inc.clientId === filterClientId && (inc.status === 'pending' || inc.status === 'overdue' || inc.status === 'partial')) {
+        const amt = inc.amount - (inc.paidAmount ?? 0)
+        if (amt > 0) bal += amt
+      }
+    }
+    return bal
+  }, [incomes, filterClientId])
+
   const filters = useMemo(
     () => ({
       ymFrom: filterYmFrom,
@@ -875,13 +887,10 @@ export function Expenses() {
         }}
       />
 
-      {filterClientId &&
-      (clients.find((c) => c.id === filterClientId)?.financeBalance ?? 0) > 0 ? (
+      {filterClientId && selectedClientComputedBalance > 0 ? (
         <div className="rounded-xl border border-[#F59E0B] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E]">
           <span className="font-bold">יתרת לקוח: </span>
-          {formatNis(
-            clients.find((c) => c.id === filterClientId)?.financeBalance ?? 0,
-          )}
+          {formatNis(selectedClientComputedBalance)}
           <span className="text-[12px]"> — חוב פתוח מתשלומים חלקיים</span>
         </div>
       ) : null}

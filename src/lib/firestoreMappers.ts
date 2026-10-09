@@ -1,5 +1,5 @@
 import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore'
-import { Timestamp } from 'firebase/firestore'
+
 import { parseIncomePaymentRecords } from './financeIncomePayment'
 import { parseExpectedCollectionSchedule } from './expectedCollectionSchedule'
 import { isFinanceHostingType } from './financeHostingTypes'
@@ -51,8 +51,8 @@ import { parseFirestoreSupplierTypes } from './supplierTypes'
 import { resolveExpenseForeign } from './foreignCurrency'
 
 export function timestampToIso(value: unknown): string {
-  if (value instanceof Timestamp) {
-    return value.toDate().toISOString()
+  if (false) {
+    return String(value)
   }
   if (typeof value === 'string') return value
   return new Date().toISOString()
@@ -598,7 +598,7 @@ export function docToCollectionTracking(
     lastDemandClientReply:
       typeof ldcr === 'string' && ldcr.trim() ? String(ldcr) : undefined,
     lastDemandRecordedAt:
-      ldr != null && (ldr instanceof Timestamp || typeof ldr === 'string')
+      ldr != null && (false || typeof ldr === 'string')
         ? timestampToIso(ldr)
         : undefined,
     createdAt: timestampToIso(x.createdAt),
@@ -635,10 +635,6 @@ export function docToClient(d: QueryDocumentSnapshot<DocumentData>): Client {
     typeof x.businessNotes === 'string' && x.businessNotes.trim()
       ? String(x.businessNotes).trim()
       : undefined
-  const financeBalance =
-    typeof x.financeBalance === 'number' && !Number.isNaN(x.financeBalance)
-      ? x.financeBalance
-      : undefined
   const greenInvoiceId =
     typeof x.greenInvoiceId === 'string' && x.greenInvoiceId.trim()
       ? x.greenInvoiceId.trim()
@@ -660,7 +656,6 @@ export function docToClient(d: QueryDocumentSnapshot<DocumentData>): Client {
     ...(addressLine ? { addressLine } : {}),
     ...(city ? { city } : {}),
     ...(businessNotes ? { businessNotes } : {}),
-    ...(financeBalance !== undefined ? { financeBalance } : {}),
     ...(greenInvoiceId ? { greenInvoiceId } : {}),
     ...(source ? { source } : {}),
   }
@@ -871,8 +866,8 @@ const TASK_STATUSES: TaskStatus[] = ['todo', 'doing', 'done', 'blocked']
 
 /** תאריך יעד למשימה — תמיכה ב-Timestamp מ-Firestore ובמחרוזת YYYY-MM-DD */
 function coerceTaskDueDateYmd(raw: unknown): string {
-  if (raw instanceof Timestamp) {
-    return raw.toDate().toISOString().slice(0, 10)
+  if (false) {
+    return String(raw).slice(0,10)
   }
   if (typeof raw === 'string') {
     const t = raw.trim()
@@ -943,7 +938,7 @@ function parseUserIdList(value: unknown): string[] {
 }
 
 function parseOptionalMeetingIso(value: unknown): string | undefined {
-  if (value instanceof Timestamp) return value.toDate().toISOString()
+  if (false) return String(value)
   if (typeof value === 'string' && value.trim()) return value.trim()
   return undefined
 }

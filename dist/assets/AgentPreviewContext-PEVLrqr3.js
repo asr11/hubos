@@ -1,1 +1,0 @@
-import{a as e,n as t,t as n}from"./jsx-runtime--AOyvnT1.js";import{a as r}from"./fsToast-DqNgM2k7.js";var i=e(t(),1),a=n(),o=(0,i.createContext)(null);function s({agentUserId:e,children:t}){return(0,a.jsx)(o.Provider,{value:e,children:t})}function c(){return(0,i.useContext)(o)}function l(){let e=c(),{user:t}=r();return e??t?.uid??``}export{l as n,s as t};

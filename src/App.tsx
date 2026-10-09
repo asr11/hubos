@@ -14,7 +14,6 @@ const AgentBusinessPage = lazy(() => import('./pages/agent/AgentBusinessPage').t
 const AgentFinancePage = lazy(() => import('./pages/agent/AgentFinancePage').then(m => ({ default: m.AgentFinancePage })))
 const AgentsAdmin = lazy(() => import('./pages/AgentsAdmin').then(m => ({ default: m.AgentsAdmin })))
 const AgentsNeuralNetwork = lazy(() => import('./pages/AgentsNeuralNetwork').then(m => ({ default: m.AgentsNeuralNetwork })))
-const AiEfficiencyDashboard = lazy(() => import('./pages/AiEfficiencyDashboard').then(m => ({ default: m.AiEfficiencyDashboard })))
 const Clients = lazy(() => import('./pages/Clients').then(m => ({ default: m.Clients })))
 const Collections = lazy(() => import('./pages/Collections').then(m => ({ default: m.Collections })))
 import { Dashboard } from './pages/Dashboard'
@@ -203,14 +202,7 @@ export default function App() {
                       </RequireAdmin>
                     }
                   />
-                  <Route
-                    path="ai-roi"
-                    element={
-                      <RequireAdmin>
-                        <AiEfficiencyDashboard />
-                      </RequireAdmin>
-                    }
-                  />
+
                   <Route path="attendance" element={<Attendance />} />
                   <Route path="vault" element={<Vault />} />
                   <Route

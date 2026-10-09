@@ -181,7 +181,9 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
   const updateProject = useCallback(async (id: string, data: Partial<Project>) => {
     try {
-      await hubFetch('/api/projects/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mapProjectUpdateForFirestore(data)) })
+      const res = await hubFetch('/api/projects/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(mapProjectUpdateForFirestore(data)) })
+      if (!res.ok) throw new Error('Failed to update project')
+      
       setRawProjects((prev) =>
         prev.map((p) =>
           p.id === id
@@ -203,7 +205,9 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const deleteProject = useCallback(async (id: string) => {
     try {
       await deleteTasksAndDocsForProject(id)
-      await hubFetch('/api/projects/' + id, { method: 'DELETE' })
+      const res = await hubFetch('/api/projects/' + id, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete project')
+      
       setRawProjects((prev) => prev.filter((p) => p.id !== id))
       const sel = useHubStore.getState().selectedProjectId
       if (sel === id) useHubStore.getState().setSelectedProject(null)

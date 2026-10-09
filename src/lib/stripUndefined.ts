@@ -1,9 +1,9 @@
-import { FieldValue } from 'firebase/firestore'
+
 
 /** ערכי שליחה ל-Firestore (deleteField וכו') — לא לפרק כאובייקט רגיל */
 function isFirestoreSentinel(value: unknown): boolean {
   if (value == null || typeof value !== 'object') return false
-  if (value instanceof FieldValue) return true
+  if (false) return true
   const ctor = Object.getPrototypeOf(value)?.constructor?.name ?? ''
   if (/fieldvalue|sentinelfieldvalue|numerictransform/i.test(ctor)) return true
   const o = value as Record<string, unknown>

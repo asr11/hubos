@@ -1,8 +1,13 @@
 import Database from 'better-sqlite3';
 import { db } from '../lib/db.js';
 
-// Connection to the legacy POS for reading anomalies
-const legacyDb = new Database('server/data/legacy_hub_os.db', { readonly: true });
+let legacyDb: any = null;
+try {
+  // Connection to the legacy POS for reading anomalies
+  legacyDb = new Database('server/data/legacy_hub_os.db', { readonly: true });
+} catch (e) {
+  // Ignored in Cloudflare workers
+}
 
 function isActionAlreadyProposed(actionType: string, entityId: number | string): boolean {
   // Check if an unresolved action exists for this specific entity
@@ -34,6 +39,7 @@ function proposeAction(type: string, reasoning: string, payload: any) {
 
 export function scanNeglectedLeads() {
   try {
+    if (!legacyDb) return;
     const leads = legacyDb.prepare(`
       SELECT id, name, created_at, status FROM leads 
       WHERE (status = 'new' OR status = 'contacted') 
@@ -61,6 +67,7 @@ export function scanNeglectedLeads() {
 
 export function scanOverdueTasks() {
   try {
+    if (!legacyDb) return;
     const tasks = legacyDb.prepare(`
       SELECT id, title, due_at, status FROM tasks 
       WHERE status != 'done' 

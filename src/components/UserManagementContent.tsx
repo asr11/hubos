@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { httpsCallable } from 'firebase/functions'
+import { hubFetch } from "../lib/hubFetch"
 import { useAuth } from '../contexts/AuthContext'
 import { useUsers } from '../hooks/useUsers'
-import { functionsClient } from '../lib/firebase'
+
 import { toastFsError, toastFsSuccess } from '../lib/fsToast'
 import type { TeamMember } from '../types'
 import { AGENT_COMMISSION_PERCENT_FALLBACK } from '../lib/agentRevenue'
@@ -245,18 +245,9 @@ export function UserManagementContent() {
     cancelEdit()
   }
 
-  const createManagedUser = httpsCallable<
-    { email: string; password: string; name: string; role: TeamRole; isAgent?: boolean },
-    { uid: string }
-  >(functionsClient, 'createManagedUser')
-  const updateManagedUserEmail = httpsCallable<
-    { uid: string; email: string },
-    { ok: true }
-  >(functionsClient, 'updateManagedUserEmail')
-  const updateManagedUserPassword = httpsCallable<
-    { uid: string; password: string },
-    { ok: true }
-  >(functionsClient, 'updateManagedUserPassword')
+  const createManagedUser = async (data: any) => { const res = await hubFetch("/api/functions/" + "createManagedUser", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(!res.ok) throw new Error("Failed"); return await res.json(); }
+  const updateManagedUserEmail = async (data: any) => { const res = await hubFetch("/api/functions/" + "updateManagedUserEmail", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(!res.ok) throw new Error("Failed"); return await res.json(); }
+  const updateManagedUserPassword = async (data: any) => { const res = await hubFetch("/api/functions/" + "updateManagedUserPassword", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(!res.ok) throw new Error("Failed"); return await res.json(); }
 
   const createUser = async () => {
     const email = newEmail.trim()

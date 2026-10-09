@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { deleteField } from 'firebase/firestore'
+
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { addDaysYmd, formatDateIL, todayYmd } from '../lib/dates'
@@ -330,13 +330,13 @@ export function Projects() {
     }
     const supplierPatch = form.supplierId
       ? { supplierId: form.supplierId }
-      : { supplierId: deleteField() as unknown as string }
-    /** deleteField() מותר רק ב-updateDoc — לא ב-addDoc */
+      : { supplierId: null as unknown as string }
+    /** null מותר רק ב-updateDoc — לא ב-addDoc */
     const clientPatchUpdate: Record<string, unknown> =
       form.type === 'internal'
         ? form.clientId.trim()
           ? { clientId: form.clientId.trim() }
-          : { clientId: deleteField() }
+          : { clientId: null }
         : { clientId: form.clientId.trim() }
 
     const editingProject = editingId
@@ -345,7 +345,7 @@ export function Projects() {
 
     const descPatch = form.description.trim()
       ? { description: form.description.trim() }
-      : { description: deleteField() as unknown as string }
+      : { description: null as unknown as string }
 
     setSaving(true)
     try {
@@ -364,8 +364,8 @@ export function Projects() {
             ownerId: form.ownerId,
             color: form.color,
             projectType: 'retainer',
-            retainerAmount: deleteField() as unknown as number,
-            subContractor: deleteField() as unknown as string,
+            retainerAmount: null as unknown as number,
+            subContractor: null as unknown as string,
             startDate: start,
             dueDate: start,
             ...(editingProject?.projectType !== 'retainer'
@@ -385,10 +385,10 @@ export function Projects() {
             color: form.color,
             projectType: 'one-time',
             dueDate: form.dueDate.slice(0, 10),
-            retainerAmount: deleteField() as unknown as number,
-            subContractor: deleteField() as unknown as string,
-            startDate: deleteField() as unknown as string,
-            retainerLog: deleteField() as unknown as [],
+            retainerAmount: null as unknown as number,
+            subContractor: null as unknown as string,
+            startDate: null as unknown as string,
+            retainerLog: null as unknown as [],
           } as Partial<Project>)
         }
         if (ok) setModalOpen(false)
@@ -759,7 +759,7 @@ export function Projects() {
                       v === null
                         ? {
                             manualProgressPercent:
-                              deleteField() as unknown as number,
+                              null as unknown as number,
                           }
                         : { manualProgressPercent: v },
                     )

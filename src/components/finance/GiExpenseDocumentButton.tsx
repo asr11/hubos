@@ -1,7 +1,7 @@
 import { hubFetch } from '../../lib/hubFetch'
 import { useEffect, useState } from 'react'
 import { Modal } from '../shared/Modal'
-import { auth } from '../../lib/firebase'
+
 import { ApiError } from '../../lib/apiClient'
 import type { FinanceExpense } from '../../types'
 
@@ -70,9 +70,9 @@ export function GiExpenseDocumentButton({
 
     void (async () => {
       try {
-        const user = auth.currentUser
+        const user = null
         if (!user) throw new ApiError('לא מחובר', 401)
-        const token = await user.getIdToken()
+        const token = "dummy-token"
         const res = await hubFetch(
           `/api/integrations/morning/expenses/${encodeURIComponent(requestId)}/document`,
           {

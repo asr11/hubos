@@ -87,3 +87,15 @@ export function morningEnvConfigured(): boolean {
 export function morningConfigured(): boolean {
   return morningEnvConfigured()
 }
+
+export function injectCloudflareEnv(cfEnv: any) {
+  const mutEnv = env as any;
+  if (cfEnv.MORNING_ENV) mutEnv.morning.env = cfEnv.MORNING_ENV;
+  if (cfEnv.MORNING_KEY_ID) mutEnv.morning.keyId = cfEnv.MORNING_KEY_ID;
+  if (cfEnv.MORNING_KEY_SECRET) mutEnv.morning.keySecret = cfEnv.MORNING_KEY_SECRET;
+  if (cfEnv.BOT_API_KEY) mutEnv.botApiKey = cfEnv.BOT_API_KEY;
+  if (cfEnv.FIREBASE_SERVICE_ACCOUNT_JSON) mutEnv.firebaseServiceAccountJson = cfEnv.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (cfEnv.FIREBASE_SERVICE_ACCOUNT_B64) mutEnv.firebaseServiceAccountB64 = cfEnv.FIREBASE_SERVICE_ACCOUNT_B64;
+  if (cfEnv.ADMIN_EMAILS) mutEnv.adminEmails = cfEnv.ADMIN_EMAILS.split(',').map((s: string) => s.trim().toLowerCase());
+  if (cfEnv.CORS_ORIGINS) mutEnv.corsOrigins = cfEnv.CORS_ORIGINS.split(',').map((s: string) => s.trim());
+}

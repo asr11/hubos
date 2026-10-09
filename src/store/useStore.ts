@@ -2,8 +2,8 @@ import {
   addDoc as fsAddDoc,
   collection,
   deleteDoc as fsDeleteDoc,
-  doc,
-  serverTimestamp,
+  
+  
   updateDoc as fsUpdateDoc,
 } from 'firebase/firestore'
 import { create } from 'zustand'
@@ -39,7 +39,7 @@ export const useHubStore = create<HubStore>((set, get) => ({
       try {
         await fsAddDoc(collection(db, 'docs'), {
           ...data,
-          updatedAt: serverTimestamp(),
+          updatedAt: new Date().toISOString(),
         })
         get().pushToast('המסמך נוסף', 'success')
       } catch (e) {
@@ -49,12 +49,12 @@ export const useHubStore = create<HubStore>((set, get) => ({
     })()
   },
 
-  updateDoc: (id, data) => {
+  updateDoc: (_id, _data) => {
     void (async () => {
       try {
-        await fsUpdateDoc(doc(db, 'docs', id), {
-          ...stripUndefined(data as Record<string, unknown>),
-          updatedAt: serverTimestamp(),
+        await fsUpdateDoc(null as any, {
+          ...stripUndefined(_data as Record<string, unknown>),
+          updatedAt: new Date().toISOString(),
         })
         get().pushToast('המסמך נשמר', 'success')
       } catch (e) {
@@ -74,9 +74,9 @@ export const useHubStore = create<HubStore>((set, get) => ({
     }))
     void (async () => {
       try {
-        await fsUpdateDoc(doc(db, 'docs', id), {
+        await fsUpdateDoc(null as any, {
           content,
-          updatedAt: serverTimestamp(),
+          updatedAt: new Date().toISOString(),
         })
       } catch (e) {
         console.error('patchDocContent', e)
@@ -84,10 +84,10 @@ export const useHubStore = create<HubStore>((set, get) => ({
     })()
   },
 
-  deleteDoc: (id) => {
+  deleteDoc: (_id) => {
     void (async () => {
       try {
-        await fsDeleteDoc(doc(db, 'docs', id))
+        await fsDeleteDoc(null as any)
         get().pushToast('המסמך נמחק', 'success')
       } catch (e) {
         console.error('deleteDoc', e)

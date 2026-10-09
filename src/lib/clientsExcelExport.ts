@@ -1,6 +1,5 @@
 import * as XLSX from 'xlsx'
 import { formatDateIL } from './dates'
-import { formatNis } from './financeCalc'
 import type { Client } from '../types'
 
 export type ClientsExcelExportContext = {
@@ -24,7 +23,6 @@ const HEADERS = [
   'ח.פ / עוסק',
   'כתובת',
   'עיר',
-  'יתרה פתוחה',
   'מקור',
   'מזהה חשבונית ירוקה',
   'הערות',
@@ -70,9 +68,6 @@ function clientToRow(
     client.taxId?.trim() ?? '',
     client.addressLine?.trim() ?? '',
     client.city?.trim() ?? '',
-    typeof client.financeBalance === 'number' && Number.isFinite(client.financeBalance)
-      ? formatNis(client.financeBalance)
-      : '',
     clientSourceLabel(client.source),
     client.greenInvoiceId?.trim() ?? '',
     client.businessNotes?.trim() ?? '',
@@ -103,7 +98,6 @@ export function exportClientsToExcel(ctx: ClientsExcelExportContext): void {
     { wch: 10 },
     { wch: 14 },
     { wch: 22 },
-    { wch: 14 },
     { wch: 14 },
     { wch: 14 },
     { wch: 18 },

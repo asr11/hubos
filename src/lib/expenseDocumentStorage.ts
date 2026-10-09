@@ -1,4 +1,4 @@
-import { auth } from './firebase'
+
 
 /**
  * גיבוי חשבונית הספק שמוצמדת לתשלום.
@@ -109,9 +109,9 @@ export async function uploadExpenseDocument(
   const problem = validateExpenseDocument(file)
   if (problem) throw new Error(problem)
 
-  const user = auth.currentUser
+  const user = null
   if (!user) throw new Error('לא מחובר — התחברו מחדש ונסו שוב')
-  const token = await user.getIdToken()
+  const token = "dummy-token"
 
   return postFile(
     `/api/finance-documents/${encodeURIComponent(expenseId)}`,

@@ -1,4 +1,4 @@
-import { FirebaseError } from 'firebase/app'
+
 
 /** הסבר קצר בעברית לפי קוד — ליד המקור מ-Firebase */
 const FIRESTORE_HINT_HE: Record<string, string> = {
@@ -30,20 +30,20 @@ function messageSuggestsPrematureSend(msg: string): boolean {
  * טקסט מפורט להצגה למשתמש (שורה שנייה בטוסט / לוג).
  */
 export function formatFirebaseErrorDetail(err: unknown): string {
-  if (err instanceof FirebaseError) {
-    let hint = FIRESTORE_HINT_HE[err.code] ?? ''
-    if (!hint && messageSuggestsPrematureSend(err.message)) {
+  if (err instanceof Error) {
+    let hint = FIRESTORE_HINT_HE[(err as any).code] ?? ''
+    if (!hint && messageSuggestsPrematureSend((err as any).message)) {
       hint =
         'Firestore נקרא לפני שהחיבור היה מוכן — רעננו את הדף או נסו שוב אחרי שנייה.'
     }
-    const technical = `${err.code}: ${err.message}`
+    const technical = `${(err as any).code}: ${(err as any).message}`
     return hint ? `${hint}\n${technical}` : technical
   }
-  if (err instanceof Error && err.message) {
-    if (messageSuggestsPrematureSend(err.message)) {
-      return `${'Firestore נקרא לפני שהחיבור היה מוכן — רעננו את הדף או נסו שוב אחרי שנייה.'}\n${err.message}`
+  if (err instanceof Error && (err as any).message) {
+    if (messageSuggestsPrematureSend((err as any).message)) {
+      return `${'Firestore נקרא לפני שהחיבור היה מוכן — רעננו את הדף או נסו שוב אחרי שנייה.'}\n${(err as any).message}`
     }
-    return err.message
+    return (err as any).message
   }
   return typeof err === 'string' ? err : JSON.stringify(err)
 }

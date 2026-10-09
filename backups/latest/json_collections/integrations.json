@@ -1,13 +1,13 @@
 [
   {
     "syncState": {
-      "lastSyncAt": "2026-09-22T11:01:45.619Z",
-      "lastFromDate": "2025-01-01",
+      "lastSyncAt": "2026-09-22T14:31:51.505Z",
+      "lastFromDate": "2010-01-01",
       "lastToDate": "2026-09-22",
-      "lastFetched": 417,
-      "lastImported": 405,
-      "lastRemoved": 12,
-      "lastUnmatchedClients": 6,
+      "lastFetched": 1740,
+      "lastImported": 1715,
+      "lastRemoved": 25,
+      "lastUnmatchedClients": 12,
       "lastClientsFetched": 285,
       "lastClientsCreated": 0,
       "lastClientsUpdated": 285,

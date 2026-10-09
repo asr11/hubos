@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { deleteField } from 'firebase/firestore'
+
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { formatDateIL, todayYmd } from '../lib/dates'
@@ -362,7 +362,7 @@ export function Leads() {
     if (uid) {
       await updateLead(leadId, { salesAgentUserId: uid })
     } else {
-      await updateLead(leadId, { salesAgentUserId: deleteField() as unknown as string })
+      await updateLead(leadId, { salesAgentUserId: null as unknown as string })
     }
   }
 
@@ -633,7 +633,7 @@ export function Leads() {
     if (statusDraft === 'not_relevant') {
       payload.notRelevantReason = notRelReason
     } else if (lead.notRelevantReason) {
-      payload.notRelevantReason = deleteField()
+      payload.notRelevantReason = null
     }
     if (text) {
       payload.lastActivityText = text
@@ -695,20 +695,20 @@ export function Leads() {
     if (agentUid) {
       base.salesAgentUserId = agentUid
     } else {
-      base.salesAgentUserId = deleteField()
+      base.salesAgentUserId = null
     }
     if (channel === 'green_invoice') {
-      base.quotePdfUrl = deleteField()
-      base.quotePdfFileName = deleteField()
-      base.quoteVisualUrl = deleteField()
+      base.quotePdfUrl = null
+      base.quotePdfFileName = null
+      base.quoteVisualUrl = null
     } else if (channel === 'pdf_file') {
       base.quotePdfUrl = opts.pdfUrl
       base.quotePdfFileName = opts.pdfName
-      base.quoteVisualUrl = deleteField()
+      base.quoteVisualUrl = null
     } else {
       base.quoteVisualUrl = opts.visualUrl
-      base.quotePdfUrl = deleteField()
-      base.quotePdfFileName = deleteField()
+      base.quotePdfUrl = null
+      base.quotePdfFileName = null
     }
     await updateLead(leadId, base)
     setQuoteModalLeadId(null)

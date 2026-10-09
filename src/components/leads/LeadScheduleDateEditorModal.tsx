@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { deleteField } from 'firebase/firestore'
+
 import { Modal } from '../shared/Modal'
 import { useLeads } from '../../hooks/useLeads'
 import { todayYmd } from '../../lib/dates'
@@ -52,7 +52,7 @@ export function LeadScheduleDateEditorModal({ lead, isOpen, onClose }: Props) {
     setSaving(true)
     try {
       await updateLead(lead.id, {
-        [field]: deleteField(),
+        [field]: null,
       } as Partial<Lead> & Record<string, unknown>)
       onClose()
     } catch {

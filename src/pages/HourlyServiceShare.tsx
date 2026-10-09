@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { doc, getDoc } from 'firebase/firestore'
+import { hubFetch } from '../lib/hubFetch'
 import { formatDateIL } from '../lib/dates'
-import { db } from '../lib/firebase'
 import {
   formatHours,
   formatHoursWithMinutes,
@@ -36,14 +35,19 @@ export function HourlyServiceShare() {
       return
     }
     let cancelled = false
-    void getDoc(doc(db, 'hourlyServicesPublic', token)).then((snap) => {
+    void hubFetch(`/api/public/hours-share/${token}`).then(async (res) => {
       if (cancelled) return
-      if (!snap.exists()) {
+      if (!res.ok) {
         setError('הדוח לא נמצא או שהקישור בוטל')
         setLoading(false)
         return
       }
-      setShare(snap.data() as HourlyServicePublicShare)
+      const data = await res.json()
+      setShare(data as HourlyServicePublicShare)
+      setLoading(false)
+    }).catch(() => {
+      if (cancelled) return
+      setError('הדוח לא נמצא או שהקישור בוטל')
       setLoading(false)
     })
     return () => {

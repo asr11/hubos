@@ -1,19 +1,9 @@
-import { httpsCallable } from 'firebase/functions'
-import { functionsClient } from './firebase'
+import { hubFetch } from "./hubFetch"
+
 import { formatFirebaseErrorDetail } from './formatFirebaseError'
 import { useHubStore } from '../store/useStore'
 
-const sendMeetingInviteNotifications = httpsCallable<
-  { meetingId: string },
-  {
-    ok: boolean
-    sent?: boolean
-    sentCount?: number
-    skipped?: boolean
-    skippedRecipients?: number
-    reason?: string
-  }
->(functionsClient, 'sendMeetingInviteNotifications')
+const sendMeetingInviteNotifications = async (data: any) => { const res = await hubFetch("/api/functions/" + "sendMeetingInviteNotifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(!res.ok) throw new Error("Failed"); return await res.json(); }
 
 /** אחרי יצירת פגישה — כישלון לא חוסם את הממשק */
 export function requestMeetingInviteEmails(meetingId: string): void {
