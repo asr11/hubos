@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { buildApp } from './app.js'
 import { initLocalDatabase, seedSuperAdmin, logSystemEvent, setD1Database } from './lib/db.js'
 import { injectCloudflareEnv } from './config/env.js'
+import { createEntitiesRouter } from './routes/entities.js'
 import type { Context, Next } from 'hono'
 
 export interface ExecutionContext {
@@ -147,109 +148,11 @@ workerRouter.get('/api/clients', async (c: Context<{ Bindings: Bindings }>) => {
   }
 })
 
-workerRouter.get('/api/projects', async (c: Context<{ Bindings: Bindings }>) => {
-  try {
-    const { results } = await c.env.DB.prepare('SELECT * FROM projects ORDER BY created_at DESC').all() as any;
-    const mapped = results.map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      clientId: r.client_id,
-      status: r.status,
-      createdAt: r.created_at,
-      created_at: r.created_at,
-      tenantId: r.tenant_id
-    }));
-    return c.json(mapped, 200);
-  } catch (err: any) {
-    console.error("D1 Error:", err);
-    return c.json({ error: err.message || 'Internal Server Error' }, 500);
-  }
-});
-
-workerRouter.get('/api/suppliers', async (c: Context<{ Bindings: Bindings }>) => {
-  try {
-    const { results } = await c.env.DB.prepare('SELECT * FROM suppliers ORDER BY created_at DESC').all() as any;
-    const mapped = results.map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      contactInfo: r.contact_info,
-      createdAt: r.created_at,
-      created_at: r.created_at
-    }));
-    return c.json(mapped, 200);
-  } catch (err: any) {
-    console.error("D1 Error:", err);
-    return c.json({ error: err.message || 'Internal Server Error' }, 500);
-  }
-});
-
-workerRouter.get('/api/tasks', async (c: Context<{ Bindings: Bindings }>) => {
-  try {
-    const { results } = await c.env.DB.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all() as any;
-    const mapped = results.map((r: any) => {
-      let st = r.status;
-      if (st === 'לביצוע') st = 'todo';
-      if (st === 'בתהליך') st = 'in_progress';
-      if (st === 'הושלם') st = 'done';
-      return {
-        id: r.id,
-        title: r.title,
-        description: r.description,
-        status: st,
-        projectId: r.project_id,
-        assignee: r.assignee,
-        assigneeId: r.assignee,
-        dueDate: r.due_at || null,
-        createdAt: r.created_at,
-        created_at: r.created_at
-      };
-    });
-    return c.json(mapped, 200);
-  } catch (err: any) {
-    console.error("D1 Error:", err);
-    return c.json({ error: err.message || 'Internal Server Error' }, 500);
-  }
-});
-
-workerRouter.get('/api/leads', async (c: Context<{ Bindings: Bindings }>) => {
-  try {
-    const { results } = await c.env.DB.prepare('SELECT * FROM leads ORDER BY created_at DESC').all() as any;
-    const mapped = results.map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      email: r.email,
-      phone: r.phone,
-      status: r.status,
-      createdAt: r.created_at,
-      created_at: r.created_at,
-      tenantId: r.tenant_id
-    }));
-    return c.json(mapped, 200);
-  } catch (err: any) {
-    console.error("D1 Error:", err);
-    return c.json({ error: err.message || 'Internal Server Error' }, 500);
-  }
-});
-
-workerRouter.get('/api/campaigns', async (c: Context<{ Bindings: Bindings }>) => {
-  try {
-    const { results } = await c.env.DB.prepare('SELECT * FROM campaigns ORDER BY created_at DESC').all() as any;
-    const mapped = results.map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      status: r.status,
-      budget: r.budget,
-      spent: r.spent,
-      createdAt: r.created_at,
-      created_at: r.created_at,
-      tenantId: r.tenant_id
-    }));
-    return c.json(mapped, 200);
-  } catch (err: any) {
-    console.error("D1 Error:", err);
-    return c.json({ error: err.message || 'Internal Server Error' }, 500);
-  }
-});
+// Phase 2 SSOT: projects / tasks / leads / suppliers / campaigns are served from their
+// SQL tables (core columns + `data` JSON) by a single typed router. Mounted after the JWT
+// middleware and before the legacy `/api/*` fallthrough, so crud.ts (generic_documents)
+// no longer receives these entities.
+workerRouter.route('/api', createEntitiesRouter())
 
 workerRouter.all('/api/*', async (c: Context<{ Bindings: Bindings }>) => {
   if (!backendApp) {
