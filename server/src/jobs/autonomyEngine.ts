@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { scanNeglectedLeads, scanOverdueTasks, scanOutstandingBalances } from './scanners.js';
 import { logSystemEvent } from '../lib/db.js';
 

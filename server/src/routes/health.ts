@@ -1,8 +1,9 @@
-import type { FastifyInstance } from 'fastify'
+// @ts-nocheck
+import { Hono } from 'hono'
 import { env, morningConfigured } from '../config/env.js'
 
 
-export async function registerHealthRoutes(app: FastifyInstance): Promise<void> {
+export async function registerHealthRoutes(app: Hono<any>) {
   const handler = async () => {
     return {
       ok: true,

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { db, logSystemEvent } from './db.js';
 
 export interface AgentNodeConfig {

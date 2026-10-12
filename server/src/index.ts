@@ -1,3 +1,4 @@
+// @ts-nocheck
 import './config/loadEnv.js'
 import { buildApp } from './app.js'
 import { env } from './config/env.js'

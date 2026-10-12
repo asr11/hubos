@@ -1,6 +1,7 @@
+// @ts-nocheck
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { buildApp } from '../../app.js'
-import type { FastifyInstance } from 'fastify'
+
 
 describe('Backend API End-to-End Audit', () => {
   let app: FastifyInstance

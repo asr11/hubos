@@ -1,0 +1,22 @@
+name = "hub-pos-server"
+main = "src/worker.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+account_id = "4fdbb9a5ab5ca7023d857c6762c99f6d"
+workers_dev = true
+
+routes = [
+  { pattern = "os.hub.co.il/*", zone_name = "hub.co.il" },
+  { pattern = "os.hub.co.il", zone_name = "hub.co.il" }
+]
+
+[vars]
+NODE_ENV = "production"
+SERVER_HOST = "127.0.0.1"
+SERVER_PORT = 8788
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hub-os-d1"
+database_id = "b3bb48cb-ebdd-4454-a33e-3460a63e9527"
+migrations_dir = "migrations"

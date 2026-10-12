@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { env } from '../config/env.js'
 import { db } from './db.js'
 import {

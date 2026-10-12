@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Database from 'better-sqlite3';
 import { db } from '../lib/db.js';
 

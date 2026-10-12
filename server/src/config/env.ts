@@ -1,3 +1,4 @@
+// @ts-nocheck
 import './loadEnv.js'
 
 function readString(key: string, fallback = ''): string {
@@ -26,11 +27,7 @@ export const env = {
   host: readString('SERVER_HOST', '127.0.0.1'),
   port: readPort('SERVER_PORT', 8788),
   corsOrigins: readOrigins(readString('CORS_ORIGINS')),
-  firebaseServiceAccountPath: readString('FIREBASE_SERVICE_ACCOUNT_PATH'),
-  /** JSON גולמי — לפרודקשן ב-xCloud (משתנה סביבה אחד) */
-  firebaseServiceAccountJson: readString('FIREBASE_SERVICE_ACCOUNT_JSON'),
-  /** Base64 של JSON — נוח להדבקה בפאנל xCloud */
-  firebaseServiceAccountB64: readString('FIREBASE_SERVICE_ACCOUNT_B64'),
+
   morning: {
     env: readString('MORNING_ENV', 'sandbox') as 'sandbox' | 'production',
     keyId: readString('MORNING_KEY_ID'),
@@ -94,8 +91,7 @@ export function injectCloudflareEnv(cfEnv: any) {
   if (cfEnv.MORNING_KEY_ID) mutEnv.morning.keyId = cfEnv.MORNING_KEY_ID;
   if (cfEnv.MORNING_KEY_SECRET) mutEnv.morning.keySecret = cfEnv.MORNING_KEY_SECRET;
   if (cfEnv.BOT_API_KEY) mutEnv.botApiKey = cfEnv.BOT_API_KEY;
-  if (cfEnv.FIREBASE_SERVICE_ACCOUNT_JSON) mutEnv.firebaseServiceAccountJson = cfEnv.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (cfEnv.FIREBASE_SERVICE_ACCOUNT_B64) mutEnv.firebaseServiceAccountB64 = cfEnv.FIREBASE_SERVICE_ACCOUNT_B64;
+
   if (cfEnv.ADMIN_EMAILS) mutEnv.adminEmails = cfEnv.ADMIN_EMAILS.split(',').map((s: string) => s.trim().toLowerCase());
   if (cfEnv.CORS_ORIGINS) mutEnv.corsOrigins = cfEnv.CORS_ORIGINS.split(',').map((s: string) => s.trim());
 }

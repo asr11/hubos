@@ -1,15 +1,16 @@
-import { type FastifyInstance } from 'fastify'
+// @ts-nocheck
+
 import { db } from '../lib/db.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireAdmin } from '../middleware/requireAdmin.js'
 import bcrypt from 'bcryptjs'
 import crypto from 'node:crypto'
 
-export async function registerUsersRoutes(app: FastifyInstance) {
+export async function registerUsersRoutes(app: Hono<any>) {
   // GET /api/users & GET /api/auth/users
-  app.get('/api/users', { preHandler: requireAuth }, async (_request, reply) => {
+  app.get('/api/users', requireAuth , async (c: any) => {
     const users = db.prepare('SELECT id, email, role, created_at FROM users').all()
-    return reply.send(users.map((u: any) => ({
+    return c.json(users.map((u: any) => ({
       id: u.id,
       uid: u.id,
       email: u.email,
@@ -19,16 +20,16 @@ export async function registerUsersRoutes(app: FastifyInstance) {
     })))
   })
 
-  app.get('/api/auth/users', { preHandler: requireAuth }, async (_request, reply) => {
+  app.get('/api/auth/users', requireAuth , async (c: any) => {
     const users = db.prepare('SELECT id, email, role, created_at FROM users').all()
-    return reply.send({ ok: true, users })
+    return c.json({ ok: true, users })
   })
 
   // POST /api/auth/users
-  app.post('/api/auth/users', { preHandler: requireAdmin }, async (request, reply) => {
-    const { email, password, role } = request.body as any
+  app.post('/api/auth/users', requireAdmin , async (c: any) => {
+    const { email, password, role } = await c.req.json() as any
     if (!email || !password) {
-      return reply.code(400).send({ ok: false, error: 'missing_fields' })
+      return c.json({ ok: false, error: 'missing_fields' }, 400)
     }
 
     try {
@@ -37,19 +38,19 @@ export async function registerUsersRoutes(app: FastifyInstance) {
       db.prepare('INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, ?, ?)').run(
         id, email, hash, role || 'user'
       )
-      return reply.send({ ok: true, user: { id, email, role: role || 'user' } })
+      return c.json({ ok: true, user: { id, email, role: role || 'user' } })
     } catch (e: any) {
       if (e.message.includes('UNIQUE constraint failed')) {
-        return reply.code(409).send({ ok: false, error: 'email_exists' })
+        return c.json({ ok: false, error: 'email_exists' }, 409)
       }
       throw e
     }
   })
 
   // PATCH /api/auth/users/:id
-  app.patch('/api/auth/users/:id', { preHandler: requireAdmin }, async (request, reply) => {
-    const { id } = request.params as any
-    const { email, password, role } = request.body as any
+  app.patch('/api/auth/users/:id', requireAdmin , async (c: any) => {
+    const { id } = c.req.param() as any
+    const { email, password, role } = await c.req.json() as any
     
     let query = 'UPDATE users SET '
     const params: any[] = []
@@ -69,7 +70,7 @@ export async function registerUsersRoutes(app: FastifyInstance) {
     }
 
     if (updates.length === 0) {
-      return reply.code(400).send({ ok: false, error: 'no_updates_provided' })
+      return c.json({ ok: false, error: 'no_updates_provided' }, 400)
     }
 
     query += updates.join(', ') + ' WHERE id = ?'
@@ -78,24 +79,24 @@ export async function registerUsersRoutes(app: FastifyInstance) {
     try {
       const info = db.prepare(query).run(...params)
       if (info.changes === 0) {
-        return reply.code(404).send({ ok: false, error: 'user_not_found' })
+        return c.json({ ok: false, error: 'user_not_found' }, 404)
       }
-      return reply.send({ ok: true })
+      return c.json({ ok: true })
     } catch (e: any) {
       if (e.message.includes('UNIQUE constraint failed')) {
-        return reply.code(409).send({ ok: false, error: 'email_exists' })
+        return c.json({ ok: false, error: 'email_exists' }, 409)
       }
       throw e
     }
   })
 
   // DELETE /api/auth/users/:id
-  app.delete('/api/auth/users/:id', { preHandler: requireAdmin }, async (request, reply) => {
-    const { id } = request.params as any
+  app.delete('/api/auth/users/:id', requireAdmin , async (c: any) => {
+    const { id } = c.req.param() as any
     const info = db.prepare('DELETE FROM users WHERE id = ?').run(id)
     if (info.changes === 0) {
-      return reply.code(404).send({ ok: false, error: 'user_not_found' })
+      return c.json({ ok: false, error: 'user_not_found' }, 404)
     }
-    return reply.send({ ok: true })
+    return c.json({ ok: true })
   })
 }

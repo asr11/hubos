@@ -1,1 +1,0 @@
-function e(e){switch(e){case`todo`:return`לביצוע`;case`doing`:return`בעבודה`;case`blocked`:return`חסום`;case`done`:return`הושלם`}}function t(e){switch(e){case`high`:return`גבוהה`;case`medium`:return`בינונית`;case`low`:return`נמוכה`}}export{t as n,e as t};

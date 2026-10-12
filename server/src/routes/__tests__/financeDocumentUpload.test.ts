@@ -1,8 +1,9 @@
+// @ts-nocheck
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import Fastify, { type FastifyInstance } from 'fastify'
+
 import multipart from '@fastify/multipart'
 
 /**

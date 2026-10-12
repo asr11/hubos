@@ -15,6 +15,7 @@ const AgentFinancePage = lazy(() => import('./pages/agent/AgentFinancePage').the
 const AgentsAdmin = lazy(() => import('./pages/AgentsAdmin').then(m => ({ default: m.AgentsAdmin })))
 const AgentsNeuralNetwork = lazy(() => import('./pages/AgentsNeuralNetwork').then(m => ({ default: m.AgentsNeuralNetwork })))
 const Clients = lazy(() => import('./pages/Clients').then(m => ({ default: m.Clients })))
+const ClientDetail = lazy(() => import('./pages/ClientDetail').then(m => ({ default: m.ClientDetail })))
 const Collections = lazy(() => import('./pages/Collections').then(m => ({ default: m.Collections })))
 import { Dashboard } from './pages/Dashboard'
 const Expenses = lazy(() => import('./pages/Expenses').then(m => ({ default: m.Expenses })))
@@ -79,6 +80,7 @@ export default function App() {
                 <Route element={<Layout />}>
                   <Route index element={<Dashboard />} />
                   <Route path="clients" element={<Clients />} />
+                  <Route path="clients/:id" element={<ClientDetail />} />
                   <Route path="collections" element={<Collections />} />
                   <Route
                     path="finance"

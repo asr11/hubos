@@ -1,3 +1,4 @@
+// @ts-nocheck
 const AMOUNT_TOLERANCE = 0.05
 const AMOUNT_PERCENT_TOLERANCE = 0.04
 

@@ -1,0 +1,16 @@
+-- Migration number: 0003
+ALTER TABLE users ADD COLUMN display_name TEXT;
+ALTER TABLE users ADD COLUMN rate REAL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS docs (
+  id TEXT PRIMARY KEY,
+  data JSON NOT NULL
+);

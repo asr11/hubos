@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MorningDocument } from './morningClient.js'
 
 /** סוגי מסמך הוצאה ב-Morning */

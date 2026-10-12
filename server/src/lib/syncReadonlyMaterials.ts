@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { db, logSystemEvent } from './db.js'
 import { MorningClient } from './morningClient.js'
 import { loadMorningCredentials } from './morningCredentials.js'

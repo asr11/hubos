@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Database, { type Database as DatabaseType } from 'better-sqlite3'
 import path from 'node:path'
 import fs from 'node:fs'

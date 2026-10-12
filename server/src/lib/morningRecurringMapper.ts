@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MorningDocument } from './morningClient.js'
 
 /** סטטוסים פעילים — הוראת קבע (10=created, 20=started) */

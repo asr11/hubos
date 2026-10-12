@@ -1,1 +1,0 @@
-{"version":3,"file":"requireAdmin.d.ts","sourceRoot":"","sources":["../../src/middleware/requireAdmin.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,cAAc,EAAE,MAAM,SAAS,CAAA;AAiD3D,wBAAsB,YAAY,CAChC,GAAG,EAAE,cAAc,EACnB,KAAK,EAAE,YAAY,GAClB,OAAO,CAAC,IAAI,CAAC,CAiDf"}

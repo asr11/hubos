@@ -16,6 +16,7 @@ import { memberIsSalesAgentFlag } from '../lib/salesAgent'
 import { ClientActivityModal } from '../components/ClientActivityModal'
 import { ClientsSyncButton } from '../components/ClientsSyncButton'
 import { exportClientsToExcel } from '../lib/clientsExcelExport'
+import { Eye } from 'lucide-react'
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
@@ -256,13 +257,28 @@ export function Clients() {
     return (
       <article className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--dash-panel-bg)] p-4 shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
         <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--border)] pb-3">
-          <button
-            type="button"
-            onClick={() => setActivityClient(c)}
-            className="min-w-0 flex-1 text-right text-base font-extrabold leading-snug text-[var(--orange)] underline-offset-2 hover:underline"
-          >
-            {c.name}
-          </button>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(`/clients/${encodeURIComponent(c.id)}`)}
+              className="min-w-0 text-right text-base font-extrabold leading-snug text-[var(--orange)] underline-offset-2 hover:underline"
+            >
+              {c.name}
+            </button>
+            <button
+              type="button"
+              id={`client-quickview-${c.id}`}
+              aria-label="תצוגה מהירה"
+              title="תצוגה מהירה"
+              onClick={(e) => {
+                e.stopPropagation()
+                setActivityClient(c)
+              }}
+              className="inline-flex shrink-0 items-center justify-center rounded p-1 text-[var(--text-mid)] hover:bg-[var(--dash-bg)] hover:text-[var(--orange)] transition-colors"
+            >
+              <Eye className="h-4 w-4" />
+            </button>
+          </div>
           <Badge label={statusLabel} color={statusColor} />
         </div>
 
@@ -429,13 +445,28 @@ export function Clients() {
                 return (
                   <tr key={c.id} className="border-t border-[var(--border)] align-top">
                     <td className="px-3 py-3 break-words">
-                      <button
-                        type="button"
-                        onClick={() => setActivityClient(c)}
-                        className="text-right font-semibold text-[var(--orange)] underline-offset-2 hover:underline"
-                      >
-                        {c.name}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/clients/${encodeURIComponent(c.id)}`)}
+                          className="text-right font-semibold text-[var(--orange)] underline-offset-2 hover:underline"
+                        >
+                          {c.name}
+                        </button>
+                        <button
+                          type="button"
+                          id={`client-quickview-${c.id}`}
+                          aria-label="תצוגה מהירה"
+                          title="תצוגה מהירה"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setActivityClient(c)
+                          }}
+                          className="inline-flex shrink-0 items-center justify-center rounded p-1 text-[var(--text-mid)] hover:bg-[var(--dash-bg)] hover:text-[var(--orange)] transition-colors"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-[var(--text-mid)] break-words">
                       {c.contact || '—'}

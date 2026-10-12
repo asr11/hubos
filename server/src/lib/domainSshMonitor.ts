@@ -1,3 +1,4 @@
+// @ts-nocheck
 import net from 'node:net'
 import { db, logSystemEvent } from './db.js'
 

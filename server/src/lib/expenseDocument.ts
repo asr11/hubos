@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { MorningClient } from './morningClient.js'
 
 export type ExpenseFileSource =

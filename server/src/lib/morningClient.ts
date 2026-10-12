@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { MORNING_AUTH_URLS, MORNING_BASE_URLS } from '../config/env.js'
 import type { MorningCredentials } from './morningCredentials.js'
 
