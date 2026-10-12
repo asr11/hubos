@@ -1,103 +1,38 @@
-// @ts-nocheck
+import type { MiddlewareHandler, Next } from 'hono'
+import { verifyAuthUser, type AuthUser } from './requireAuth.js'
 
-import { env } from '../config/env.js'
-import { db } from '../lib/db.js'
-import { requireAuth } from './requireAuth.js'
+/**
+ * Legacy-app admin gate (Hono middleware). Verifies the Bearer token itself (so it can be used
+ * standalone or after requireAuth) and allows only admin-level roles taken from the JWT payload
+ * (role is written from the users table at login in worker.ts).
+ *
+ * - Missing/invalid token => 401, non-admin role => 403.
+ * - `await next()` runs outside any try/catch so handler errors surface via app.onError.
+ *
+ * NOTE: routes in morning.ts / financeDocuments.ts still pass Fastify-style
+ * `{ preHandler: requireAdmin }` objects as the 2nd argument — those are not valid Hono handlers
+ * and must be refactored separately to `app.get(path, requireAdmin, handler)`.
+ */
 
-const ADMIN_CACHE_TTL_MS = 5 * 60 * 1000
-const adminRoleCache = new Map<
-  string,
-  { isAdmin: boolean; expiresAt: number }
->()
+const ADMIN_ROLES = new Set(['ceo', 'admin', 'superadmin', 'technical_admin'])
 
-function isAdminRole(role: unknown): boolean {
-  const r = String(role ?? '')
-    .trim()
-    .toLowerCase()
-  return r === 'admin' || r === 'superadmin' || r === 'ceo'
+export function isAdminRole(role: unknown): boolean {
+  return ADMIN_ROLES.has(String(role ?? '').trim().toLowerCase())
 }
 
-function readCachedAdmin(uid: string): boolean | null {
-  const hit = adminRoleCache.get(uid)
-  if (!hit) return null
-  if (Date.now() > hit.expiresAt) {
-    adminRoleCache.delete(uid)
-    return null
-  }
-  return hit.isAdmin
+type AdminEnv = {
+  Bindings: { JWT_SECRET?: string }
+  Variables: { authUser: AuthUser }
 }
 
-function writeCachedAdmin(uid: string, isAdmin: boolean): void {
-  adminRoleCache.set(uid, {
-    isAdmin,
-    expiresAt: Date.now() + ADMIN_CACHE_TTL_MS,
-  })
-}
-
-function adminByEmail(email?: string): boolean {
-  if (!email || env.adminEmails.length === 0) return false
-  return env.adminEmails.includes(email.trim().toLowerCase())
-}
-
-async function readAdminRole(uid: string): Promise<string | undefined> {
-  try {
-    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(uid) as { role: string } | undefined
-    return user?.role
-  } catch (e) {
-    throw e
+export const requireAdmin: MiddlewareHandler<AdminEnv> = async (c, next: Next) => {
+  const user = c.get('authUser') ?? (await verifyAuthUser(c))
+  if (!user) {
+    return c.json({ ok: false, error: 'unauthenticated', message: 'Invalid or missing token' }, 401)
   }
-}
-
-export async function requireAdmin(
-  req: FastifyRequest,
-  reply: FastifyReply,
-): Promise<void> {
-  await requireAuth(req, reply)
-  if (reply.sent) return
-
-  const uid = req.authUser?.uid
-  if (!uid) {
-    c.status(401).send({ ok: false, error: 'unauthenticated' })
-    return
+  if (!isAdminRole(user.role)) {
+    return c.json({ ok: false, error: 'forbidden', message: 'נדרשת הרשאת מנהל' }, 403)
   }
-
-  const cached = readCachedAdmin(uid)
-  if (cached === false) {
-    c.status(403).send({
-      ok: false,
-      error: 'forbidden',
-      message: 'נדרשת הרשאת מנהל',
-    })
-    return
-  }
-  if (cached === true) return
-
-  if (adminByEmail(req.authUser?.email)) {
-    writeCachedAdmin(uid, true)
-    return
-  }
-
-  try {
-    const role = await readAdminRole(uid)
-    const isAdmin = isAdminRole(role)
-    writeCachedAdmin(uid, isAdmin)
-    if (!isAdmin) {
-      c.status(403).send({
-        ok: false,
-        error: 'forbidden',
-        message: 'נדרשת הרשאת מנהל',
-      })
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    if (adminByEmail(req.authUser?.email)) {
-      writeCachedAdmin(uid, true)
-      return
-    }
-    c.status(503).send({
-      ok: false,
-      error: 'admin_check_failed',
-      message: `בדיקת הרשאות מנהל נכשלה — ${msg}`,
-    })
-  }
+  c.set('authUser', user)
+  await next()
 }

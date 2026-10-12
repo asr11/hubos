@@ -14,7 +14,7 @@ function safeParseJson(data: string): Record<string, unknown> {
   try {
     return JSON.parse(data)
   } catch {
-    return c.json({})
+    return {}
   }
 }
 
