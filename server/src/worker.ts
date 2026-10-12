@@ -5,6 +5,9 @@ import { initLocalDatabase, logSystemEvent, setD1Database } from './lib/db.js'
 import { injectCloudflareEnv } from './config/env.js'
 import { createEntitiesRouter } from './routes/entities.js'
 import { createCoreRouter } from './routes/core.js'
+import { createDocumentsRouter } from './routes/documents.js'
+import { createCeoRouter } from './routes/ceo.js'
+import { createCollectionRouter } from './routes/collection.js'
 import type { Context, Next } from 'hono'
 
 export interface ExecutionContext {
@@ -157,6 +160,12 @@ workerRouter.route('/api', createEntitiesRouter())
 // Typed core routes (/api/me, /api/users, /api/passwords_vault, /api/health) — replace the
 // broken legacy handlers in api.ts / users.ts / vault.ts / health.ts.
 workerRouter.route('/api', createCoreRouter())
+
+// Typed batch #3 routers: /api/documents/:collection (whitelisted generic_documents),
+// /api/ceo/actions (human-gated queue, no execution), /api/collection/* (dry-run, no sending).
+workerRouter.route('/api', createDocumentsRouter())
+workerRouter.route('/api', createCeoRouter())
+workerRouter.route('/api', createCollectionRouter())
 
 workerRouter.all('/api/*', async (c: Context<{ Bindings: Bindings }>) => {
   if (!backendApp) {

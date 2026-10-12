@@ -31,11 +31,11 @@ export async function registerMorningRoutes(app: Hono<any>) {
    */
   app.get(
     '/api/integrations/morning/status',
-    { preHandler: requireAdmin },
-    async () => {
+    requireAdmin,
+    async (c) => {
       const creds = await loadMorningCredentials()
       const syncState = await readSyncState()
-      return {
+      return c.json({
         ok: true,
         firebaseReady: true,
         firebaseReason: null,
@@ -44,14 +44,14 @@ export async function registerMorningRoutes(app: Hono<any>) {
         credentialsFromEnv: credentialsFromEnv(),
         fromDate: env.sync.fromDate,
         syncState,
-      }
+      })
     },
   )
 
   /** שמירת מפתח API + אימות מול Morning */
   app.post(
     '/api/integrations/morning/connect',
-    { preHandler: requireAdmin },
+    requireAdmin,
     async (c) => {
       const body = (await c.req.json() ?? {}) as Record<string, unknown>
       const keyId = String(body.keyId ?? '').trim()
@@ -63,7 +63,6 @@ export async function registerMorningRoutes(app: Hono<any>) {
           error: 'missing_credentials',
           message: 'חסר מזהה מפתח או סוד',
         }, 400)
-        return
       }
 
       const client = new MorningClient({ keyId, keySecret, env: giEnv })
@@ -71,15 +70,14 @@ export async function registerMorningRoutes(app: Hono<any>) {
         await client.verifyConnection()
       } catch (e) {
         const status = e instanceof MorningError ? e.status : 500
-        c.status(status === 401 ? 400 : 502).send({
+        return c.json({
           ok: false,
           error: 'morning_auth_failed',
           message:
             e instanceof MorningError
               ? e.message
               : 'אימות מול חשבונית ירוקה נכשל',
-        })
-        return
+        }, status === 401 ? 400 : 502)
       }
 
       await saveMorningCredentials({ keyId, keySecret, env: giEnv })
@@ -90,12 +88,11 @@ export async function registerMorningRoutes(app: Hono<any>) {
   /** בדיקת חיבור מהיר ללא שמירה */
   app.post(
     '/api/integrations/morning/test',
-    { preHandler: requireAdmin },
+    requireAdmin,
     async (c) => {
       const creds = await loadMorningCredentials()
       if (!creds) {
         return c.json({ ok: false, error: 'not_connected' }, 400)
-        return
       }
       const client = new MorningClient(creds)
       try {
@@ -117,7 +114,7 @@ export async function registerMorningRoutes(app: Hono<any>) {
    */
   app.post(
     '/api/integrations/morning/sync',
-    { preHandler: requireAdmin },
+    requireAdmin,
     async (c) => {
       const body = (await c.req.json() ?? {}) as Record<string, unknown>
       const fromDate =
@@ -125,14 +122,14 @@ export async function registerMorningRoutes(app: Hono<any>) {
           ? body.fromDate.trim()
           : undefined
       try {
-        return await fetchMorningSyncPayload({ fromDate })
+        return c.json(await fetchMorningSyncPayload({ fromDate }))
       } catch (e) {
         const status = e instanceof MorningError ? e.status : 500
-        c.status(status >= 400 && status < 500 ? status : 502).send({
+        return c.json({
           ok: false,
           error: 'sync_failed',
           message: e instanceof Error ? e.message : 'הסנכרון נכשל',
-        })
+        }, status >= 400 && status < 500 ? status : 502)
       }
     },
   )
@@ -140,18 +137,18 @@ export async function registerMorningRoutes(app: Hono<any>) {
   /** משיכת לקוחות בלבד — בלי כתיבת Admin ל-Firestore */
   app.post(
     '/api/integrations/morning/sync-clients',
-    { preHandler: requireAdmin },
+    requireAdmin,
     async (c) => {
       try {
         const clients = await fetchMorningClients()
         return c.json({ ok: true, mode: 'client_write' as const, clients })
       } catch (e) {
         const status = e instanceof MorningError ? e.status : 500
-        c.status(status >= 400 && status < 500 ? status : 502).send({
+        return c.json({
           ok: false,
           error: 'client_sync_failed',
           message: e instanceof Error ? e.message : 'סנכרון הלקוחות נכשל',
-        })
+        }, status >= 400 && status < 500 ? status : 502)
       }
     },
   )
@@ -159,7 +156,7 @@ export async function registerMorningRoutes(app: Hono<any>) {
   /** שמירת סיכום סנכרון על דיסק השרת (אחרי שהדפדפן סיים לכתוב ל-Firestore) */
   app.post(
     '/api/integrations/morning/ack-sync',
-    { preHandler: requireAdmin },
+    requireAdmin,
     async (c) => {
       const body = (await c.req.json() ?? {}) as Record<string, unknown>
       try {
@@ -181,17 +178,17 @@ export async function registerMorningRoutes(app: Hono<any>) {
   /** התאמה מחדש של הוצאות קיימות מול תנועות הבנק */
   app.post(
     '/api/integrations/morning/reconcile-expenses',
-    { preHandler: requireAdmin },
+    requireAdmin,
     async (c) => {
       try {
-        return await runExpenseReconcile()
+        return c.json(await runExpenseReconcile())
       } catch (e) {
         const status = e instanceof MorningError ? e.status : 500
-        c.status(status >= 400 && status < 500 ? status : 502).send({
+        return c.json({
           ok: false,
           error: 'reconcile_failed',
           message: e instanceof Error ? e.message : 'ההתאמה נכשלה',
-        })
+        }, status >= 400 && status < 500 ? status : 502)
       }
     },
   )
@@ -199,39 +196,36 @@ export async function registerMorningRoutes(app: Hono<any>) {
   /** צפייה / הורדה במסמך הוצאה מצורף ב-GI (PDF) */
   app.get(
     '/api/integrations/morning/expenses/:greenInvoiceId/document',
-    { preHandler: requireAdmin },
+    requireAdmin,
     async (c) => {
       const greenInvoiceId = String(
         (c.req.param()).greenInvoiceId ?? '',
       ).trim()
       if (!greenInvoiceId) {
         return c.json({ ok: false, message: 'חסר מזהה הוצאה' }, 400)
-        return
       }
       const creds = await loadMorningCredentials()
       if (!creds) {
         return c.json({ ok: false, message: 'חיבור GI לא מוגדר' }, 400)
-        return
       }
       try {
         const client = new MorningClient(creds)
         const doc = await fetchExpenseDocumentBuffer(client, greenInvoiceId)
-        reply
-          .header('Content-Type', doc.mimeType)
-          .header(
-            'Content-Disposition',
-            `inline; filename="${encodeURIComponent(doc.fileName)}"`,
-          )
-          .send(doc.buffer)
+        return new Response(doc.buffer, {
+          headers: {
+            'Content-Type': doc.mimeType,
+            'Content-Disposition': `inline; filename="${encodeURIComponent(doc.fileName)}"`,
+          },
+        })
       } catch (e) {
         const status = e instanceof MorningError ? e.status : 404
-        c.status(status >= 400 && status < 500 ? status : 404).send({
+        return c.json({
           ok: false,
           message:
             e instanceof Error
               ? e.message
               : 'לא ניתן לטעון את המסמך מחשבונית ירוקה',
-        })
+        }, status >= 400 && status < 500 ? status : 404)
       }
     },
   )
@@ -239,7 +233,7 @@ export async function registerMorningRoutes(app: Hono<any>) {
   /** מחיקת כל ההכנסות הקיימות — איפוס לפני סנכרון מלא */
   app.post(
     '/api/integrations/morning/reset-incomes',
-    { preHandler: requireAdmin },
+    requireAdmin,
     async (c) => {
       try {
         const deleted = await resetAllIncomes()
