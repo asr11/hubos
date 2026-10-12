@@ -2,7 +2,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { env } from './config/env.js'
-import { initLocalDatabase, logSystemEvent, seedSuperAdmin } from './lib/db.js'
+import { initLocalDatabase, logSystemEvent } from './lib/db.js'
 import { startAutonomyEngine } from './jobs/index.js'
 
 import { registerFinanceDocumentRoutes } from './routes/financeDocuments.js'
@@ -19,7 +19,6 @@ import { registerAiLogsRoutes } from './routes/ai-logs.js'
 
 export async function buildApp() {
   initLocalDatabase()
-  seedSuperAdmin()
   logSystemEvent('SYSTEM_START', 'SERVER', 'SQLite local database initialized successfully')
   
   if (env.isDev && process.env.DISABLE_AUTONOMY !== 'true') {

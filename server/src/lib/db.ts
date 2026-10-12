@@ -2,7 +2,6 @@
 import Database, { type Database as DatabaseType } from 'better-sqlite3'
 import path from 'node:path'
 import fs from 'node:fs'
-import bcrypt from 'bcryptjs'
 
 export let db: any;
 
@@ -211,32 +210,5 @@ export function logSystemEvent(eventType: string, target: string, details?: stri
   stmt.run(eventType, target, details ?? null)
 }
 
-export function seedSuperAdmin() {
-  const email = 'a0527777817@gmail.com'
-  const password = '123456'
-  const hash = bcrypt.hashSync(password, 10)
-
-  // UUID קבוע — אותו ID בכל סביבה (Local, Docker, Production)
-  const CEO_ID = '00000000-0000-4000-a000-000000000001'
-
-  // Seed or update CEO
-  db.prepare('INSERT OR IGNORE INTO users (id, email, password_hash, role) VALUES (?, ?, ?, ?)').run(
-    CEO_ID, email, hash, 'ceo'
-  )
-  db.prepare("UPDATE users SET role = 'ceo', id = ? WHERE email = ?").run(CEO_ID, email)
-
-  // Seed demo users with fixed IDs
-  const demoUsers = [
-    { id: '00000000-0000-4000-a000-000000000002', email: 'finance@hub.co.il', role: 'finance' },
-    { id: '00000000-0000-4000-a000-000000000003', email: 'pm@hub.co.il', role: 'project_manager' },
-    { id: '00000000-0000-4000-a000-000000000004', email: 'sales@hub.co.il', role: 'sales' }
-  ]
-
-  for (const user of demoUsers) {
-    db.prepare('INSERT OR IGNORE INTO users (id, email, password_hash, role) VALUES (?, ?, ?, ?)').run(
-      user.id, user.email, hash, user.role
-    )
-  }
-
-  console.log('Super Admin and demo users seeded.')
-}
+// seedSuperAdmin() was removed (2026-10-12): it ran at runtime with a hardcoded password and
+// rewrote users.role/id. Users are managed only through explicit, authorized flows.

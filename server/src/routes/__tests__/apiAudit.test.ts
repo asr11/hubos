@@ -14,7 +14,7 @@ describe('Backend API End-to-End Audit', () => {
     const loginRes = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email: 'a0527777817@gmail.com', password: '123456' },
+      payload: { email: process.env.HUB_EMAIL ?? '', password: process.env.HUB_PASSWORD ?? '' },
     })
     expect(loginRes.statusCode).toBe(200)
     const body = JSON.parse(loginRes.body)

@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { buildApp } from './app.js'
-import { initLocalDatabase, seedSuperAdmin, logSystemEvent, setD1Database } from './lib/db.js'
+import { initLocalDatabase, logSystemEvent, setD1Database } from './lib/db.js'
 import { injectCloudflareEnv } from './config/env.js'
 import { createEntitiesRouter } from './routes/entities.js'
+import { createCoreRouter } from './routes/core.js'
 import type { Context, Next } from 'hono'
 
 export interface ExecutionContext {
@@ -40,7 +41,6 @@ workerRouter.use('/*', async (c: Context<{ Bindings: Bindings }>, next: Next) =>
   if (!initialized && c.env.DB) {
     try {
       await initLocalDatabase()
-      await seedSuperAdmin()
       await logSystemEvent('WORKER_START', 'CLOUDFLARE', 'Cloudflare Worker initialized with D1 database')
       initialized = true
     } catch (err) {
@@ -153,6 +153,10 @@ workerRouter.get('/api/clients', async (c: Context<{ Bindings: Bindings }>) => {
 // middleware and before the legacy `/api/*` fallthrough, so crud.ts (generic_documents)
 // no longer receives these entities.
 workerRouter.route('/api', createEntitiesRouter())
+
+// Typed core routes (/api/me, /api/users, /api/passwords_vault, /api/health) — replace the
+// broken legacy handlers in api.ts / users.ts / vault.ts / health.ts.
+workerRouter.route('/api', createCoreRouter())
 
 workerRouter.all('/api/*', async (c: Context<{ Bindings: Bindings }>) => {
   if (!backendApp) {
