@@ -1,0 +1,9 @@
+# Runtime data — never committed
+storage/*
+!storage/.gitkeep
+*.sqlite
+*.sqlite-*
+
+# Root .gitignore ignores *.sql; migrations must be tracked
+!database/migrations/
+!database/migrations/*.sql
