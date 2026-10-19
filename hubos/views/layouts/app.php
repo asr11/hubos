@@ -19,8 +19,11 @@ $nav = [
     ['key' => 'projects',  'href' => '/projects',       'label' => 'פרויקטים',        'icon' => '▣', 'perm' => 'work.view'],
     ['key' => 'linking',   'href' => '/work/linking',   'label' => 'ממתין לשיוך',     'icon' => '⇄', 'perm' => 'work.link'],
     ['key' => 'recurring', 'href' => '/work/recurring', 'label' => 'תחזוקה חודשית',   'icon' => '↻', 'perm' => 'work.create'],
+    ['key' => 'assets',    'href' => '/assets',         'label' => 'נכסים ודומיינים', 'icon' => '🌐', 'perm' => 'assets.view'],
+    ['key' => 'vault',     'href' => '/vault',          'label' => 'כספת גישות',      'icon' => '🔒', 'perm' => 'vault.view'],
+    ['key' => 'users',     'href' => '/settings/users', 'label' => 'משתמשים והרשאות', 'icon' => '⚙', 'perm' => 'users.view'],
 ];
-$soon = ['גבייה', 'מכירות', 'נכסים וכספת', 'דוחות'];
+$soon = [];
 $timerBox = $timerBox ?? null;
 $returnTo = (string) ($_SERVER['REQUEST_URI'] ?? '/');
 $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $returnTo : '/';
@@ -57,13 +60,9 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
                     </a>
                 <?php endif; ?>
             <?php endforeach; ?>
-            <p class="nav-section">בקרוב</p>
-            <?php foreach ($soon as $label): ?>
-                <span class="nav-link is-soon" aria-disabled="true"><span class="nav-icon" aria-hidden="true">·</span><?= e($label) ?></span>
-            <?php endforeach; ?>
         </nav>
         <div class="sidebar-foot">
-            <span class="phase-pill">M4 · שעות ומשימות</span>
+            <span class="phase-pill">M6 · הפעלה מלאה</span>
         </div>
     </aside>
 

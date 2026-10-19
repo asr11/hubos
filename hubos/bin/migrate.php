@@ -16,13 +16,15 @@ $config = require dirname(__DIR__) . '/app/bootstrap.php';
 
 use HubOS\Core\DB;
 use HubOS\Core\Migrator;
+use HubOS\Modules\Import\AccountingRule;
 
 try {
     $pdo = DB::connect($config['db_path']);
     $applied = (new Migrator($pdo, HUBOS_ROOT . '/database/migrations'))->run();
+    $recalc = AccountingRule::recalculate($pdo);
     $mode = (string) $pdo->query('PRAGMA journal_mode')->fetchColumn();
     $fk = (string) $pdo->query('PRAGMA foreign_keys')->fetchColumn();
-    fwrite(STDOUT, 'DB: ' . $config['db_path'] . " (journal_mode={$mode}, foreign_keys={$fk})\n");
+    fwrite(STDOUT, 'DB: ' . $config['db_path'] . " (journal_mode={$mode}, foreign_keys={$fk}, accounting_recalculated={$recalc})\n");
     fwrite(STDOUT, $applied === [] ? "Nothing to migrate.\n" : 'Applied: ' . implode(', ', $applied) . "\n");
     exit(0);
 } catch (Throwable $e) {

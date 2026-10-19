@@ -41,7 +41,7 @@ final class Client360Service
     ];
 
     /** Vault columns that are safe to expose. NEVER secret_ciphertext, notes, data_json. */
-    public const VAULT_COLUMNS = ['id', 'client_id', 'title', 'service', 'url', 'username', 'has_secret', 'encryption', 'status', 'created_at', 'updated_at'];
+    public const VAULT_COLUMNS = ['id', 'client_id', 'asset_id', 'title', 'service', 'url', 'username', 'has_secret', 'encryption', 'status', 'created_at', 'updated_at'];
 
     /** Morning statuses that mean "not fully paid" on the document itself. */
     public const OPEN_STATUSES = ['unpaid', 'pending', 'partial'];
@@ -166,12 +166,13 @@ final class Client360Service
                 $incomeByOrigin[$doc['origin_name']] = ($incomeByOrigin[$doc['origin_name']] ?? 0.0) + $amount;
             }
             $bucket = match ($doc['doc_kind'] ?? null) {
-                'transaction_account', 'tax_invoice' => 'invoices',
-                'tax_invoice_receipt'                => 'invoice_receipts',
-                'receipt'                            => 'receipts',
-                default                              => 'other',
+                'transaction_account' => 'proformas',
+                'tax_invoice'         => 'invoices',
+                'tax_invoice_receipt' => 'invoice_receipts',
+                'receipt'             => 'receipts',
+                default               => 'other',
             };
-            $collection[$y] ??= ['invoices' => [0, 0.0], 'invoice_receipts' => [0, 0.0], 'receipts' => [0, 0.0], 'other' => [0, 0.0],
+            $collection[$y] ??= ['proformas' => [0, 0.0], 'proformas_open' => [0, 0.0], 'invoices' => [0, 0.0], 'invoice_receipts' => [0, 0.0], 'receipts' => [0, 0.0], 'other' => [0, 0.0],
                 'receipts_income' => 0, 'receipts_matched' => 0, 'income' => 0.0];
             $collection[$y][$bucket][0]++;
             $collection[$y][$bucket][1] += $amount;
@@ -187,14 +188,23 @@ final class Client360Service
                 $openDocs[] = $doc;
             }
         }
+        $openDemands = \HubOS\Modules\Import\AccountingRule::openDemands($finance);
+        foreach ($openDemands as $od) {
+            $y = $od['year'] ?? '—';
+            if (isset($collection[$y])) {
+                $collection[$y]['proformas_open'][0]++;
+                $collection[$y]['proformas_open'][1] += (float) $od['amount'];
+            }
+        }
         krsort($incomeByYear);
         krsort($collection);
         arsort($incomeByOrigin);
         $openAmount = array_sum(array_map(static fn (array $d): float => $d['open_amount'], $openDocs));
+        $openDemandsAmount = array_sum(array_map(static fn (array $d): float => (float) $d['amount'], $openDemands));
 
         // ---------------------------------------------------------- overview + timeline
         $openTasks = array_values(array_filter($tasks, static fn (array $t): bool => !in_array($t['status'], ['done', 'cancelled', 'closed'], true)));
-        $alerts = $this->alerts($assets, $banks, $openDocs, $now);
+        $alerts = $this->alerts($assets, $banks, $openDocs, $openDemands, $now);
         $timeline = $this->timeline($events, $interactions, $finance, $projects, $tasks, $leads, $quotes);
 
         $counts = [
@@ -204,7 +214,7 @@ final class Client360Service
             'work'         => count($projects) + count($tasks),
             'time'         => $timeEntryCount,
             'finance'      => count($finance),
-            'collection'   => count($openDocs),
+            'collection'   => count($openDocs) + count($openDemands),
             'sales'        => count($leads) + count($quotes),
             'assets'       => count($assets),
             'access'       => count($vault),
@@ -232,6 +242,7 @@ final class Client360Service
             'own_bank'     => $ownActiveBank,
             'finance'      => $finance,
             'open_docs'    => $openDocs,
+            'open_demands' => $openDemands,
             'collection'   => $collection,
             'leads'        => $leads,
             'quotes'       => $quotes,
@@ -242,19 +253,21 @@ final class Client360Service
             'alerts'       => $alerts,
             'counts'       => $counts,
             'metrics'      => [
-                'year'               => $year,
-                'month'              => $month,
-                'income_this_year'   => $incomeByYear[$year] ?? 0.0,
-                'income_by_year'     => $incomeByYear,
-                'income_by_origin'   => $incomeByOrigin,
-                'income_total'       => array_sum($incomeByYear),
-                'hours_this_month'   => $hoursThisMonth,
-                'hours_total'        => $hoursTotal,
-                'bank_remaining'     => $bankRemaining,
-                'open_docs_count'    => count($openDocs),
-                'open_docs_amount'   => $openAmount,
+                'year'                => $year,
+                'month'               => $month,
+                'income_this_year'    => $incomeByYear[$year] ?? 0.0,
+                'income_by_year'      => $incomeByYear,
+                'income_by_origin'    => $incomeByOrigin,
+                'income_total'        => array_sum($incomeByYear),
+                'hours_this_month'    => $hoursThisMonth,
+                'hours_total'         => $hoursTotal,
+                'bank_remaining'      => $bankRemaining,
+                'open_docs_count'     => count($openDocs),
+                'open_docs_amount'    => $openAmount,
+                'open_demands_count'  => count($openDemands),
+                'open_demands_amount' => $openDemandsAmount,
                 // A reliable debt balance needs a full invoice↔receipt link, which the data does not have.
-                'balance_reliable'   => false,
+                'balance_reliable'    => false,
             ],
         ];
     }
@@ -423,9 +436,10 @@ final class Client360Service
      * @param list<array<string, mixed>> $assets
      * @param list<array<string, mixed>> $banks
      * @param list<array<string, mixed>> $openDocs
+     * @param list<array<string, mixed>> $openDemands
      * @return list<array{level:string, text:string}>
      */
-    private function alerts(array $assets, array $banks, array $openDocs, DateTimeImmutable $now): array
+    private function alerts(array $assets, array $banks, array $openDocs, array $openDemands, DateTimeImmutable $now): array
     {
         $out = [];
         $today = $now->format('Y-m-d');
@@ -450,6 +464,9 @@ final class Client360Service
                 'warn90' => ['level' => 'danger', 'text' => 'בנק שעות "' . $b['name'] . '": נוצלו ' . $b['pct'] . '% (מעל 90%)'],
                 default  => ['level' => 'warn', 'text' => 'בנק שעות "' . $b['name'] . '": נוצלו ' . $b['pct'] . '% (מעל 80%)'],
             };
+        }
+        if ($openDemands !== []) {
+            $out[] = ['level' => 'warn', 'text' => count($openDemands) . ' דרישות תשלום פתוחות (חשבון עסקה 300 ללא קבלה/חשבונית מס תואמת)'];
         }
         if ($openDocs !== []) {
             $out[] = ['level' => 'info', 'text' => count($openDocs) . ' מסמכים במצב "לא שולם" לפי Morning'];

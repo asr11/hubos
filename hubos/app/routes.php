@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use HubOS\Core\Router;
+use HubOS\Modules\Assets\AssetsController;
 use HubOS\Modules\Auth\AuthController;
 use HubOS\Modules\Clients\ClientsController;
 use HubOS\Modules\Dashboard\DashboardController;
 use HubOS\Modules\Time\TimeController;
+use HubOS\Modules\Users\UsersController;
+use HubOS\Modules\Vault\VaultController;
 use HubOS\Modules\Work\WorkController;
 
 /*
@@ -54,8 +57,29 @@ return static function (Router $r): void {
     $r->post('/projects/{id:\d+}', [WorkController::class, 'updateProject'], ['auth' => true, 'perm' => 'work.update']);
     $r->post('/projects/{id:\d+}/archive', [WorkController::class, 'archiveProject'], ['auth' => true, 'perm' => 'work.archive']);
     $r->get('/work/linking', [WorkController::class, 'linking'], ['auth' => true, 'perm' => 'work.link']);
+    $r->get('/tasks/linking', [WorkController::class, 'linking'], ['auth' => true, 'perm' => 'work.link']);
     $r->post('/work/linking/{type:task|project}/{id:\d+}', [WorkController::class, 'link'], ['auth' => true, 'perm' => 'work.link']);
     $r->get('/work/recurring', [WorkController::class, 'recurring'], ['auth' => true, 'perm' => 'work.create']);
     $r->post('/work/recurring', [WorkController::class, 'storeRecurring'], ['auth' => true, 'perm' => 'work.create']);
     $r->post('/work/recurring/{id:\d+}/active', [WorkController::class, 'toggleRecurring'], ['auth' => true, 'perm' => 'work.update']);
+
+    // M5 — assets (domains, hosting, SSL, DNS/WHOIS inspection) & encrypted vault (AES-256-GCM)
+    $r->get('/assets', [AssetsController::class, 'index'], ['auth' => true, 'perm' => 'assets.view']);
+    $r->post('/assets', [AssetsController::class, 'store'], ['auth' => true, 'perm' => 'assets.create']);
+    $r->get('/assets/{id:\d+}', [AssetsController::class, 'show'], ['auth' => true, 'perm' => 'assets.view']);
+    $r->post('/assets/{id:\d+}', [AssetsController::class, 'update'], ['auth' => true, 'perm' => 'assets.update']);
+    $r->post('/assets/{id:\d+}/inspect', [AssetsController::class, 'inspect'], ['auth' => true, 'perm' => 'assets.inspect']);
+
+    $r->get('/vault', [VaultController::class, 'index'], ['auth' => true, 'perm' => 'vault.view']);
+    $r->post('/vault', [VaultController::class, 'store'], ['auth' => true, 'perm' => 'vault.create']);
+    $r->get('/vault/{id:\d+}', [VaultController::class, 'show'], ['auth' => true, 'perm' => 'vault.view']);
+    $r->post('/vault/{id:\d+}', [VaultController::class, 'update'], ['auth' => true, 'perm' => 'vault.update']);
+    $r->post('/vault/{id:\d+}/reveal', [VaultController::class, 'reveal'], ['auth' => true, 'perm' => 'vault.reveal']);
+
+    // M6 — users, roles, per-user permissions & tenant modules
+    $r->get('/settings/users', [UsersController::class, 'index'], ['auth' => true, 'perm' => 'users.view']);
+    $r->post('/settings/users', [UsersController::class, 'store'], ['auth' => true, 'perm' => 'users.manage']);
+    $r->post('/settings/users/{id:\d+}', [UsersController::class, 'update'], ['auth' => true, 'perm' => 'users.manage']);
+    $r->post('/settings/users/{id:\d+}/permissions', [UsersController::class, 'setPermission'], ['auth' => true, 'perm' => 'permissions.manage']);
+    $r->post('/settings/modules', [UsersController::class, 'setModule'], ['auth' => true, 'perm' => 'permissions.manage']);
 };

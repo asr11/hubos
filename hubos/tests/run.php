@@ -31,15 +31,21 @@ use HubOS\Core\Tenant;
 use HubOS\Core\ValidationException;
 use HubOS\Core\Vault;
 use HubOS\Core\View;
+use HubOS\Modules\Assets\AssetInspector;
+use HubOS\Modules\Assets\AssetService;
+use HubOS\Modules\Assets\NativeAssetInspector;
 use HubOS\Modules\Clients\Client360Service;
 use HubOS\Modules\Clients\ClientService;
 use HubOS\Modules\Clients\CompanyRegistry;
+use HubOS\Modules\Dashboard\DashboardService;
 use HubOS\Modules\Import\AccountingRule;
 use HubOS\Modules\Import\ClientResolver;
 use HubOS\Modules\Import\D1Importer;
 use HubOS\Modules\Time\HoursBankService;
 use HubOS\Modules\Time\TimeEntryService;
 use HubOS\Modules\Time\TimerService;
+use HubOS\Modules\Users\UserService;
+use HubOS\Modules\Vault\VaultService;
 use HubOS\Modules\Work\LinkingService;
 use HubOS\Modules\Work\ProjectService;
 use HubOS\Modules\Work\RecurringService;
@@ -382,9 +388,11 @@ test('accounting rule: invoice=income, receipt only if no matching invoice (1:1)
         $doc('rc_other_amount', '400', 1000.0, 'c:1', '2025-01-20'),
         $doc('rc_other_client', '400', 1170.0, 'c:2', '2025-01-20'),
         $doc('rc_no_client', '400', 50.0, null, '2025-01-20'),
-        $doc('ta300', '300', 300.0, 'c:3', '2025-03-01'),
+        $doc('ta300_open', '300', 300.0, 'c:3', '2025-03-01'),
+        $doc('ta300_matched', '300', 200.0, 'c:3', '2025-03-01'),
         $doc('tir320', '320', 200.0, 'c:3', '2025-03-02'),
-        ['key' => 'unknown330', 'kind' => AccountingRule::kindForCode('330'), 'amount' => 10.0, 'client_key' => 'c:3', 'date' => '2025-03-03'],
+        $doc('tir330', '330', 55.0, 'c:3', '2025-03-03'),
+        ['key' => 'unknown999', 'kind' => AccountingRule::kindForCode('999'), 'amount' => 10.0, 'client_key' => 'c:3', 'date' => '2025-03-03'],
     ]);
     eq(true, $r['inv305']['counts'], '305 tax invoice is income');
     eq(false, $r['rc_match']['counts'], 'receipt with matching invoice (same client+amount) is NOT income');
@@ -393,10 +401,16 @@ test('accounting rule: invoice=income, receipt only if no matching invoice (1:1)
     eq(true, $r['rc_other_amount']['counts'], 'different amount => no match => income');
     eq(true, $r['rc_other_client']['counts'], 'different client => no match => income');
     eq(true, $r['rc_no_client']['counts'], 'receipt without client cannot be matched => income');
-    eq(true, $r['ta300']['counts'], '300 is income');
+    eq(false, $r['ta300_open']['counts'], '300 is a proforma / payment request, NEVER realized income');
+    eq('proforma_open', $r['ta300_open']['reason'], 'unmatched 300 is an open demand');
+    eq(null, $r['ta300_open']['matched']);
+    eq(false, $r['ta300_matched']['counts'], 'matched 300 is also NOT income');
+    eq('proforma_matched', $r['ta300_matched']['reason']);
+    eq('tir320', $r['ta300_matched']['matched'], '300 paired 1:1 with matching 320 of same client & amount');
     eq(true, $r['tir320']['counts'], '320 (tax invoice/receipt, per data) is income');
-    eq(false, $r['unknown330']['counts'], 'unmapped code is flagged, not counted');
-    eq('unknown_type', $r['unknown330']['reason']);
+    eq(true, $r['tir330']['counts'], '330 (tax invoice/receipt) is income');
+    eq(false, $r['unknown999']['counts'], 'unmapped code is flagged, not counted');
+    eq('unknown_type', $r['unknown999']['reason']);
     eq('receipt', AccountingRule::kindForCode('400'));
     eq('320', AccountingRule::codeForKind('tax_invoice_receipt'));
     eq(117000, AccountingRule::cents(1170.0));
@@ -475,11 +489,13 @@ test('importer: fixture dump (FK-out-of-order) imports, links and applies the ac
     eq('tax_id', $fd('zz-320')['link_method']);
     eq($cid('gi_zz_parent'), (int) $fd('zz-320')['client_id']);
     eq(null, $fd('zz-300')['client_id'], 'ambiguous tax id is not linked');
+    eq(0, (int) $fd('zz-300')['counts_as_income'], '300 is proforma_open, not income');
+    eq('proforma_open', $fd('zz-300')['income_reason']);
     eq('320', $fd('zz-api')['doc_type'], 'explicit code from invoices collection wins over inferred label');
     eq($cid('gi_zz_child'), (int) $fd('zz-api')['client_id']);
     eq('name_exact', $fd('zz-name')['link_method']);
     eq('kind', $fd('zz-name')['doc_type_source']);
-    eq(['2025' => 2840.0, '2026' => 641.0], array_map('floatval', $s['finance']['income_by_year']));
+    eq(['2025' => 2840.0, '2026' => 341.0], array_map('floatval', $s['finance']['income_by_year']));
 
     $task = $t->all('tasks', ['legacy_id' => 't1'])[0];
     eq($cid('gi_zz_parent'), (int) $task['client_id'], 'task client via project');
@@ -1103,6 +1119,251 @@ test('router: M3/M4 routes are protected with the right permissions', function (
     ok(!$w['perms']->can($w['viewer'], 'time.track') && !$w['perms']->can($w['viewer'], 'work.create'));
     ok($w['perms']->can($w['viewer'], 'time.view') && $w['perms']->can($w['viewer'], 'work.view'));
     ok(!$w['perms']->can($w['staff'], 'work.link') && $w['perms']->can($w['staff'], 'time.track'));
+});
+
+// ---------------------------------------------------------------- M5: Assets, Inspector & Encrypted Vault
+
+final class ZzMockInspector implements AssetInspector
+{
+    public function __construct(private array $result)
+    {
+    }
+
+    public function inspect(string $domainOrHost): array
+    {
+        return $this->result + ['host' => AssetService::normHost($domainOrHost)];
+    }
+}
+
+test('assets: CRUD, expiry windows (expired/30d/60d/90d), DNS/SSL/WHOIS inspection & viewer scoping', function (): void {
+    $w = workWorld();
+    $now = new DateTimeImmutable('2026-10-19 10:00:00', new DateTimeZone('Asia/Jerusalem'));
+    $mock = new ZzMockInspector([
+        'ip_address'      => '185.199.108.153',
+        'nameservers'     => ['ns1.cloudflare.com', 'ns2.cloudflare.com'],
+        'mx'              => ['route1.mx.cloudflare.net'],
+        'ssl_status'      => 'valid',
+        'ssl_expiry_date' => '2027-01-15',
+        'ssl_issuer'      => 'Let\'s Encrypt',
+        'registrar'       => 'Box Domains Ltd',
+        'expiry_date'     => '2027-08-20',
+        'inspected_at'    => '2026-10-19T07:00:00Z',
+        'errors'          => [],
+    ]);
+    $svc = new AssetService($w['ta'], $w['perms'], $mock);
+
+    $aExpired = $svc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'kind' => 'domain', 'domain' => 'https://www.ZZ-EXPIRED.co.il/path', 'expiry_date' => '2026-10-01']);
+    $a30 = $svc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'kind' => 'domain', 'domain' => 'zz-30d.co.il', 'expiry_date' => '2026-11-05']);
+    $a60 = $svc->create($w['ownerA'], ['client_id' => (string) $w['d'], 'kind' => 'hosting', 'domain' => 'zz-60d.co.il', 'expiry_date' => '2026-12-05']);
+    $a90 = $svc->create($w['ownerA'], ['client_id' => (string) $w['d'], 'kind' => 'domain', 'domain' => 'zz-90d.co.il', 'expiry_date' => '2027-01-10']);
+
+    $all = $svc->list($w['ownerA'], [], $now);
+    eq(4, $all['kpis']['total']);
+    eq(1, $all['kpis']['expired']);
+    eq(2, $all['kpis']['expiring_30d'], 'expired + <=30d');
+    eq(3, $all['kpis']['expiring_60d']);
+    eq(4, $all['kpis']['expiring_90d']);
+    eq(1, count($svc->list($w['ownerA'], ['window' => 'expired'], $now)['rows']));
+    eq(2, count($svc->list($w['ownerA'], ['window' => '30d'], $now)['rows']));
+
+    // Inspect updates IP, SSL, registrar, expiry_date and logs asset.inspected
+    $findings = $svc->inspect($w['ownerA'], $aExpired);
+    eq('zz-expired.co.il', $findings['host']);
+    $got = $svc->get($w['ownerA'], $aExpired, $now);
+    eq('185.199.108.153', $got['ip_address']);
+    eq('valid', $got['ssl_status']);
+    eq('2027-01-15', $got['ssl_expiry_date']);
+    eq('Box Domains Ltd', $got['registrar']);
+    eq('2027-08-20', $got['expiry_date']);
+    eq(['ns1.cloudflare.com', 'ns2.cloudflare.com'], $got['inspection']['nameservers']);
+    eq(1, $w['ta']->count('events', ['action' => 'asset.inspected']));
+
+    // Viewer sees only own client's assets and cannot create/update/inspect
+    $vRows = $svc->list($w['viewer'], [], $now)['rows'];
+    eq(2, count($vRows), 'viewer sees only client C assets');
+    eq(403, throws(fn () => $svc->get($w['viewer'], $a60, $now), HttpException::class)->status, 'viewer blocked from client D asset');
+    eq(403, throws(fn () => $svc->create($w['viewer'], ['client_id' => (string) $w['c'], 'domain' => 'x.test']), HttpException::class)->status);
+    eq(403, throws(fn () => $svc->inspect($w['viewer'], $aExpired), HttpException::class)->status);
+});
+
+test('vault: AES-256-GCM create/update/reveal, plaintext never in list/get, reveal logged, viewer strictly blocked', function (): void {
+    $w = workWorld();
+    $keyHex = bin2hex(random_bytes(32));
+    $vaultCrypto = Vault::fromKeyString($keyHex);
+    $assets = new AssetService($w['ta'], $w['perms']);
+    $aid = $assets->create($w['ownerA'], ['client_id' => (string) $w['c'], 'kind' => 'hosting', 'domain' => 'zz-vault.co.il']);
+    $svc = new VaultService($w['ta'], $w['perms'], $vaultCrypto);
+
+    $secretPlain = 'ZZ_TopSecret_P@ssw0rd_999!';
+    $vid = $svc->create($w['ownerA'], [
+        'client_id' => (string) $w['c'],
+        'asset_id'  => (string) $aid,
+        'title'     => 'ZZ_cPanel Login',
+        'service'   => 'cPanel',
+        'url'       => 'https://zz-vault.co.il:2083',
+        'username'  => 'zz_root',
+        'secret'    => $secretPlain,
+        'notes'     => 'ZZ_InternalNote',
+    ]);
+
+    $listJson = (string) json_encode($svc->list($w['ownerA']), JSON_UNESCAPED_UNICODE);
+    $getJson = (string) json_encode($svc->get($w['ownerA'], $vid), JSON_UNESCAPED_UNICODE);
+    ok(!str_contains($listJson, $secretPlain) && !str_contains($listJson, 'secret_ciphertext'), 'list never leaks secret or ciphertext');
+    ok(!str_contains($getJson, $secretPlain) && !str_contains($getJson, 'secret_ciphertext'), 'get never leaks secret or ciphertext');
+
+    $rawRow = $w['ta']->find('vault_items', $vid);
+    eq('aes-256-gcm', $rawRow['encryption']);
+    eq(1, (int) $rawRow['has_secret']);
+    ok(!str_contains((string) $rawRow['secret_ciphertext'], $secretPlain), 'DB stores ciphertext only');
+
+    // Explicit reveal decrypts and writes vault.secret_revealed event without the secret
+    $revealed = $svc->reveal($w['ownerA'], $vid);
+    eq($secretPlain, $revealed);
+    $revEvents = $w['ta']->all('events', ['action' => 'vault.secret_revealed']);
+    eq(1, count($revEvents));
+    ok(!str_contains((string) $revEvents[0]['after_json'], $secretPlain), 'event log never contains plaintext secret');
+
+    // Update secret
+    $svc->update($w['ownerA'], $vid, [
+        'client_id' => (string) $w['c'],
+        'asset_id'  => (string) $aid,
+        'title'     => 'ZZ_cPanel Login v2',
+        'secret'    => 'ZZ_RotatedSecret_777!',
+    ]);
+    eq('ZZ_RotatedSecret_777!', $svc->reveal($w['ownerA'], $vid));
+    eq(1, $w['ta']->count('events', ['action' => 'vault.updated']));
+
+    // Hard security invariant: client_viewer can NEVER access or reveal vault items, even if granted override!
+    $w['perms']->setUserPermission($w['ownerA'], (int) $w['viewer']['id'], 'vault.view', true);
+    $w['perms']->setUserPermission($w['ownerA'], (int) $w['viewer']['id'], 'vault.reveal', true);
+    ok(!$w['perms']->can($w['viewer'], 'vault.view'), 'client_viewer blocked from vault.view despite override');
+    ok(!$w['perms']->can($w['viewer'], 'vault.reveal'), 'client_viewer blocked from vault.reveal despite override');
+    eq(403, throws(fn () => $svc->list($w['viewer']), HttpException::class)->status);
+    eq(403, throws(fn () => $svc->reveal($w['viewer'], $vid), HttpException::class)->status);
+});
+
+// ---------------------------------------------------------------- M6: Accounting Recalculation, CEO Dashboard, Users & Client Portal
+
+test('accounting recalculate: updates DB rows in place (300 proforma_open vs proforma_matched, 305/320/330/400)', function (): void {
+    $w = workWorld();
+    $cid = $w['c'];
+    $id300Open = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '300', 'doc_kind' => 'transaction_account', 'amount' => 1500, 'counts_as_income' => 1, 'doc_date' => '2026-03-01']);
+    $id300Closed = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '300', 'doc_kind' => 'transaction_account', 'amount' => 800, 'counts_as_income' => 1, 'doc_date' => '2026-03-02']);
+    $id305 = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '305', 'doc_kind' => 'tax_invoice', 'amount' => 800, 'counts_as_income' => 1, 'doc_date' => '2026-03-05']);
+    $id400Matched = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '400', 'doc_kind' => 'receipt', 'amount' => 800, 'counts_as_income' => 1, 'doc_date' => '2026-03-06']);
+    $id400Standalone = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '400', 'doc_kind' => 'receipt', 'amount' => 450, 'counts_as_income' => 0, 'doc_date' => '2026-03-07']);
+
+    $updated = AccountingRule::recalculate($w['pdo'], $w['ta']->id());
+    ok($updated >= 3, 'recalculate updated rows whose classification changed');
+
+    $r300Open = $w['ta']->find('finance_documents', $id300Open);
+    eq(0, (int) $r300Open['counts_as_income']);
+    eq('proforma_open', $r300Open['income_reason']);
+    eq(null, $r300Open['matched_document_id']);
+
+    $r300Closed = $w['ta']->find('finance_documents', $id300Closed);
+    eq(0, (int) $r300Closed['counts_as_income']);
+    eq('proforma_matched', $r300Closed['income_reason']);
+    eq($id305, (int) $r300Closed['matched_document_id']);
+
+    $r305 = $w['ta']->find('finance_documents', $id305);
+    eq(1, (int) $r305['counts_as_income']);
+    eq('invoice', $r305['income_reason']);
+
+    $r400M = $w['ta']->find('finance_documents', $id400Matched);
+    eq(0, (int) $r400M['counts_as_income']);
+    eq('receipt_matched', $r400M['income_reason']);
+    eq($id305, (int) $r400M['matched_document_id']);
+
+    $r400S = $w['ta']->find('finance_documents', $id400Standalone);
+    eq(1, (int) $r400S['counts_as_income']);
+    eq('receipt_unmatched', $r400S['income_reason']);
+});
+
+test('dashboard & portal: CEO morning screen 5 sections + Client Portal strict isolation', function (): void {
+    $w = workWorld();
+    $now = new DateTimeImmutable('2026-10-19 10:00:00', new DateTimeZone('Asia/Jerusalem'));
+    $cid = $w['c'];
+
+    // Seed urgent task, unlinked task, expiring asset, overdrawn bank, realized invoice + open 300 demand, time entry, vault secret
+    $tasks = new TaskService($w['ta'], $w['perms']);
+    $tOverdue = $tasks->create($w['ownerA'], ['client_id' => (string) $cid, 'title' => 'ZZ_OverdueVisible', 'priority' => 'urgent', 'due_at' => '2026-10-01', 'client_visible' => '1']);
+    $tInternal = $tasks->create($w['ownerA'], ['client_id' => (string) $cid, 'title' => 'ZZ_InternalSecretTask', 'priority' => 'high', 'due_at' => '2026-10-02', 'client_visible' => '0']);
+    $w['ta']->insert('tasks', ['title' => 'ZZ_NeedsLink', 'client_id' => null]);
+
+    (new AssetService($w['ta'], $w['perms']))->create($w['ownerA'], ['client_id' => (string) $cid, 'kind' => 'domain', 'domain' => 'zz-expiring.co.il', 'expiry_date' => '2026-10-25']);
+    (new TimeEntryService($w['ta'], $w['perms']))->create($w['ownerA'], ['client_id' => (string) $cid, 'description' => 'ZZ_Work12h', 'duration' => '12:00', 'entry_date' => '2026-10-19']);
+
+    $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '305', 'doc_kind' => 'tax_invoice', 'amount' => 2500, 'counts_as_income' => 1, 'income_reason' => 'invoice', 'doc_date' => '2026-10-10']);
+    $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '300', 'doc_kind' => 'transaction_account', 'amount' => 1800, 'counts_as_income' => 0, 'income_reason' => 'proforma_open', 'doc_date' => '2026-10-12']);
+    $w['ta']->insert('vault_items', ['client_id' => $cid, 'title' => 'ZZ_RootSSH', 'username' => 'root', 'has_secret' => 1, 'encryption' => 'aes-256-gcm', 'secret_ciphertext' => 'v1:ZZ_CIPHER']);
+
+    $dashSvc = new DashboardService($w['ta'], $w['perms']);
+    $ceo = $dashSvc->ceo($w['ownerA'], $now);
+
+    eq(2, count($ceo['urgent']['overdue_tasks']));
+    eq(1, $ceo['urgent']['needs_linking_total']);
+    eq(1, $ceo['urgent']['open_demands']['count']);
+    eq(1800.0, $ceo['urgent']['open_demands']['amount']);
+    eq(1, count($ceo['breaking']['assets']));
+    eq(1, count($ceo['breaking']['banks']));
+    eq(-2.0, (float) $ceo['breaking']['banks'][0]['remaining_hours'], '10h bank minus 12h entry = -2h overdrawn');
+    eq(2500.0, $ceo['money']['income_this_year'], 'only 305 counted as realized income, never 300');
+    eq(1800.0, $ceo['money']['separation']['proforma_open']['amount']);
+    eq(12.0, $ceo['team']['hours_today']);
+
+    // Client Portal for viewer
+    $portal = $dashSvc->portal($w['viewer'], $now);
+    eq($cid, (int) $portal['client']['id']);
+    eq([$tOverdue], array_map('intval', array_column($portal['tasks'], 'id')), 'portal shows only client_visible=1 tasks');
+    eq([], $portal['vault'], 'portal never includes vault items');
+    $portalHtml = (new View(HUBOS_ROOT . '/views'))->render('dashboard/portal', ['user' => $w['viewer'], 'portal' => $portal]);
+    ok(str_contains($portalHtml, 'ZZ_OverdueVisible'));
+    ok(!str_contains($portalHtml, 'ZZ_InternalSecretTask'), 'internal task never rendered in portal');
+    ok(!str_contains($portalHtml, 'ZZ_RootSSH') && !str_contains($portalHtml, 'ZZ_CIPHER'), 'vault never rendered in portal');
+});
+
+test('users & permissions: UserService create/update, last-owner guard, overrides, and M5/M6 routes', function (): void {
+    $w = workWorld();
+    $uSvc = new UserService($w['pdo'], $w['ta'], $w['perms']);
+    $newUid = $uSvc->create($w['ownerA'], [
+        'name'      => 'ZZ_AgentUser',
+        'email'     => 'zz_agent@hubos.test',
+        'role'      => 'agent',
+        'password'  => 'zz-agent-pass-1234',
+        'client_id' => '',
+    ]);
+    $list = $uSvc->list($w['ownerA']);
+    ok(in_array($newUid, array_map('intval', array_column($list, 'id')), true));
+
+    // Cannot demote or disable the only active owner
+    throws(fn () => $uSvc->update($w['ownerA'], (int) $w['ownerA']['id'], ['role' => 'admin']), InvalidArgumentException::class);
+    throws(fn () => $uSvc->update($w['ownerA'], (int) $w['ownerA']['id'], ['status' => 'disabled']), InvalidArgumentException::class);
+
+    // client_viewer requires a client_id
+    throws(fn () => $uSvc->create($w['ownerA'], [
+        'name' => 'ZZ_NoClientViewer', 'email' => 'zz_ncv@hubos.test', 'role' => 'client_viewer', 'password' => 'zz-pass-123456',
+    ]), InvalidArgumentException::class);
+
+    // Route table checks for M5 & M6
+    $r = new Router();
+    (require HUBOS_ROOT . '/app/routes.php')($r);
+    $perm = static fn (string $m, string $p): ?string => $r->match($m, $p)['opts']['perm'] ?? null;
+    eq('assets.view', $perm('GET', '/assets'));
+    eq('assets.create', $perm('POST', '/assets'));
+    eq('assets.view', $perm('GET', '/assets/10'));
+    eq('assets.update', $perm('POST', '/assets/10'));
+    eq('assets.inspect', $perm('POST', '/assets/10/inspect'));
+    eq('vault.view', $perm('GET', '/vault'));
+    eq('vault.create', $perm('POST', '/vault'));
+    eq('vault.view', $perm('GET', '/vault/10'));
+    eq('vault.update', $perm('POST', '/vault/10'));
+    eq('vault.reveal', $perm('POST', '/vault/10/reveal'));
+    eq('users.view', $perm('GET', '/settings/users'));
+    eq('users.manage', $perm('POST', '/settings/users'));
+    eq('users.manage', $perm('POST', '/settings/users/5'));
+    eq('permissions.manage', $perm('POST', '/settings/users/5/permissions'));
+    eq('permissions.manage', $perm('POST', '/settings/modules'));
 });
 
 // ---------------------------------------------------------------- Run
