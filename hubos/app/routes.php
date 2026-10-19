@@ -22,4 +22,7 @@ return static function (Router $r): void {
 
     $r->get('/clients', [ClientsController::class, 'index'], ['auth' => true, 'perm' => 'clients.view']);
     $r->post('/clients', [ClientsController::class, 'store'], ['auth' => true, 'perm' => 'clients.create']);
+    $r->get('/clients/{id:\d+}', [ClientsController::class, 'show'], ['auth' => true, 'perm' => 'clients.view']);
+    $r->post('/clients/{id:\d+}/enrich', [ClientsController::class, 'enrich'], ['auth' => true, 'perm' => 'clients.update']);
+    $r->post('/clients/{id:\d+}/enrich/apply', [ClientsController::class, 'applyEnrichment'], ['auth' => true, 'perm' => 'clients.update']);
 };

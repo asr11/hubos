@@ -28,3 +28,30 @@ if (!function_exists('fmt_dt')) {
         }
     }
 }
+
+if (!function_exists('fmt_money')) {
+    /** ₪ amount with thousands separators. */
+    function fmt_money(float|int|string|null $amount, int $decimals = 0): string
+    {
+        $n = (float) $amount;
+        return ($n < 0 ? '-' : '') . '₪' . number_format(abs($n), $decimals);
+    }
+}
+
+if (!function_exists('fmt_hours')) {
+    function fmt_hours(float|int|null $hours): string
+    {
+        return number_format((float) $hours, 2);
+    }
+}
+
+if (!function_exists('fmt_date')) {
+    /** 'YYYY-MM-DD…' → 'DD/MM/YYYY' (no timezone shift for plain dates). */
+    function fmt_date(?string $date): string
+    {
+        if ($date === null || preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $date, $m) !== 1) {
+            return (string) $date;
+        }
+        return $m[3] . '/' . $m[2] . '/' . $m[1];
+    }
+}

@@ -41,21 +41,31 @@ $statusLabels = ['active' => 'פעיל', 'inactive' => 'לא פעיל', 'archive
 
 <section class="card" aria-labelledby="clients-title">
     <div class="card-head">
-        <h2 id="clients-title">כל הלקוחות</h2>
-        <span class="badge"><?= e(count($clients)) ?></span>
+        <h2 id="clients-title"><?= ($q ?? '') !== '' ? 'תוצאות חיפוש' : 'כל הלקוחות' ?></h2>
+        <span class="badge" id="clients-count"><?= e(count($clients)) ?></span>
     </div>
+    <form method="get" action="/clients" class="form form-inline search-form" role="search" id="client-search-form">
+        <label class="field">
+            <span>חיפוש</span>
+            <input type="search" name="q" id="client-search" value="<?= e($q ?? '') ?>" maxlength="100"
+                   placeholder="שם, ח.פ, טלפון, אימייל, עיר או דומיין">
+        </label>
+        <button type="submit" class="btn btn-primary" id="client-search-submit">חיפוש</button>
+        <?php if (($q ?? '') !== ''): ?><a class="btn btn-ghost" href="/clients" id="client-search-clear">ניקוי</a><?php endif; ?>
+    </form>
     <?php if ($clients === []): ?>
-        <p class="empty">עדיין אין לקוחות. ייבוא מהמערכת הישנה יגיע בשלב 1.</p>
+        <p class="empty"><?= ($q ?? '') !== '' ? 'לא נמצאו לקוחות תואמים.' : 'עדיין אין לקוחות.' ?></p>
     <?php else: ?>
         <div class="table-wrap">
             <table class="table" id="clients-table">
                 <thead>
-                <tr><th scope="col">שם</th><th scope="col">אימייל</th><th scope="col">טלפון</th><th scope="col">סטטוס</th><th scope="col">נוצר</th></tr>
+                <tr><th scope="col">שם</th><th scope="col">ח.פ</th><th scope="col">אימייל</th><th scope="col">טלפון</th><th scope="col">סטטוס</th><th scope="col">נוצר</th></tr>
                 </thead>
                 <tbody>
                 <?php foreach ($clients as $c): ?>
                     <tr>
-                        <td class="strong"><?= e($c['name']) ?></td>
+                        <td class="strong"><a class="client-link" href="/clients/<?= e((int) $c['id']) ?>"><?= e($c['name']) ?></a></td>
+                        <td dir="ltr" class="ltr-cell"><?= e($c['tax_id'] ?? '') ?></td>
                         <td dir="ltr" class="ltr-cell"><?= e($c['email'] ?? '') ?></td>
                         <td dir="ltr" class="ltr-cell"><?= e($c['phone'] ?? '') ?></td>
                         <td><span class="status status-<?= e($c['status']) ?>"><?= e($statusLabels[$c['status']] ?? $c['status']) ?></span></td>

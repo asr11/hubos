@@ -18,6 +18,9 @@ use HubOS\Core\Auth;
 use HubOS\Core\Csrf;
 use HubOS\Core\DB;
 use HubOS\Core\Events;
+use HubOS\Core\HebrewText;
+use HubOS\Core\Http\HttpClient;
+use HubOS\Core\Http\HttpClientException;
 use HubOS\Core\HttpException;
 use HubOS\Core\Migrator;
 use HubOS\Core\Permissions;
@@ -28,7 +31,9 @@ use HubOS\Core\Tenant;
 use HubOS\Core\ValidationException;
 use HubOS\Core\Vault;
 use HubOS\Core\View;
+use HubOS\Modules\Clients\Client360Service;
 use HubOS\Modules\Clients\ClientService;
+use HubOS\Modules\Clients\CompanyRegistry;
 use HubOS\Modules\Import\AccountingRule;
 use HubOS\Modules\Import\ClientResolver;
 use HubOS\Modules\Import\D1Importer;
@@ -552,6 +557,237 @@ test('tenant isolation: every M1 table is scoped; cross-tenant references are re
     $tb->upsert('leads', ['legacy_id' => 'L1', 'name' => 'ZZ_other']);
     eq('ZZ_one', $ta->all('leads', ['legacy_id' => 'L1'])[0]['name'], 'same legacy_id in two tenants stays separate');
     eq(1, $tb->count('leads'));
+});
+
+// ---------------------------------------------------------------- M2: Client 360
+
+/** Tenant A with a family (parent P ← child C), an unrelated client U, and data for each. */
+function family360(): array
+{
+    [$pdo, $ta, $tb, $ownerA, $ownerB] = world();
+    $p = $ta->insert('clients', ['name' => 'ZZ_Parent אוונגרד', 'tax_id' => '513028068']);
+    $c = $ta->insert('clients', ['name' => 'ZZ_Child קבוצת מנו ספנות', 'tax_id' => '513028068', 'parent_client_id' => $p]);
+    $u = $ta->insert('clients', ['name' => 'ZZ_Unrelated']);
+    $doc = static fn (int $cid, string $code, string $kind, float $amt, int $income, string $date, string $status = 'paid') => $ta->insert('finance_documents', [
+        'client_id' => $cid, 'doc_type' => $code, 'doc_kind' => $kind, 'amount' => $amt, 'counts_as_income' => $income,
+        'doc_date' => $date, 'status' => $status, 'doc_number' => 'ZZ' . $code . $cid . (int) $amt,
+    ]);
+    $inv = $doc($p, '305', 'tax_invoice', 1000, 1, '2025-03-01');
+    $rcpt = $doc($p, '400', 'receipt', 1000, 0, '2025-03-10');
+    $ta->update('finance_documents', $rcpt, ['matched_document_id' => $inv]);
+    $doc($c, '320', 'tax_invoice_receipt', 500, 1, '2026-02-01');
+    $doc($c, '305', 'tax_invoice', 200, 1, '2026-05-01', 'unpaid');
+    $doc($u, '320', 'tax_invoice_receipt', 999, 1, '2026-01-01');
+    $ta->insert('client_contacts', ['client_id' => $c, 'name' => 'ZZ_כפיר', 'is_primary' => 1]);
+    $ta->insert('assets', ['client_id' => $c, 'kind' => 'hosting', 'domain' => 'zz-av-re.test']);
+    $bank = $ta->insert('hours_banks', ['client_id' => $c, 'name' => 'ZZ_Bank', 'total_hours' => 10, 'status' => 'active']);
+    $ta->insert('time_entries', ['client_id' => $c, 'hours_bank_id' => $bank, 'entry_date' => '2026-10-05', 'duration_seconds' => 5400]);
+    $ta->insert('time_entries', ['client_id' => $c, 'entry_date' => '2026-09-05', 'duration_seconds' => 3600]);
+    $ta->insert('vault_items', [
+        'client_id' => $c, 'title' => 'ZZ_wp-admin', 'url' => 'https://zz.test/wp-admin', 'username' => 'zz_admin',
+        'has_secret' => 1, 'encryption' => 'aes-256-gcm', 'secret_ciphertext' => 'v1:ZZ_CIPHERTEXT_LEAK',
+        'notes' => 'ZZ_SECRET_NOTE_LEAK', 'data_json' => json_encode(['notes' => 'ZZ_SECRET_JSON_LEAK']),
+    ]);
+    $cb = $tb->insert('clients', ['name' => 'ZZ_TenantB child', 'parent_client_id' => null]);
+    $tb->insert('finance_documents', ['client_id' => $cb, 'doc_type' => '305', 'doc_kind' => 'tax_invoice', 'amount' => 7777, 'counts_as_income' => 1, 'doc_date' => '2026-01-01']);
+    return compact('pdo', 'ta', 'tb', 'ownerA', 'ownerB', 'p', 'c', 'u', 'cb');
+}
+
+test('client360: family roll-up, origin labels, accounting-rule income, tenant isolation', function (): void {
+    $w = family360();
+    $svc = new Client360Service($w['ta'], new Permissions($w['ta']));
+    $now = new DateTimeImmutable('2026-10-19 10:00', new DateTimeZone('Asia/Jerusalem'));
+
+    $child = $svc->build($w['ownerA'], $w['c'], $now);
+    eq('family', $child['scope']);
+    eq($w['p'], (int) $child['parent']['id'], 'child sees its parent');
+    eq([$w['c'], $w['p']], array_keys($child['family']));
+    eq(4, count($child['finance']), 'child card rolls up the parent docs (and not the unrelated client)');
+    eq(2, count(array_filter($child['finance'], static fn (array $d): bool => $d['origin_client_id'] === $w['p'])), 'parent docs labeled with parent');
+    ok(in_array('ZZ_Parent אוונגרד', array_column($child['finance'], 'origin_name'), true));
+    eq(1700.0, $child['metrics']['income_total'], 'income uses counts_as_income (receipt not double counted; naive sum would be 2700)');
+    eq(700.0, $child['metrics']['income_this_year']);
+    eq(['2026' => 700.0, '2025' => 1000.0], $child['metrics']['income_by_year']);
+    eq(1, $child['metrics']['open_docs_count']);
+    eq(false, $child['metrics']['balance_reliable'], 'balance is declared not reliably computable');
+    eq(1.5, round($child['metrics']['hours_this_month'], 4));
+    eq(8.5, round($child['metrics']['bank_remaining'], 4));
+    eq(4, $child['counts']['finance']);
+    eq(1, $child['counts']['access']);
+    foreach (array_keys(Client360Service::TABS) as $tab) {
+        ok(array_key_exists($tab, $child['counts']), "count for tab {$tab}");
+    }
+
+    $parent = $svc->build($w['ownerA'], $w['p'], $now);
+    eq([$w['c']], array_map(static fn (array $r): int => (int) $r['id'], $parent['children']), 'parent lists its child');
+    eq(4, count($parent['finance']), 'parent card rolls up the child docs');
+    ok(!in_array(999.0, array_map('floatval', array_column($parent['finance'], 'amount')), true), 'unrelated client excluded');
+    ok(!in_array(7777.0, array_map('floatval', array_column($parent['finance'], 'amount')), true), 'other tenant excluded');
+
+    $e = throws(fn () => $svc->build($w['ownerA'], $w['cb']), HttpException::class);
+    eq(404, $e->status, 'tenant A cannot open a tenant B client');
+    $svcB = new Client360Service($w['tb'], new Permissions($w['tb']));
+    eq(404, throws(fn () => $svcB->build($w['ownerB'], $w['c']), HttpException::class)->status);
+});
+
+test('client360: vault secrets never leave the service or the HTML; views are logged', function (): void {
+    $w = family360();
+    $svc = new Client360Service($w['ta'], new Permissions($w['ta']));
+    $card = $svc->build($w['ownerA'], $w['p']);
+    $json = json_encode($card, JSON_UNESCAPED_UNICODE);
+    foreach (['ZZ_CIPHERTEXT_LEAK', 'ZZ_SECRET_NOTE_LEAK', 'ZZ_SECRET_JSON_LEAK', 'secret_ciphertext'] as $needle) {
+        ok(!str_contains((string) $json, $needle), "service output leaks {$needle}");
+    }
+    eq(1, count($card['vault']));
+    $allowed = array_merge(Client360Service::VAULT_COLUMNS, ['origin_client_id', 'origin_name', 'is_own']);
+    eq([], array_values(array_diff(array_keys($card['vault'][0]), $allowed)), 'vault row has metadata columns only');
+    eq('zz_admin', $card['vault'][0]['username']);
+
+    $view = new View(HUBOS_ROOT . '/views');
+    foreach (array_keys(Client360Service::TABS) as $tab) {
+        $html = $view->render('clients/show', ['card' => $card, 'tab' => $tab, 'canEnrich' => false, 'suggestion' => null, 'registryError' => null]);
+        foreach (['ZZ_CIPHERTEXT_LEAK', 'ZZ_SECRET_NOTE_LEAK', 'ZZ_SECRET_JSON_LEAK'] as $needle) {
+            ok(!str_contains($html, $needle), "HTML tab {$tab} leaks {$needle}");
+        }
+        if ($tab === 'access') {
+            ok(str_contains($html, 'ZZ_wp-admin'), 'access tab shows vault metadata');
+        }
+    }
+
+    $svc->logVaultView($w['ownerA'], $w['p'], $card['vault']);
+    $ev = $w['ta']->all('events', ['action' => 'vault.metadata_viewed']);
+    eq(1, count($ev), 'vault view logged');
+    eq($w['p'], (int) $ev[0]['client_id']);
+    ok(!str_contains((string) $ev[0]['after_json'], 'LEAK'));
+});
+
+test('client360: client_viewer sees only its own client (no roll-up, no vault, no audit)', function (): void {
+    $w = family360();
+    $perms = new Permissions($w['ta']);
+    $viewer = userRow($w['pdo'], Provisioning::createUser($w['pdo'], $w['ta']->id(), 'zz_viewer360@hubos.test', 'ZZ_Viewer', 'client_viewer', 'zz-password-123V', (int) $w['ownerA']['id'], $w['c']));
+    $staff = userRow($w['pdo'], Provisioning::createUser($w['pdo'], $w['ta']->id(), 'zz_staff360@hubos.test', 'ZZ_Staff', 'staff', 'zz-password-123S'));
+    $svc = new Client360Service($w['ta'], $perms);
+
+    $own = $svc->build($viewer, $w['c']);
+    eq('self', $own['scope']);
+    eq([$w['c']], array_keys($own['family']), 'no family roll-up for viewer');
+    eq(2, count($own['finance']), 'only own docs');
+    eq([], $own['vault'], 'no vault for viewer');
+    eq([], $own['events'], 'no audit events for viewer');
+    eq(null, $own['parent']);
+    eq(403, throws(fn () => $svc->build($viewer, $w['p']), HttpException::class)->status, 'viewer cannot open parent');
+    eq(403, throws(fn () => $svc->build($viewer, $w['u']), HttpException::class)->status, 'viewer cannot open other client');
+    eq(403, throws(fn () => (new ClientService($w['ta'], $perms))->applyRegistry($viewer, $w['c'], ['name' => 'X'], ['name']), HttpException::class)->status);
+    $cs = new ClientService($w['ta'], $perms);
+    eq([$w['c']], array_map('intval', array_column($cs->search($viewer, ''), 'id')));
+    eq([], $cs->search($viewer, 'ZZ_Unrelated'), 'viewer search cannot reach other clients');
+
+    $s = $svc->build($staff, $w['u']);
+    eq('family', $s['scope'], 'staff sees any tenant client');
+});
+
+test('hebrew search: normalization, one-letter prefix stripping, ranking', function (): void {
+    eq('בעמ', HebrewText::normalize('בע"מ'));
+    eq('בעמ', HebrewText::normalize('בע״מ'));
+    eq('שלומ', HebrewText::normalize('שָׁלוֹם'), 'niqqud removed, final mem normalized');
+    eq('אבג דה', HebrewText::normalize('  אבג - דה! '));
+    eq('מנו', HebrewText::stripPrefix('למנו'));
+    eq(null, HebrewText::stripPrefix('מנו'), 'no strip when < 3 letters remain');
+    eq(null, HebrewText::stripPrefix('abc'));
+    ok(HebrewText::score('מנו', 'קבוצת מנו ספנות') > 0);
+    ok(HebrewText::score('למנו', 'קבוצת מנו ספנות') > 0, 'query prefix ל stripped');
+    ok(HebrewText::score('הספנות', 'קבוצת מנו ספנות') > 0, 'query prefix ה stripped');
+    ok(HebrewText::score('ספנות', 'קבוצת מנו והספנות') > 0, 'haystack word prefix stripped');
+    ok(HebrewText::score('מנו ספנ', 'קבוצת מנו ספנות') > 0, 'all tokens must match (prefix)');
+    eq(0, HebrewText::score('מנו רכב', 'קבוצת מנו ספנות'), 'every token must match');
+    eq(0, HebrewText::score('', 'x'));
+    ok(HebrewText::score('מנו', 'קבוצת מנו ספנות') > HebrewText::score('מנו', 'מנוהלים'), 'exact word outranks prefix');
+
+    $w = family360();
+    $cs = new ClientService($w['ta'], new Permissions($w['ta']));
+    foreach (['מנו', 'למנו', 'הספנות', 'ספנות', '513028068'] as $q) {
+        ok(in_array($w['c'], array_map('intval', array_column($cs->search($w['ownerA'], $q), 'id')), true), "search '{$q}' finds the Mano client");
+    }
+    eq($w['c'], (int) $cs->search($w['ownerA'], 'מנו')[0]['id'], 'best match first');
+    eq(3, count($cs->search($w['ownerA'], '')), 'empty query lists all');
+});
+
+final class ZzMockHttp implements HttpClient
+{
+    /** @var list<string> */
+    public array $urls = [];
+
+    /** @param array{status:int, body:string}|Throwable $reply */
+    public function __construct(private array|Throwable $reply)
+    {
+    }
+
+    public function get(string $url, int $timeoutSeconds = 8): array
+    {
+        $this->urls[] = $url;
+        if ($this->reply instanceof Throwable) {
+            throw $this->reply;
+        }
+        return $this->reply;
+    }
+}
+
+test('registry enrichment: mocked HTTP, suggestions only, explicit apply is stored + logged, failures graceful', function (): void {
+    $body = json_encode(['success' => true, 'result' => ['records' => [
+        ['מספר חברה' => 513028069, 'שם חברה' => 'ZZ_אחרת בע~מ'],
+        ['מספר חברה' => 513028068, 'שם חברה' => 'ZZ_אוונגרד רזידנס בע~מ', 'שם באנגלית' => 'ZZ AVANTGARDE', 'סטטוס חברה' => 'פעילה',
+         'סוג תאגיד' => 'ישראלית חברה פרטית', 'תאריך התאגדות' => '31/10/2000', 'שם עיר' => 'חיפה', 'שם רחוב' => 'פלי~ם', 'מספר בית' => '2', 'מיקוד' => 3309502],
+    ]]], JSON_UNESCAPED_UNICODE);
+    $http = new ZzMockHttp(['status' => 200, 'body' => (string) $body]);
+    $reg = new CompanyRegistry($http, 'https://registry.invalid/api?resource_id=x');
+    $r = $reg->lookup('51-302806-8');
+    ok($r['ok'], 'lookup ok');
+    eq(1, count($http->urls));
+    ok(str_contains($http->urls[0], '&q=513028068'), 'tax id sent as q');
+    eq('ZZ_אוונגרד רזידנס בע"מ', $r['suggestion']['name'], 'exact tax-id record chosen; ~ decoded');
+    eq('פלי"ם 2', $r['suggestion']['address']);
+    eq('חיפה', $r['suggestion']['city']);
+    eq('2000-10-31', $r['suggestion']['incorporation_date']);
+    eq('פעילה', $r['suggestion']['status']);
+
+    $fail = (new CompanyRegistry(new ZzMockHttp(new HttpClientException('down'))))->lookup('513028068');
+    ok(!$fail['ok'] && str_contains($fail['error'], 'לא ניתן להתחבר'), 'network failure is graceful');
+    ok(!(new CompanyRegistry(new ZzMockHttp(['status' => 503, 'body' => ''])))->lookup('513028068')['ok']);
+    ok(!(new CompanyRegistry(new ZzMockHttp(['status' => 200, 'body' => 'not json'])))->lookup('513028068')['ok']);
+    ok(!(new CompanyRegistry(new ZzMockHttp(['status' => 200, 'body' => (string) $body])))->lookup('999999999')['ok'], 'no exact match → not found');
+    $noCall = new ZzMockHttp(['status' => 200, 'body' => '']);
+    ok(!(new CompanyRegistry($noCall))->lookup(null)['ok']);
+    eq([], $noCall->urls, 'invalid tax id never calls the network');
+
+    $w = family360();
+    $cs = new ClientService($w['ta'], new Permissions($w['ta']));
+    $before = $w['ta']->find('clients', $w['p']);
+    eq(0, $w['ta']->count('events', ['action' => 'client.registry_applied']), 'lookup alone stores nothing');
+    $cs->applyRegistry($w['ownerA'], $w['p'], $r['suggestion'], ['address', 'city', 'bogus']);
+    $after = $w['ta']->find('clients', $w['p']);
+    eq($before['name'], $after['name'], 'unchecked field (name) untouched');
+    eq('פלי"ם 2', $after['address']);
+    eq('חיפה', $after['city']);
+    $reg = json_decode((string) $after['data_json'], true)['registry'];
+    eq('פעילה', $reg['status']);
+    eq('2000-10-31', $reg['incorporation_date']);
+    eq(['address', 'city'], $reg['applied_fields']);
+    $ev = $w['ta']->all('events', ['action' => 'client.registry_applied']);
+    eq(1, count($ev), 'apply logged');
+    eq($w['p'], (int) $ev[0]['entity_id']);
+});
+
+test('router: M2 client card routes are protected', function (): void {
+    $r = new Router();
+    (require HUBOS_ROOT . '/app/routes.php')($r);
+    $m = $r->match('GET', '/clients/286');
+    eq(200, $m['status']);
+    eq('286', $m['params']['id']);
+    eq('clients.view', $m['opts']['perm'] ?? null);
+    eq('clients.update', $r->match('POST', '/clients/1/enrich')['opts']['perm'] ?? null);
+    eq('clients.update', $r->match('POST', '/clients/1/enrich/apply')['opts']['perm'] ?? null);
+    eq(404, $r->match('GET', '/clients/abc')['status']);
+    eq(405, $r->match('GET', '/clients/1/enrich')['status']);
 });
 
 // ---------------------------------------------------------------- Run
