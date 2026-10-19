@@ -93,7 +93,8 @@ final class DashboardService
             $odRow = $this->tenant->selectOne(
                 "SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total
                  FROM finance_documents
-                 WHERE tenant_id = :tenant_id AND counts_as_income = 0 AND income_reason = 'proforma_open'"
+                 WHERE tenant_id = :tenant_id AND counts_as_income = 0 AND income_reason = 'proforma_open'
+                   AND COALESCE(LOWER(status), '') != 'paid'"
             );
             $openDemandsSummary['count'] = (int) ($odRow['n'] ?? 0);
             $openDemandsSummary['amount'] = (float) ($odRow['total'] ?? 0.0);
@@ -104,6 +105,7 @@ final class DashboardService
                  FROM finance_documents f
                  LEFT JOIN clients c ON c.tenant_id = f.tenant_id AND c.id = f.client_id
                  WHERE f.tenant_id = :tenant_id AND f.counts_as_income = 0 AND f.income_reason = 'proforma_open'
+                   AND COALESCE(LOWER(f.status), '') != 'paid'
                  GROUP BY f.client_id, COALESCE(c.name, f.client_name_raw, 'ללא שיוך')
                  ORDER BY total_amount DESC LIMIT 8"
             );
@@ -113,6 +115,7 @@ final class DashboardService
                  FROM finance_documents f
                  LEFT JOIN clients c ON c.tenant_id = f.tenant_id AND c.id = f.client_id
                  WHERE f.tenant_id = :tenant_id AND f.counts_as_income = 0 AND f.income_reason = 'proforma_open'
+                   AND COALESCE(LOWER(f.status), '') != 'paid'
                  ORDER BY f.doc_date DESC, f.id DESC LIMIT 8"
             );
         }
@@ -177,6 +180,7 @@ final class DashboardService
                 'receipt_matched_to_invoice' => ['count' => 0, 'amount' => 0.0],
                 'proforma_open'              => ['count' => 0, 'amount' => 0.0],
                 'proforma_matched'           => ['count' => 0, 'amount' => 0.0],
+                'proforma_paid_in_morning'   => ['count' => 0, 'amount' => 0.0],
             ],
         ];
         if ($canClients) {

@@ -1248,19 +1248,25 @@ test('vault: AES-256-GCM create/update/reveal, plaintext never in list/get, reve
 test('accounting recalculate: updates DB rows in place (300 proforma_open vs proforma_matched, 305/320/330/400)', function (): void {
     $w = workWorld();
     $cid = $w['c'];
-    $id300Open = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '300', 'doc_kind' => 'transaction_account', 'amount' => 1500, 'counts_as_income' => 1, 'doc_date' => '2026-03-01']);
+    $id300Open = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '300', 'doc_kind' => 'transaction_account', 'amount' => 1500, 'counts_as_income' => 1, 'status' => 'unpaid', 'doc_date' => '2026-03-01']);
+    $id300PaidMorning = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '300', 'doc_kind' => 'transaction_account', 'amount' => 950, 'counts_as_income' => 1, 'status' => 'paid', 'paid_amount' => 950, 'doc_date' => '2026-03-01']);
     $id300Closed = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '300', 'doc_kind' => 'transaction_account', 'amount' => 800, 'counts_as_income' => 1, 'doc_date' => '2026-03-02']);
     $id305 = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '305', 'doc_kind' => 'tax_invoice', 'amount' => 800, 'counts_as_income' => 1, 'doc_date' => '2026-03-05']);
     $id400Matched = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '400', 'doc_kind' => 'receipt', 'amount' => 800, 'counts_as_income' => 1, 'doc_date' => '2026-03-06']);
     $id400Standalone = $w['ta']->insert('finance_documents', ['client_id' => $cid, 'doc_type' => '400', 'doc_kind' => 'receipt', 'amount' => 450, 'counts_as_income' => 0, 'doc_date' => '2026-03-07']);
 
     $updated = AccountingRule::recalculate($w['pdo'], $w['ta']->id());
-    ok($updated >= 3, 'recalculate updated rows whose classification changed');
+    ok($updated >= 4, 'recalculate updated rows whose classification changed');
 
     $r300Open = $w['ta']->find('finance_documents', $id300Open);
     eq(0, (int) $r300Open['counts_as_income']);
     eq('proforma_open', $r300Open['income_reason']);
     eq(null, $r300Open['matched_document_id']);
+
+    $r300PaidMorning = $w['ta']->find('finance_documents', $id300PaidMorning);
+    eq(0, (int) $r300PaidMorning['counts_as_income']);
+    eq('proforma_paid_in_morning', $r300PaidMorning['income_reason']);
+    eq(null, $r300PaidMorning['matched_document_id']);
 
     $r300Closed = $w['ta']->find('finance_documents', $id300Closed);
     eq(0, (int) $r300Closed['counts_as_income']);

@@ -373,6 +373,12 @@ $prov = $provenance ?? null;
                             <td><?= e((int) ($sep['proforma_matched']['count'] ?? 0)) ?></td>
                             <td dir="ltr" class="muted">₪<?= e(number_format((float) ($sep['proforma_matched']['amount'] ?? 0), 0)) ?></td>
                         </tr>
+                        <tr>
+                            <td>חשבון עסקה שסומן "שולם" ב-Morning (300 · proforma_paid_in_morning)</td>
+                            <td><span class="pill">לא (שולם ב-Morning)</span></td>
+                            <td><?= e((int) ($sep['proforma_paid_in_morning']['count'] ?? 0)) ?></td>
+                            <td dir="ltr" class="muted">₪<?= e(number_format((float) ($sep['proforma_paid_in_morning']['amount'] ?? 0), 0)) ?></td>
+                        </tr>
                     </tbody>
                 </table>
             </div>

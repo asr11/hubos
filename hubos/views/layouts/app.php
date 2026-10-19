@@ -36,12 +36,12 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
     <title><?= e($title ?? '') ?> · <?= e($appName) ?></title>
     <meta name="description" content="OS HUB — מערכת ההפעלה של האב מערכות מתקדמות: לקוחות, גבייה, שעות ופרויקטים במקום אחד.">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="light">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&amp;display=swap">
-    <link rel="stylesheet" href="/assets/app.css">
-    <script src="/assets/timer.js" defer></script>
+    <link rel="stylesheet" href="/assets/app.css?v=2">
+    <script src="/assets/timer.js?v=2" defer></script>
 </head>
 <body class="app-body">
 <div class="app-shell">
