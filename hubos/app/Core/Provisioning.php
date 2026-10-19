@@ -13,7 +13,7 @@ use PDO;
  */
 final class Provisioning
 {
-    public const DEFAULT_MODULES = ['clients'];
+    public const DEFAULT_MODULES = ['clients', 'time', 'work'];
     public const MIN_PASSWORD = 12;
 
     public static function ensureTenant(PDO $pdo, string $slug, string $name): int

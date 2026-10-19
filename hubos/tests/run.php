@@ -37,6 +37,13 @@ use HubOS\Modules\Clients\CompanyRegistry;
 use HubOS\Modules\Import\AccountingRule;
 use HubOS\Modules\Import\ClientResolver;
 use HubOS\Modules\Import\D1Importer;
+use HubOS\Modules\Time\HoursBankService;
+use HubOS\Modules\Time\TimeEntryService;
+use HubOS\Modules\Time\TimerService;
+use HubOS\Modules\Work\LinkingService;
+use HubOS\Modules\Work\ProjectService;
+use HubOS\Modules\Work\RecurringService;
+use HubOS\Modules\Work\TaskService;
 
 final class T
 {
@@ -788,6 +795,314 @@ test('router: M2 client card routes are protected', function (): void {
     eq('clients.update', $r->match('POST', '/clients/1/enrich/apply')['opts']['perm'] ?? null);
     eq(404, $r->match('GET', '/clients/abc')['status']);
     eq(405, $r->match('GET', '/clients/1/enrich')['status']);
+});
+
+// ---------------------------------------------------------------- M3/M4: timer, banks, tasks, projects
+
+/** Tenant A: client C (active 10h bank), client D (no bank), staff + viewer of C; tenant B with its own client. */
+function workWorld(): array
+{
+    [$pdo, $ta, $tb, $ownerA, $ownerB] = world();
+    $c = $ta->insert('clients', ['name' => 'ZZ_Mano קבוצת מנו', 'domain' => 'zz-av-re.co.il']);
+    $d = $ta->insert('clients', ['name' => 'ZZ_Other']);
+    $bank = $ta->insert('hours_banks', ['client_id' => $c, 'name' => 'ZZ_Bank 10', 'total_hours' => 10, 'status' => 'active', 'created_at' => '2026-08-01T00:00:00Z']);
+    $staff = userRow($pdo, Provisioning::createUser($pdo, $ta->id(), 'zz_staff_w@hubos.test', 'ZZ_Staff', 'staff', 'zz-password-123S'));
+    $viewer = userRow($pdo, Provisioning::createUser($pdo, $ta->id(), 'zz_viewer_w@hubos.test', 'ZZ_Viewer', 'client_viewer', 'zz-password-123V', null, $c));
+    $cb = $tb->insert('clients', ['name' => 'ZZ_TenantB client']);
+    $perms = new Permissions($ta);
+    return compact('pdo', 'ta', 'tb', 'ownerA', 'ownerB', 'c', 'd', 'bank', 'staff', 'viewer', 'cb', 'perms');
+}
+
+test('timer: one active timer per user, survives reload, pause/resume accumulate', function (): void {
+    $w = workWorld();
+    $now = 1_790_000_000;
+    $clock = static function () use (&$now): int { return $now; };
+    $svc = new TimerService($w['ta'], $w['perms'], $clock);
+    $svc->start($w['ownerA'], ['client_id' => (string) $w['c']]);
+    eq(409, throws(fn () => $svc->start($w['ownerA'], ['client_id' => (string) $w['d']]), HttpException::class)->status, 'second timer rejected');
+    eq(1, $w['ta']->count('active_timers', ['user_id' => (int) $w['ownerA']['id']]));
+    throws(fn () => $w['ta']->insert('active_timers', ['user_id' => (int) $w['ownerA']['id'], 'client_id' => $w['d']]), PDOException::class); // DB UNIQUE as well
+    $svc->start($w['staff'], ['client_id' => (string) $w['d']]);
+    eq(2, $w['ta']->count('active_timers'), 'other users have their own timer');
+
+    $now += 600;
+    $reloaded = (new TimerService($w['ta'], $w['perms'], $clock))->current($w['ownerA']); // "refresh": fresh service, state from DB
+    eq(600, $reloaded['elapsed_seconds']);
+    ok($reloaded['running']);
+    eq($w['c'], (int) $reloaded['client_id']);
+    $svc->pause($w['ownerA']);
+    $now += 1000; // paused time does not count
+    eq(600, $svc->current($w['ownerA'])['elapsed_seconds']);
+    $svc->resume($w['ownerA']);
+    $now += 60;
+    eq(660, $svc->current($w['ownerA'])['elapsed_seconds']);
+    foreach (['timer.started', 'timer.paused', 'timer.resumed'] as $a) {
+        ok($w['ta']->count('events', ['action' => $a]) >= 1, "{$a} logged");
+    }
+    // tenant isolation: tenant B owner cannot start a timer on tenant A's client
+    $svcB = new TimerService($w['tb'], new Permissions($w['tb']), $clock);
+    ok(isset(throws(fn () => $svcB->start($w['ownerB'], ['client_id' => (string) $w['c']]), ValidationException::class)->errors['client_id']));
+});
+
+test('timer: stop requires a description, creates the entry and deducts the client bank', function (): void {
+    $w = workWorld();
+    $now = 1_790_000_000;
+    $clock = static function () use (&$now): int { return $now; };
+    $svc = new TimerService($w['ta'], $w['perms'], $clock);
+    $task = (new TaskService($w['ta'], $w['perms']))->create($w['ownerA'], ['client_id' => (string) $w['c'], 'title' => 'ZZ_task']);
+    $svc->start($w['ownerA'], ['task_id' => (string) $task]); // client derived from the task
+    $now += 5400;
+    throws(fn () => $svc->stop($w['ownerA'], ' '), ValidationException::class);
+    eq(1, $w['ta']->count('active_timers'), 'timer still running after rejected stop');
+    eq(0, $w['ta']->count('time_entries'));
+
+    $entryId = $svc->stop($w['ownerA'], 'ZZ_תיקון באתר');
+    $e = $w['ta']->find('time_entries', $entryId);
+    eq(5400, (int) $e['duration_seconds']);
+    eq($w['c'], (int) $e['client_id']);
+    eq($task, (int) $e['task_id']);
+    eq($w['bank'], (int) $e['hours_bank_id'], 'linked to the active bank');
+    eq((int) $w['ownerA']['id'], (int) $e['user_id']);
+    eq('timer', $e['source']);
+    eq(0, $w['ta']->count('active_timers'), 'timer removed');
+    $bank = (new HoursBankService($w['ta']))->summarize($w['ta']->find('hours_banks', $w['bank']));
+    eq(1.5, $bank['used_hours']);
+    eq(8.5, $bank['remaining_hours'], 'bank remaining decreased');
+    eq(1, $w['ta']->count('events', ['action' => 'time_entry.created']));
+    eq(1, $w['ta']->count('events', ['action' => 'timer.stopped']));
+    eq(409, throws(fn () => $svc->stop($w['ownerA'], 'ZZ_again'), HttpException::class)->status, 'no timer to stop');
+
+    // client without a bank: entry still created, no bank link
+    $svc->start($w['ownerA'], ['client_id' => (string) $w['d']]);
+    $now += 60;
+    eq(null, $w['ta']->find('time_entries', $svc->stop($w['ownerA'], 'ZZ_no bank'))['hours_bank_id']);
+});
+
+test('hours bank: 80% / 90% thresholds and threshold-crossing events', function (): void {
+    eq('ok', HoursBankService::level(7.99, 10));
+    eq('warn80', HoursBankService::level(8.0, 10));
+    eq('warn80', HoursBankService::level(8.99, 10));
+    eq('warn90', HoursBankService::level(9.0, 10));
+    eq('over', HoursBankService::level(10.0, 10));
+    eq('ok', HoursBankService::level(0, 0));
+    eq('over', HoursBankService::level(1, 0));
+
+    $w = workWorld();
+    $entries = new TimeEntryService($w['ta'], $w['perms']);
+    $entries->create($w['ownerA'], ['client_id' => (string) $w['c'], 'description' => 'ZZ_a', 'duration' => '7:30', 'entry_date' => '2026-10-01']);
+    eq(0, $w['ta']->count('events', ['action' => 'hours_bank.threshold_crossed']), '75%: no alert');
+    $entries->create($w['ownerA'], ['client_id' => (string) $w['c'], 'description' => 'ZZ_b', 'duration' => '0:45', 'entry_date' => '2026-10-02']);
+    $ev = $w['ta']->all('events', ['action' => 'hours_bank.threshold_crossed']);
+    eq(1, count($ev), '82.5%: crossed 80');
+    eq('warn80', json_decode((string) $ev[0]['after_json'], true)['level']);
+    $entries->create($w['ownerA'], ['client_id' => (string) $w['c'], 'description' => 'ZZ_c', 'duration' => '0:45', 'entry_date' => '2026-10-03']);
+    eq(2, $w['ta']->count('events', ['action' => 'hours_bank.threshold_crossed']), '90%: crossed 90');
+    $s = (new HoursBankService($w['ta']))->summarize($w['ta']->find('hours_banks', $w['bank']));
+    eq('warn90', $s['level']);
+    eq(90, $s['pct']);
+    $card = (new Client360Service($w['ta'], $w['perms']))->build($w['ownerA'], $w['c']);
+    ok((bool) array_filter($card['alerts'], static fn (array $a): bool => str_contains($a['text'], '90%')), 'card shows the 90% alert');
+    eq('warn90', $card['own_bank']['level']);
+});
+
+test('hours bank: monthly rollover computation (carry, cap, no negative carry, off)', function (): void {
+    $used = ['2026-08' => 6.0, '2026-09' => 12.0, '2026-10' => 3.0];
+    $m = HoursBankService::rollover(10, true, '2026-08', '2026-10', $used);
+    eq(['2026-08', '2026-09', '2026-10'], array_column($m, 'month'));
+    eq([10.0, 14.0, 12.0], array_map('floatval', array_column($m, 'allowance')), 'unused 4h → Sep, then 2h → Oct');
+    eq([4.0, 2.0, 9.0], array_map('floatval', array_column($m, 'remaining')));
+    $capped = HoursBankService::rollover(10, true, '2026-08', '2026-10', $used, 1.0);
+    eq([10.0, 11.0, 10.0], array_map('floatval', array_column($capped, 'allowance')), 'carry capped at 1h; overuse carries 0');
+    $off = HoursBankService::rollover(10, false, '2026-08', '2026-10', $used);
+    eq([10.0, 10.0, 10.0], array_map('floatval', array_column($off, 'allowance')));
+    eq(-2.0, (float) $off[1]['remaining'], 'overuse shows negative in its own month');
+    eq('2027-01', HoursBankService::nextMonth('2026-12'));
+    eq(1, count(HoursBankService::rollover(5, true, '2026-12', '2026-10', [])), 'start after current clamps');
+
+    $w = workWorld();
+    (new HoursBankService($w['ta'], $w['perms']))->updateSettings($w['ownerA'], $w['bank'], ['period' => 'monthly', 'rollover' => '1', 'starts_on' => '2026-08-01']);
+    eq(1, $w['ta']->count('events', ['action' => 'hours_bank.settings_updated']), 'settings change logged');
+    $entries = new TimeEntryService($w['ta'], $w['perms']);
+    foreach (['2026-08-10' => '6:00', '2026-09-10' => '12:00', '2026-10-10' => '3:00'] as $date => $dur) {
+        $entries->create($w['ownerA'], ['client_id' => (string) $w['c'], 'description' => 'ZZ_m', 'duration' => $dur, 'entry_date' => $date]);
+    }
+    $s = (new HoursBankService($w['ta']))->summarize($w['ta']->find('hours_banks', $w['bank']), '2026-10');
+    eq(12.0, (float) $s['allowance_hours']);
+    eq(9.0, (float) $s['remaining_hours']);
+    eq(403, throws(fn () => (new HoursBankService($w['ta'], $w['perms']))->updateSettings($w['staff'], $w['bank'], ['period' => 'one_time']), HttpException::class)->status, 'staff cannot change bank settings');
+});
+
+test('time entries: manual create/edit/delete logged with before/after; own entries only for staff', function (): void {
+    $w = workWorld();
+    $svc = new TimeEntryService($w['ta'], $w['perms']);
+    eq(3600, TimeEntryService::parseDuration('1:00'));
+    eq(5400, TimeEntryService::parseDuration('1.5'));
+    eq(2700, TimeEntryService::parseDuration('45m'));
+    eq(null, TimeEntryService::parseDuration('0'));
+    eq(null, TimeEntryService::parseDuration('25:00'));
+    $e = throws(fn () => $svc->create($w['ownerA'], ['description' => 'ZZ_x', 'duration' => '1:00']), ValidationException::class);
+    ok(isset($e->errors['client_id']), 'client required for time entries');
+    $id = $svc->create($w['staff'], ['client_id' => (string) $w['c'], 'description' => 'ZZ_manual', 'duration' => '1:00', 'entry_date' => '2026-10-05']);
+    eq($w['bank'], (int) $w['ta']->find('time_entries', $id)['hours_bank_id']);
+    $svc->update($w['ownerA'], $id, ['client_id' => (string) $w['c'], 'description' => 'ZZ_manual fixed', 'duration' => '2:00', 'entry_date' => '2026-10-05']);
+    $ev = $w['ta']->all('events', ['action' => 'time_entry.updated'])[0];
+    eq(3600, json_decode((string) $ev['before_json'], true)['duration_seconds']);
+    eq(7200, json_decode((string) $ev['after_json'], true)['duration_seconds']);
+    $other = $svc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'description' => 'ZZ_owner', 'duration' => '0:30']);
+    eq(403, throws(fn () => $svc->update($w['staff'], $other, ['client_id' => (string) $w['c'], 'description' => 'ZZ_hijack', 'duration' => '9:00']), HttpException::class)->status, 'staff cannot edit others');
+    $svc->delete($w['staff'], $id);
+    eq(null, $w['ta']->find('time_entries', $id));
+    $del = $w['ta']->all('events', ['action' => 'time_entry.deleted'])[0];
+    eq('ZZ_manual fixed', json_decode((string) $del['before_json'], true)['description'], 'delete keeps the before snapshot');
+    $list = $svc->list($w['ownerA'], ['client_id' => (string) $w['c']]);
+    eq(1800, $list['total_seconds']);
+});
+
+test('tasks & projects: client_id is required on create and edit; references must agree', function (): void {
+    $w = workWorld();
+    $tasks = new TaskService($w['ta'], $w['perms']);
+    $projects = new ProjectService($w['ta'], $w['perms']);
+    $n = $w['ta']->count('tasks');
+    $e = throws(fn () => $tasks->create($w['ownerA'], ['title' => 'ZZ_no client']), ValidationException::class);
+    ok(isset($e->errors['client_id']));
+    eq($n, $w['ta']->count('tasks'), 'nothing created');
+    ok(isset(throws(fn () => $projects->create($w['ownerA'], ['name' => 'ZZ_no client']), ValidationException::class)->errors['client_id']));
+    ok(isset(throws(fn () => $tasks->create($w['ownerA'], ['title' => 'ZZ_x', 'client_id' => '999999']), ValidationException::class)->errors['client_id']), 'unknown client');
+    ok(isset(throws(fn () => $tasks->create($w['ownerA'], ['title' => 'ZZ_x', 'client_id' => (string) $w['cb']]), ValidationException::class)->errors['client_id']), 'other tenant client');
+
+    $pid = $projects->create($w['ownerA'], ['name' => 'ZZ_Proj', 'client_id' => (string) $w['c']]);
+    ok(isset(throws(fn () => $tasks->create($w['ownerA'], ['title' => 'ZZ_x', 'client_id' => (string) $w['d'], 'project_id' => (string) $pid]), ValidationException::class)->errors['project_id']), 'project of another client');
+    $tid = $tasks->create($w['ownerA'], ['title' => 'ZZ_ok', 'client_id' => (string) $w['c'], 'project_id' => (string) $pid, 'priority' => 'high', 'due_at' => '2026-11-01', 'assignee_user_id' => (string) $w['staff']['id'], 'client_visible' => '1']);
+    $t = $w['ta']->find('tasks', $tid);
+    eq(['todo', 'high', 1, (int) $w['staff']['id']], [$t['status'], $t['priority'], (int) $t['client_visible'], (int) $t['assignee_user_id']]);
+    ok(isset(throws(fn () => $tasks->update($w['ownerA'], $tid, ['title' => 'ZZ_ok', 'client_id' => '']), ValidationException::class)->errors['client_id']), 'edit cannot drop the client');
+    ok(isset(throws(fn () => $tasks->create($w['ownerA'], ['title' => 'ZZ_x', 'client_id' => (string) $w['c'], 'assignee_user_id' => (string) $w['viewer']['id']]), ValidationException::class)->errors['assignee_user_id']), 'viewer cannot be assignee');
+    $tasks->update($w['ownerA'], $tid, ['title' => 'ZZ_ok2', 'client_id' => (string) $w['c'], 'status' => 'doing']);
+    $ev = $w['ta']->all('events', ['action' => 'task.updated'])[0];
+    eq('todo', json_decode((string) $ev['before_json'], true)['status']);
+    eq('doing', json_decode((string) $ev['after_json'], true)['status']);
+    $tasks->setArchived($w['ownerA'], $tid, true);
+    eq([], array_values(array_filter($tasks->list($w['ownerA']), static fn (array $r): bool => (int) $r['id'] === $tid)), 'archived hidden from list');
+    eq(1, count($tasks->list($w['ownerA'], ['archived' => '1'])));
+    foreach (['task.created', 'task.archived', 'project.created'] as $a) {
+        eq(1, $w['ta']->count('events', ['action' => $a]), "{$a} logged");
+    }
+});
+
+test('needs linking: suggestions by domain/name are never auto-applied; explicit link is logged', function (): void {
+    $w = workWorld();
+    $parent = $w['ta']->insert('clients', ['name' => 'ZZ_אוונגרד', 'domain' => 'www.zz-av-re.co.il']);
+    $t1 = $w['ta']->insert('tasks', ['title' => 'בניית תיק לקוח ZZ-AV-RE.CO.IL']);
+    $t2 = $w['ta']->insert('tasks', ['title' => 'פגישה עם ZZ_Other מחר']);
+    $t3 = $w['ta']->insert('tasks', ['title' => 'משהו כללי']);
+    $p1 = $w['ta']->insert('projects', ['name' => 'zz-av-re.com']);
+    $svc = new LinkingService($w['ta'], $w['perms']);
+    $q = $svc->queue($w['ownerA']);
+    $byId = array_column($q['tasks'], null, 'id');
+    $sug = array_map('intval', array_column($byId[$t1]['suggestions'], 'client_id'));
+    sort($sug);
+    eq([$w['c'], $parent], $sug, 'domain match suggests both av-re clients');
+    eq(100, $byId[$t1]['suggestions'][0]['score']);
+    eq($w['d'], $byId[$t2]['suggestions'][0]['client_id'] ?? null, 'name match');
+    eq([], $byId[$t3]['suggestions'], 'no suggestion for generic title');
+    eq(80, array_column($q['projects'], null, 'id')[$p1]['suggestions'][0]['score'], 'same domain label, other TLD');
+    // NEVER auto-applied: computing suggestions changed nothing
+    eq(4, $w['ta']->count('tasks', ['client_id' => null]) + $w['ta']->count('projects', ['client_id' => null]));
+    eq(0, $w['ta']->count('events', ['action' => 'task.linked']));
+    eq(403, throws(fn () => $svc->queue($w['staff']), HttpException::class)->status, 'admin-only queue');
+    eq(403, throws(fn () => $svc->link($w['staff'], 'task', $t1, $w['c']), HttpException::class)->status);
+
+    $svc->link($w['ownerA'], 'task', $t1, $parent);
+    eq($parent, (int) $w['ta']->find('tasks', $t1)['client_id']);
+    $ev = $w['ta']->all('events', ['action' => 'task.linked'])[0];
+    $after = json_decode((string) $ev['after_json'], true);
+    ok($after['used_suggestion'], 'logged as suggestion accepted');
+    eq(null, json_decode((string) $ev['before_json'], true)['client_id']);
+    eq(409, throws(fn () => $svc->link($w['ownerA'], 'task', $t1, $w['c']), HttpException::class)->status, 'already linked');
+    $svc->link($w['ownerA'], 'project', $p1, $w['d']);
+    ok(!json_decode((string) $w['ta']->all('events', ['action' => 'project.linked'])[0]['after_json'], true)['used_suggestion'], 'manual choice logged');
+    $card = (new Client360Service($w['ta'], $w['perms']))->build($w['ownerA'], $parent);
+    ok(in_array($t1, array_map('intval', array_column($card['tasks'], 'id')), true), 'linked task appears in the client work tab');
+    $svcB = new LinkingService($w['tb'], new Permissions($w['tb']));
+    eq(404, throws(fn () => $svcB->link($w['ownerB'], 'task', $t2, $w['cb']), HttpException::class)->status, 'tenant isolation');
+});
+
+test('recurring: monthly template generation is idempotent per month', function (): void {
+    $w = workWorld();
+    $svc = new RecurringService($w['ta'], $w['perms']);
+    $tpl = $svc->createTemplate($w['ownerA'], ['client_id' => (string) $w['c'], 'title' => 'ZZ_גיבוי חודשי', 'day_of_month' => '5', 'client_visible' => '1']);
+    ok(isset(throws(fn () => $svc->createTemplate($w['ownerA'], ['title' => 'ZZ_x']), ValidationException::class)->errors['client_id']), 'template requires client');
+    $r1 = $svc->generate('2026-11');
+    eq(1, count($r1['created']));
+    $task = $w['ta']->find('tasks', $r1['created'][0]);
+    eq([$w['c'], '2026-11-05', $tpl, '2026-11', 1], [(int) $task['client_id'], $task['due_at'], (int) $task['recurring_template_id'], $task['recurring_period'], (int) $task['client_visible']]);
+    $r2 = $svc->generate('2026-11');
+    eq([[], 1], [$r2['created'], $r2['skipped']], 'second run creates nothing');
+    eq(1, $w['ta']->count('tasks', ['recurring_template_id' => $tpl]));
+    throws(fn () => $w['ta']->insert('tasks', ['client_id' => $w['c'], 'title' => 'dup', 'recurring_template_id' => $tpl, 'recurring_period' => '2026-11']), PDOException::class); // DB guard
+    eq(1, count($svc->generate('2026-12')['created']), 'next month creates one');
+    $svc->setActive($w['ownerA'], $tpl, false);
+    eq(0, count($svc->generate('2027-01')['created']), 'inactive template skipped');
+    eq(2, $w['ta']->count('events', ['action' => 'task.created']), 'both generated tasks (Nov, Dec) are logged');
+    throws(fn () => $svc->generate('2026-13'), InvalidArgumentException::class);
+});
+
+test('viewer: client-visible tasks and time totals only; cannot start timers or edit', function (): void {
+    $w = workWorld();
+    $tasks = new TaskService($w['ta'], $w['perms']);
+    $visible = $tasks->create($w['ownerA'], ['client_id' => (string) $w['c'], 'title' => 'ZZ_visible', 'client_visible' => '1']);
+    $internal = $tasks->create($w['ownerA'], ['client_id' => (string) $w['c'], 'title' => 'ZZ_internal']);
+    $tasks->create($w['ownerA'], ['client_id' => (string) $w['d'], 'title' => 'ZZ_other client', 'client_visible' => '1']);
+    (new TimeEntryService($w['ta'], $w['perms']))->create($w['ownerA'], ['client_id' => (string) $w['c'], 'description' => 'ZZ_SECRET_INTERNAL_NOTE', 'duration' => '2:00']);
+    $v = $w['viewer'];
+
+    eq([$visible], array_map('intval', array_column($tasks->list($v), 'id')), 'viewer list = own client-visible only');
+    ok(!array_key_exists('assignee_user_id', $tasks->list($v)[0]), 'no internal fields for viewer');
+    eq(403, throws(fn () => $tasks->get($v, $internal), HttpException::class)->status);
+    eq(403, throws(fn () => $tasks->create($v, ['client_id' => (string) $w['c'], 'title' => 'ZZ_v']), HttpException::class)->status);
+    eq(403, throws(fn () => $tasks->update($v, $visible, ['client_id' => (string) $w['c'], 'title' => 'ZZ_v']), HttpException::class)->status);
+    eq(403, throws(fn () => (new TimerService($w['ta'], $w['perms']))->start($v, ['client_id' => (string) $w['c']]), HttpException::class)->status, 'viewer cannot start a timer');
+    eq(403, throws(fn () => (new TimeEntryService($w['ta'], $w['perms']))->create($v, ['client_id' => (string) $w['c'], 'description' => 'x', 'duration' => '1:00']), HttpException::class)->status);
+    eq(0, $w['ta']->count('active_timers'));
+
+    $list = (new TimeEntryService($w['ta'], $w['perms']))->list($v, ['client_id' => (string) $w['d']]);
+    eq([], $list['rows'], 'no entry rows for viewer');
+    eq(7200, $list['total_seconds'], 'forced to own client totals');
+    eq($w['c'], $list['filters']['client_id']);
+
+    $card = (new Client360Service($w['ta'], $w['perms']))->build($v, $w['c']);
+    eq([$visible], array_map('intval', array_column($card['tasks'], 'id')), 'card work tab: visible tasks only');
+    eq([], $card['time_entries']);
+    eq(2.0, $card['metrics']['hours_total'], 'viewer still sees totals');
+    $html = (new View(HUBOS_ROOT . '/views'))->render('clients/show', ['card' => $card, 'tab' => 'time', 'canEnrich' => false, 'suggestion' => null, 'registryError' => null]);
+    ok(!str_contains($html, 'ZZ_SECRET_INTERNAL_NOTE'), 'no internal description in viewer HTML');
+    ok(!str_contains($html, 'client-timer-form'), 'no timer controls for viewer');
+    $html = (new View(HUBOS_ROOT . '/views'))->render('clients/show', ['card' => $card, 'tab' => 'work', 'canEnrich' => false, 'suggestion' => null, 'registryError' => null]);
+    ok(!str_contains($html, 'ZZ_internal') && str_contains($html, 'ZZ_visible'));
+});
+
+test('router: M3/M4 routes are protected with the right permissions', function (): void {
+    $r = new Router();
+    (require HUBOS_ROOT . '/app/routes.php')($r);
+    $perm = static fn (string $m, string $p): ?string => $r->match($m, $p)['opts']['perm'] ?? null;
+    eq('time.view', $perm('GET', '/time'));
+    eq('time.view', $perm('GET', '/timer'));
+    foreach (['/timer/start', '/timer/pause', '/timer/resume', '/timer/stop', '/timer/discard', '/time/entries', '/time/entries/5', '/time/entries/5/delete'] as $p) {
+        eq('time.track', $perm('POST', $p), $p);
+    }
+    eq('time.manage', $perm('POST', '/hours-banks/1/settings'));
+    eq('work.view', $perm('GET', '/tasks'));
+    eq('work.create', $perm('POST', '/tasks'));
+    eq('work.update', $perm('POST', '/tasks/55'));
+    eq('work.archive', $perm('POST', '/projects/3/archive'));
+    eq('work.link', $perm('GET', '/work/linking'));
+    eq('work.link', $perm('POST', '/work/linking/task/55'));
+    eq('work.link', $perm('POST', '/work/linking/project/3'));
+    eq(404, $r->match('POST', '/work/linking/client/3')['status']);
+    $w = workWorld();
+    ok(!$w['perms']->can($w['viewer'], 'time.track') && !$w['perms']->can($w['viewer'], 'work.create'));
+    ok($w['perms']->can($w['viewer'], 'time.view') && $w['perms']->can($w['viewer'], 'work.view'));
+    ok(!$w['perms']->can($w['staff'], 'work.link') && $w['perms']->can($w['staff'], 'time.track'));
 });
 
 // ---------------------------------------------------------------- Run

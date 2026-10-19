@@ -76,7 +76,9 @@ check "GET /clients" 200 "$code"
 out=$(curl -s -c "$JAR" -b "$JAR" -o /dev/null -w '%{http_code} %{redirect_url}' --data-urlencode "_csrf=$TOKEN" --data-urlencode "name=ZZ_Client <b>x</b>" "$BASE/clients")
 check "POST /clients create" "303 $BASE/clients" "$out"
 curl -s -c "$JAR" -b "$JAR" -o "$TMP/clients.html" "$BASE/clients"
-check "client listed + escaped" 1 "$(grep -c 'ZZ_Client &lt;b&gt;x&lt;/b&gt;' "$TMP/clients.html")"
+# scoped to the clients table (the M3 header timer also lists client names, escaped)
+check "client listed + escaped" 1 "$(sed -n '/id="clients-table"/,/<\/table>/p' "$TMP/clients.html" | grep -c 'ZZ_Client &lt;b&gt;x&lt;/b&gt;')"
+check "client name never rendered raw" 0 "$(grep -c 'ZZ_Client <b>' "$TMP/clients.html" || true)"
 code=$(curl -s -c "$JAR" -b "$JAR" -o /dev/null -w '%{http_code}' --data-urlencode "name=ZZ_NoToken" "$BASE/clients")
 check "POST /clients without CSRF" 403 "$code"
 

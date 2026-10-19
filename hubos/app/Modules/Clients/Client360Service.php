@@ -11,6 +11,7 @@ use HubOS\Core\HttpException;
 use HubOS\Core\Lang;
 use HubOS\Core\Permissions;
 use HubOS\Core\Tenant;
+use HubOS\Modules\Time\HoursBankService;
 
 /**
  * Client 360: one call returns everything about a client, rolled up over its
@@ -103,6 +104,10 @@ final class Client360Service
         $interactions = $this->label($this->rows('interactions', $ids, 'COALESCE(occurred_at, created_at) DESC'), $names, $clientId);
         $projects = $this->label($this->rows('projects', $ids, 'created_at DESC'), $names, $clientId);
         $tasks = $this->label($this->tasks($ids, array_map(static fn (array $p): int => (int) $p['id'], $projects)), $names, $clientId);
+        // M4: archived work is hidden; viewers see only client-visible items.
+        $visible = static fn (array $r): bool => $r['archived_at'] === null && ($internal || (int) $r['client_visible'] === 1);
+        $projects = array_values(array_filter($projects, $visible));
+        $tasks = array_values(array_filter($tasks, $visible));
         $timeEntries = $this->label($this->rows('time_entries', $ids, 'COALESCE(entry_date, started_at, created_at) DESC'), $names, $clientId);
         $banks = $this->label($this->rows('hours_banks', $ids, 'status ASC, id ASC'), $names, $clientId);
         $finance = $this->label($this->rows('finance_documents', $ids, 'doc_date DESC, id DESC'), $names, $clientId);
@@ -119,15 +124,17 @@ final class Client360Service
         unset($doc);
 
         // ---------------------------------------------------------- time
-        $usedByBank = $this->bankUsage(array_map(static fn (array $b): int => (int) $b['id'], $banks));
+        // M3: usage / thresholds (80%, 90%) / monthly rollover via HoursBankService.
+        $bankService = new HoursBankService($this->tenant);
         $bankRemaining = null;
+        $ownActiveBank = null;
         foreach ($banks as &$bank) {
-            $used = ($usedByBank[(int) $bank['id']] ?? 0) / 3600;
-            $bank['used_hours'] = $used;
-            $bank['remaining_hours'] = (float) $bank['total_hours'] - $used;
-            $bank['low'] = (float) $bank['total_hours'] > 0 && $bank['remaining_hours'] / (float) $bank['total_hours'] < 0.2;
+            $bank = $bankService->summarize($bank, $month);
             if (($bank['status'] ?? '') === 'active') {
                 $bankRemaining = ($bankRemaining ?? 0.0) + $bank['remaining_hours'];
+                if ($bank['is_own'] && $ownActiveBank === null) {
+                    $ownActiveBank = $bank;
+                }
             }
         }
         unset($bank);
@@ -140,6 +147,10 @@ final class Client360Service
             if (str_starts_with($date, $month)) {
                 $hoursThisMonth += $h;
             }
+        }
+        $timeEntryCount = count($timeEntries);
+        if (!$internal) {
+            $timeEntries = []; // client_viewer: totals only, never internal descriptions
         }
 
         // ---------------------------------------------------------- money (accounting rule)
@@ -191,7 +202,7 @@ final class Client360Service
             'contacts'     => count($contacts),
             'interactions' => count($interactions),
             'work'         => count($projects) + count($tasks),
-            'time'         => count($timeEntries),
+            'time'         => $timeEntryCount,
             'finance'      => count($finance),
             'collection'   => count($openDocs),
             'sales'        => count($leads) + count($quotes),
@@ -218,6 +229,7 @@ final class Client360Service
             'open_tasks'   => $openTasks,
             'time_entries' => $timeEntries,
             'hours_banks'  => $banks,
+            'own_bank'     => $ownActiveBank,
             'finance'      => $finance,
             'open_docs'    => $openDocs,
             'collection'   => $collection,
@@ -376,26 +388,6 @@ final class Client360Service
         );
     }
 
-    /**
-     * @param list<int> $bankIds
-     * @return array<int, int> bank id => used seconds
-     */
-    private function bankUsage(array $bankIds): array
-    {
-        if ($bankIds === []) {
-            return [];
-        }
-        [$in, $params] = self::in($bankIds, 'b');
-        $out = [];
-        foreach ($this->tenant->select(
-            "SELECT hours_bank_id, SUM(duration_seconds) AS secs FROM time_entries WHERE tenant_id = :tenant_id AND hours_bank_id IN ({$in}) GROUP BY hours_bank_id",
-            $params
-        ) as $r) {
-            $out[(int) $r['hours_bank_id']] = (int) $r['secs'];
-        }
-        return $out;
-    }
-
     /** @return array<string, mixed>|null registry data previously applied by a user */
     private function registryData(int $clientId): ?array
     {
@@ -450,9 +442,14 @@ final class Client360Service
             }
         }
         foreach ($banks as $b) {
-            if (($b['status'] ?? '') === 'active' && $b['low']) {
-                $out[] = ['level' => 'warn', 'text' => 'בנק שעות "' . $b['name'] . '": נותרו פחות מ-20%'];
+            if (($b['status'] ?? '') !== 'active' || $b['level'] === 'ok') {
+                continue;
             }
+            $out[] = match ($b['level']) {
+                'over'   => ['level' => 'danger', 'text' => 'בנק שעות "' . $b['name'] . '": נוצל במלואו (' . $b['pct'] . '%)'],
+                'warn90' => ['level' => 'danger', 'text' => 'בנק שעות "' . $b['name'] . '": נוצלו ' . $b['pct'] . '% (מעל 90%)'],
+                default  => ['level' => 'warn', 'text' => 'בנק שעות "' . $b['name'] . '": נוצלו ' . $b['pct'] . '% (מעל 80%)'],
+            };
         }
         if ($openDocs !== []) {
             $out[] = ['level' => 'info', 'text' => count($openDocs) . ' מסמכים במצב "לא שולם" לפי Morning'];

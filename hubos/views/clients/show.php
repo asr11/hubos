@@ -15,7 +15,14 @@ $c = $card['client'];
 $m = $card['metrics'];
 $id = (int) $c['id'];
 $statusLabels = ['active' => 'פעיל', 'inactive' => 'לא פעיל', 'archived' => 'בארכיון'];
-$taskStatus = ['todo' => 'לביצוע', 'in_progress' => 'בתהליך', 'done' => 'בוצע'];
+$taskStatus = ['todo' => 'לביצוע', 'doing' => 'בתהליך', 'in_progress' => 'בתהליך', 'done' => 'בוצע'];
+$priorityLabels = \HubOS\Modules\Work\TaskService::PRIORITIES;
+$levelLabels = ['ok' => 'תקין', 'warn80' => 'מעל 80%', 'warn90' => 'מעל 90%', 'over' => 'נוצל במלואו'];
+$canTrack = $canTrack ?? false;
+$canWork = $canWork ?? false;
+$timer = $timer ?? null;
+$ownBank = $card['own_bank'] ?? null;
+$hm = static fn (int $s): string => sprintf('%d:%02d', intdiv($s, 3600), intdiv($s % 3600, 60));
 $projStatus = ['active' => 'פעיל', 'done' => 'הסתיים', 'paused' => 'מושהה'];
 $docStatus = ['paid' => 'שולם', 'unpaid' => 'לא שולם', 'pending' => 'ממתין', 'partial' => 'שולם חלקית'];
 $interactionKinds = ['note' => 'הערה', 'call' => 'שיחה', 'meeting' => 'פגישה', 'whatsapp' => 'ווטסאפ', 'email' => 'מייל', 'task_note' => 'הערת משימה', 'task_activity' => 'פעילות משימה'];
@@ -66,9 +73,10 @@ $familyRolled = count($card['family']) > 1;
             <span class="kpi-hint"><?= e($m['month']) ?></span>
         </div>
         <div class="kpi" id="kpi-bank">
-            <span class="kpi-label">יתרה בבנק השעות</span>
-            <span class="kpi-value"><?= $m['bank_remaining'] === null ? '—' : e(fmt_hours($m['bank_remaining'])) ?></span>
-            <span class="kpi-hint"><?= $m['bank_remaining'] === null ? 'אין בנק שעות פעיל' : 'שעות בבנקים פעילים' ?></span>
+            <span class="kpi-label">יתרה בבנק השעות
+                <?php if ($ownBank !== null && $ownBank['level'] !== 'ok'): ?><span class="level level-<?= e($ownBank['level']) ?>" id="bank-alert"><?= e($ownBank['pct']) ?>%</span><?php endif; ?></span>
+            <span class="kpi-value" id="bank-remaining"><?= $m['bank_remaining'] === null ? '—' : e(fmt_hours($m['bank_remaining'])) ?></span>
+            <span class="kpi-hint"><?php if ($ownBank !== null): ?>נוצלו <?= e(fmt_hours($ownBank['used_hours'])) ?> מתוך <?= e(fmt_hours($ownBank['allowance_hours'])) ?><?php elseif ($m['bank_remaining'] === null): ?>אין בנק שעות פעיל<?php else: ?>שעות בבנקים פעילים<?php endif; ?></span>
         </div>
         <div class="kpi" id="kpi-income">
             <span class="kpi-label">הכנסה <?= e($m['year']) ?></span>
@@ -76,6 +84,25 @@ $familyRolled = count($card['family']) > 1;
             <span class="kpi-hint">לפי חוק המסמך החשבונאי · ברוטו</span>
         </div>
     </div>
+    <?php if ($canTrack): ?>
+    <div class="client-timer" id="client-timer">
+        <?php if ($timer !== null && (int) $timer['client_id'] === $id): ?>
+            <span class="timer-dot <?= $timer['running'] ? 'is-running' : 'is-paused' ?>" aria-hidden="true"></span>
+            <strong id="client-timer-running">טיימר <?= $timer['running'] ? 'רץ' : 'מושהה' ?> על הלקוח</strong>
+            <span class="muted"><?= e($timer['task_title'] ?? '') ?> · <?= e($hm((int) $timer['elapsed_seconds'])) ?> · לעצירה: בסרגל העליון</span>
+        <?php elseif ($timer !== null): ?>
+            <span class="muted" id="client-timer-other">טיימר פעיל על <a href="/clients/<?= e((int) $timer['client_id']) ?>"><?= e($timer['client_name'] ?? '') ?></a> — יש לעצור אותו לפני הפעלה כאן.</span>
+        <?php else: ?>
+            <form method="post" action="/timer/start" class="inline-form" id="client-timer-form">
+                <?= Csrf::field() ?><input type="hidden" name="client_id" value="<?= e($id) ?>"><input type="hidden" name="_return" value="/clients/<?= e($id) ?>?tab=time">
+                <select name="task_id" aria-label="משימה (רשות)"><option value="">ללא משימה</option>
+                    <?php foreach ($card['open_tasks'] as $ot): ?><?php if ($ot['is_own']): ?><option value="<?= e((int) $ot['id']) ?>"><?= e($ot['title']) ?></option><?php endif; ?><?php endforeach; ?>
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm" id="client-timer-start">▶ הפעלת טיימר ללקוח</button>
+            </form>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 </section>
 
 <?php if ($canEnrich): ?>
@@ -188,22 +215,29 @@ $familyRolled = count($card['family']) > 1;
     </ol>
 
 <?php elseif ($tab === 'work'): ?>
+    <?php if ($canWork): ?><p class="tab-actions"><a class="btn btn-ghost btn-sm" id="work-new-task" href="/tasks?client_id=<?= e($id) ?>#new">+ משימה חדשה ללקוח</a>
+        <a class="btn btn-ghost btn-sm" href="/projects?client_id=<?= e($id) ?>#new">+ פרויקט חדש</a></p><?php endif; ?>
     <h3>פרויקטים (<?= e(count($card['projects'])) ?>)</h3>
     <?php if ($card['projects'] === []): ?><p class="empty">אין פרויקטים.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="projects-table">
         <thead><tr><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">נוצר</th><th scope="col">לקוח</th></tr></thead>
         <tbody><?php foreach ($card['projects'] as $p): ?>
-            <tr><td class="strong"><?= e($p['name']) ?></td><td><?= e($projStatus[$p['status']] ?? $p['status']) ?></td><td class="muted"><?= e(fmt_dt($p['created_at'])) ?></td><td><?= $origin($p) ?></td></tr>
+            <tr><td class="strong"><?php if ($card['internal']): ?><a href="/projects/<?= e((int) $p['id']) ?>"><?= e($p['name']) ?></a><?php else: ?><?= e($p['name']) ?><?php endif; ?></td><td><?= e($projStatus[$p['status']] ?? $p['status']) ?></td><td class="muted"><?= e(fmt_dt($p['created_at'])) ?></td><td><?= $origin($p) ?></td></tr>
         <?php endforeach; ?></tbody>
     </table></div>
     <?php endif; ?>
     <h3>משימות (<?= e(count($card['tasks'])) ?>)</h3>
     <?php if ($card['tasks'] === []): ?><p class="empty">אין משימות.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="tasks-table">
-        <thead><tr><th scope="col">משימה</th><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">אחראי</th><th scope="col">יעד</th><th scope="col">לקוח</th></tr></thead>
+        <thead><tr><th scope="col">משימה</th><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">עדיפות</th><?php if ($card['internal']): ?><th scope="col">נראות</th><?php endif; ?><th scope="col">יעד</th><th scope="col">לקוח</th><?php if ($canTrack): ?><th scope="col"></th><?php endif; ?></tr></thead>
         <tbody><?php foreach ($card['tasks'] as $t): ?>
-            <tr><td class="strong"><?= e($t['title']) ?></td><td><?= e($t['project_name'] ?? '') ?></td><td><?= e($taskStatus[$t['status']] ?? $t['status']) ?></td>
-                <td><?= e($t['assignee'] ?? '') ?></td><td><?= e(fmt_date($t['due_at'] ?? null)) ?></td><td><?= $origin($t) ?></td></tr>
+            <tr class="work-task" id="work-task-<?= e((int) $t['id']) ?>"><td class="strong"><a href="/tasks/<?= e((int) $t['id']) ?>"><?= e($t['title']) ?></a></td><td><?= e($t['project_name'] ?? '') ?></td><td><?= e($taskStatus[$t['status']] ?? $t['status']) ?></td>
+                <td><?= e($priorityLabels[$t['priority'] ?? 'normal'] ?? '') ?></td>
+                <?php if ($card['internal']): ?><td><?= (int) ($t['client_visible'] ?? 0) === 1 ? '<span class="visible-flag">גלוי ללקוח</span>' : '<span class="muted">פנימי</span>' ?></td><?php endif; ?>
+                <td><?= e(fmt_date($t['due_at'] ?? null)) ?></td><td><?= $origin($t) ?></td>
+                <?php if ($canTrack): ?><td><?php if ($timer === null && $t['client_id'] !== null): ?><form method="post" action="/timer/start" class="inline-form"><?= Csrf::field() ?>
+                    <input type="hidden" name="task_id" value="<?= e((int) $t['id']) ?>"><input type="hidden" name="_return" value="/clients/<?= e($id) ?>?tab=work">
+                    <button type="submit" class="btn btn-ghost btn-sm" title="טיימר על המשימה">▶</button></form><?php endif; ?></td><?php endif; ?></tr>
         <?php endforeach; ?></tbody>
     </table></div>
     <?php endif; ?>
@@ -212,21 +246,41 @@ $familyRolled = count($card['family']) > 1;
     <h3>בנקי שעות (<?= e(count($card['hours_banks'])) ?>)</h3>
     <?php if ($card['hours_banks'] === []): ?><p class="empty">אין בנק שעות.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="banks-table">
-        <thead><tr><th scope="col">בנק</th><th scope="col">סטטוס</th><th scope="col">סה"כ</th><th scope="col">נוצל</th><th scope="col">יתרה</th><th scope="col">תעריף</th><th scope="col">לקוח</th></tr></thead>
+        <thead><tr><th scope="col">בנק</th><th scope="col">סטטוס</th><th scope="col">תקופה</th><th scope="col">מכסה</th><th scope="col">נוצל</th><th scope="col">יתרה</th><th scope="col">מצב</th><th scope="col">תעריף</th><th scope="col">לקוח</th></tr></thead>
         <tbody><?php foreach ($card['hours_banks'] as $b): ?>
-            <tr class="<?= $b['low'] ? 'row-warn' : '' ?>"><td class="strong"><?= e($b['name']) ?></td><td><?= e($b['status']) ?></td><td><?= e(fmt_hours($b['total_hours'])) ?></td>
-                <td><?= e(fmt_hours($b['used_hours'])) ?></td><td><?= e(fmt_hours($b['remaining_hours'])) ?></td><td><?= $b['rate'] !== null ? e(fmt_money($b['rate'])) : '' ?></td><td><?= $origin($b) ?></td></tr>
+            <tr class="<?= $b['low'] ? 'row-warn' : '' ?>" id="card-bank-<?= e((int) $b['id']) ?>"><td class="strong"><?= e($b['name']) ?></td><td><?= e($b['status']) ?></td>
+                <td><?= ($b['period'] ?? 'one_time') === 'monthly' ? 'חודשי' . ((int) ($b['rollover'] ?? 0) === 1 ? ' + גלגול' : '') : 'חד-פעמי' ?></td>
+                <td><?= e(fmt_hours($b['allowance_hours'])) ?></td>
+                <td><?= e(fmt_hours($b['used_hours'])) ?> <span class="muted">(<?= e($b['pct']) ?>%)</span></td><td class="bank-remaining"><?= e(fmt_hours($b['remaining_hours'])) ?></td>
+                <td><span class="level level-<?= e($b['level']) ?>"><?= e($levelLabels[$b['level']] ?? '') ?></span></td>
+                <td><?= $b['rate'] !== null ? e(fmt_money($b['rate'])) : '' ?></td><td><?= $origin($b) ?></td></tr>
+            <?php if (($b['months'] ?? []) !== [] && (int) ($b['rollover'] ?? 0) === 1): ?>
+            <tr class="bank-months"><td colspan="9" class="muted small">גלגול: <?php foreach (array_slice($b['months'], -4) as $mo): ?><?= e($mo['month']) ?> — מכסה <?= e(fmt_hours($mo['allowance'])) ?> (מתוכה הועבר <?= e(fmt_hours($mo['carried_in'])) ?>), נוצל <?= e(fmt_hours($mo['used'])) ?> · <?php endforeach; ?></td></tr>
+            <?php endif; ?>
         <?php endforeach; ?></tbody>
     </table></div>
-    <p class="muted small">ניצול = סכום רישומי זמן המקושרים לבנק (hours_bank_id).</p>
+    <p class="muted small">ניצול = סכום רישומי זמן המקושרים לבנק. התראות ב-80% וב-90%. רישום חדש מנוכה אוטומטית מהבנק הפעיל של הלקוח.</p>
     <?php endif; ?>
-    <h3>רישומי זמן (<?= e(count($card['time_entries'])) ?> · סה"כ <?= e(fmt_hours($m['hours_total'])) ?> שעות)</h3>
-    <?php if ($card['time_entries'] === []): ?><p class="empty">אין רישומי זמן.</p><?php else: ?>
+    <?php if ($canTrack): ?>
+    <h3>רישום זמן ידני</h3>
+    <form method="post" action="/time/entries" class="form form-inline" id="card-entry-form">
+        <?= Csrf::field() ?><input type="hidden" name="client_id" value="<?= e($id) ?>"><input type="hidden" name="_return" value="/clients/<?= e($id) ?>?tab=time">
+        <label class="field"><span>משימה</span><select name="task_id"><option value="">ללא</option>
+            <?php foreach ($card['open_tasks'] as $ot): ?><?php if ($ot['is_own']): ?><option value="<?= e((int) $ot['id']) ?>"><?= e($ot['title']) ?></option><?php endif; ?><?php endforeach; ?></select></label>
+        <label class="field"><span>תאריך</span><input type="date" name="entry_date" value="<?= e(\HubOS\Modules\Time\TimeEntryService::today()) ?>"></label>
+        <label class="field"><span>משך * (1:30)</span><input type="text" name="duration" required dir="ltr"></label>
+        <label class="field field-wide"><span>תיאור *</span><input type="text" name="description" required maxlength="500"></label>
+        <button type="submit" class="btn btn-primary">שמירה</button>
+    </form>
+    <?php endif; ?>
+    <h3>רישומי זמן (<?= e($card['counts']['time']) ?> · סה"כ <?= e(fmt_hours($m['hours_total'])) ?> שעות · החודש <?= e(fmt_hours($m['hours_this_month'])) ?>)</h3>
+    <?php if ($card['time_entries'] === []): ?><p class="empty"><?= $card['internal'] ? 'אין רישומי זמן.' : 'מוצגים סיכומי שעות בלבד.' ?></p><?php else: ?>
     <div class="table-wrap"><table class="table" id="time-table">
-        <thead><tr><th scope="col">תאריך</th><th scope="col">תיאור</th><th scope="col">שעות</th><th scope="col">מקור</th><th scope="col">לקוח</th></tr></thead>
+        <thead><tr><th scope="col">תאריך</th><th scope="col">תיאור</th><th scope="col">שעות</th><th scope="col">מקור</th><th scope="col">לקוח</th><?php if ($canTrack): ?><th scope="col"></th><?php endif; ?></tr></thead>
         <tbody><?php foreach ($card['time_entries'] as $te): ?>
-            <tr><td><?= e(fmt_date($te['entry_date'] ?? $te['started_at'])) ?></td><td><?= e($te['description'] ?? '') ?></td>
-                <td><?= e(fmt_hours((int) $te['duration_seconds'] / 3600)) ?></td><td class="muted"><?= e($te['source'] ?? '') ?></td><td><?= $origin($te) ?></td></tr>
+            <tr class="card-time-entry"><td><?= e(fmt_date($te['entry_date'] ?? $te['started_at'])) ?></td><td><?= e($te['description'] ?? '') ?></td>
+                <td><?= e(fmt_hours((int) $te['duration_seconds'] / 3600)) ?></td><td class="muted"><?= e($te['source'] ?? '') ?></td><td><?= $origin($te) ?></td>
+                <?php if ($canTrack): ?><td><a class="btn btn-ghost btn-sm" href="/time/entries/<?= e((int) $te['id']) ?>">עריכה</a></td><?php endif; ?></tr>
         <?php endforeach; ?></tbody>
     </table></div>
     <?php endif; ?>
