@@ -56,8 +56,25 @@ final class AccountingRule
         return (int) round($amount * 100);
     }
 
+    public static function isPaidInMorning(array $doc): bool
+    {
+        $st = strtolower(trim((string) ($doc['status'] ?? '')));
+        if ($st === 'paid') {
+            return true;
+        }
+        $amt = (float) ($doc['amount'] ?? 0.0);
+        $paidRaw = $doc['paid_amount'] ?? $doc['paidAmount'] ?? null;
+        if ($paidRaw !== null && $paidRaw !== '' && is_numeric($paidRaw)) {
+            $paid = (float) $paidRaw;
+            if ($amt > 0.0 && self::cents($paid) >= self::cents($amt)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
-     * @param list<array{key:string, kind:?string, amount:float, client_key:?string, date:?string}> $docs
+     * @param list<array{key:string, kind:?string, amount:float, client_key:?string, date:?string, status?:?string, paid_amount?:?float}> $docs
      * @return array<string, array{counts:bool, reason:string, matched:?string}>
      */
     public static function classify(array $docs): array
@@ -104,7 +121,8 @@ final class AccountingRule
         foreach ($proformas as $p) {
             $bucket = $p['client_key'] === null ? null : $p['client_key'] . '|' . self::cents($p['amount']);
             if ($bucket === null || empty($closingPool[$bucket])) {
-                $out[$p['key']] = ['counts' => false, 'reason' => 'proforma_open', 'matched' => null];
+                $reason = self::isPaidInMorning($p) ? 'proforma_paid_in_morning' : 'proforma_open';
+                $out[$p['key']] = ['counts' => false, 'reason' => $reason, 'matched' => null];
                 continue;
             }
             $matched = self::takeNearest($closingPool[$bucket], (string) $p['date']);
@@ -131,11 +149,14 @@ final class AccountingRule
         foreach ($tenantIds as $tid) {
             $t = new Tenant($pdo, $tid);
             $rows = $t->select(
-                'SELECT id, legacy_id, client_id, client_name_raw, doc_type, doc_type_source, doc_kind, amount, doc_date,
+                "SELECT id, legacy_id, client_id, client_name_raw, doc_type, doc_type_source, doc_kind, amount, doc_date,
+                        status, paid_amount,
+                        CASE WHEN data_json IS NOT NULL AND json_valid(data_json) THEN json_extract(data_json, '$.status') ELSE NULL END AS json_status,
+                        CASE WHEN data_json IS NOT NULL AND json_valid(data_json) THEN json_extract(data_json, '$.paidAmount') ELSE NULL END AS json_paid_amount,
                         counts_as_income, income_reason, matched_document_id
                    FROM finance_documents
                   WHERE tenant_id = :tenant_id
-                  ORDER BY COALESCE(legacy_id, CAST(id AS TEXT)) ASC, id ASC'
+                  ORDER BY COALESCE(legacy_id, CAST(id AS TEXT)) ASC, id ASC"
             );
             if ($rows === []) {
                 continue;
@@ -158,12 +179,20 @@ final class AccountingRule
                 $clientKey = $r['client_id'] !== null
                     ? 'c:' . (int) $r['client_id']
                     : (($n = ClientResolver::normName(is_string($r['client_name_raw'] ?? null) ? $r['client_name_raw'] : null)) !== null ? 'n:' . $n : null);
+                $statusVal = is_string($r['status'] ?? null) && trim($r['status']) !== ''
+                    ? trim($r['status'])
+                    : (is_string($r['json_status'] ?? null) && trim($r['json_status']) !== '' ? trim($r['json_status']) : null);
+                $paidVal = ($r['paid_amount'] ?? null) !== null && is_numeric($r['paid_amount'])
+                    ? (float) $r['paid_amount']
+                    : (($r['json_paid_amount'] ?? null) !== null && is_numeric($r['json_paid_amount']) ? (float) $r['json_paid_amount'] : null);
                 $input[] = [
-                    'key'        => $key,
-                    'kind'       => $kind,
-                    'amount'     => (float) $r['amount'],
-                    'client_key' => $clientKey,
-                    'date'       => is_string($r['doc_date'] ?? null) ? $r['doc_date'] : null,
+                    'key'         => $key,
+                    'kind'        => $kind,
+                    'amount'      => (float) $r['amount'],
+                    'client_key'  => $clientKey,
+                    'date'        => is_string($r['doc_date'] ?? null) ? $r['doc_date'] : null,
+                    'status'      => $statusVal,
+                    'paid_amount' => $paidVal,
                 ];
             }
             $classified = self::classify($input);
@@ -200,10 +229,11 @@ final class AccountingRule
      */
     public static function openDemands(array $rows): array
     {
+        $knownReasons = ['proforma_open', 'proforma_matched', 'proforma_paid_in_morning'];
         $needsClassify = false;
         foreach ($rows as $r) {
             $is300 = ($r['doc_type'] ?? '') === '300' || ($r['doc_kind'] ?? '') === 'transaction_account';
-            if ($is300 && !in_array($r['income_reason'] ?? null, ['proforma_open', 'proforma_matched'], true)) {
+            if ($is300 && !in_array($r['income_reason'] ?? null, $knownReasons, true)) {
                 $needsClassify = true;
                 break;
             }
@@ -216,11 +246,13 @@ final class AccountingRule
                 $kind = $r['doc_kind'] ?? self::kindForCode((string) ($r['doc_type'] ?? ''));
                 $cid = $r['client_id'] ?? $r['origin_client_id'] ?? null;
                 $input[] = [
-                    'key'        => $key,
-                    'kind'       => is_string($kind) ? $kind : null,
-                    'amount'     => (float) ($r['amount'] ?? 0),
-                    'client_key' => $cid !== null ? 'c:' . (int) $cid : null,
-                    'date'       => is_string($r['doc_date'] ?? null) ? $r['doc_date'] : null,
+                    'key'         => $key,
+                    'kind'        => is_string($kind) ? $kind : null,
+                    'amount'      => (float) ($r['amount'] ?? 0),
+                    'client_key'  => $cid !== null ? 'c:' . (int) $cid : null,
+                    'date'        => is_string($r['doc_date'] ?? null) ? $r['doc_date'] : null,
+                    'status'      => is_string($r['status'] ?? null) ? $r['status'] : null,
+                    'paid_amount' => isset($r['paid_amount']) && is_numeric($r['paid_amount']) ? (float) $r['paid_amount'] : null,
                 ];
             }
             $classified = self::classify($input);
@@ -229,11 +261,11 @@ final class AccountingRule
         $out = [];
         foreach ($rows as $i => $r) {
             $is300 = ($r['doc_type'] ?? '') === '300' || ($r['doc_kind'] ?? '') === 'transaction_account';
-            if (!$is300) {
+            if (!$is300 || self::isPaidInMorning($r)) {
                 continue;
             }
             $reason = $r['income_reason'] ?? null;
-            if (in_array($reason, ['proforma_open', 'proforma_matched'], true)) {
+            if (in_array($reason, $knownReasons, true)) {
                 if ($reason === 'proforma_open' && ($r['matched_document_id'] ?? null) === null) {
                     $out[] = $r;
                 }

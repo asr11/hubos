@@ -848,7 +848,16 @@ final class D1Importer
             $this->link('finance_documents', $method);
             $ids[$key] = $id;
             $clientKey = $clientId !== null ? 'c:' . $clientId : (($n = ClientResolver::normName($rawName)) !== null ? 'n:' . $n : null);
-            $ruleInput[] = ['key' => $key, 'kind' => $kind, 'amount' => $amount, 'client_key' => $clientKey, 'date' => $date, 'code' => $code];
+            $ruleInput[] = [
+                'key'         => $key,
+                'kind'        => $kind,
+                'amount'      => $amount,
+                'client_key'  => $clientKey,
+                'date'        => $date,
+                'code'        => $code,
+                'status'      => self::s($d['status'] ?? null),
+                'paid_amount' => self::f($d['paidAmount'] ?? null),
+            ];
         }
 
         $result = AccountingRule::classify(array_map(static fn (array $r): array => array_diff_key($r, ['code' => 1]), $ruleInput));

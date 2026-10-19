@@ -55,8 +55,9 @@ TENANT=$(q "SELECT tenant_id FROM clients WHERE id=$CHILD_ID")
 check "zero 300 docs counted as realized income" 0 "$(q "SELECT COUNT(*) FROM finance_documents WHERE doc_type='300' AND counts_as_income=1")"
 OPEN_300=$(q "SELECT COUNT(*) FROM finance_documents WHERE doc_type='300' AND income_reason='proforma_open'")
 MATCHED_300=$(q "SELECT COUNT(*) FROM finance_documents WHERE doc_type='300' AND income_reason='proforma_matched'")
+PAID_MORNING_300=$(q "SELECT COUNT(*) FROM finance_documents WHERE doc_type='300' AND income_reason='proforma_paid_in_morning'")
 TOTAL_300=$(q "SELECT COUNT(*) FROM finance_documents WHERE doc_type='300'")
-check "all 300 docs classified as proforma_open or proforma_matched" "$TOTAL_300" "$((OPEN_300 + MATCHED_300))"
+check "all 300 docs classified as proforma_open, proforma_matched or proforma_paid_in_morning" "$TOTAL_300" "$((OPEN_300 + MATCHED_300 + PAID_MORNING_300))"
 
 HUBOS_APP_ROOT="$ROOT" php -r '
 require getenv("HUBOS_APP_ROOT")."/app/bootstrap.php";
