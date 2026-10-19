@@ -59,4 +59,27 @@ Environment: `HUBOS_DB_PATH`, `HUBOS_SESSION_PATH`, `HUBOS_LOG_PATH`,
 
 - Nginx `root` must point to `hubos/public`; deny everything else.
 - Set `HUBOS_COOKIE_SECURE=1` behind TLS.
-- Vault encryption (libsodium) is Phase 5.
+
+## M1 — business schema + D1 import
+
+- `database/migrations/002_business.sql`: the 7 roots — `clients` (+ legacy_id,
+  tax_id, address, city, domain, notes, data_json, parent_client_id),
+  `client_contacts`, `suppliers`, `projects`, `tasks`, `hours_banks`,
+  `time_entries`, `active_timers`, `finance_documents`, `expenses`, `leads`,
+  `quotes`, `assets`, `vault_items`, `interactions`. All tenant-scoped and
+  registered in `Tenant::TABLES`; references use composite FKs
+  `(tenant_id, x_id)` so a row cannot point at another tenant's data.
+  `legacy_id` is UNIQUE per tenant → `Tenant::upsert()` makes imports idempotent.
+- Importer: `php bin/import_d1.php <dump.sql> [--db=…] [--report=…]` → tenant
+  `hub` ("האב מערכות מתקדמות"). Loads the dump into a temp staging SQLite
+  (foreign keys OFF), maps every entity from its SSOT, writes
+  `storage/import_report.md` (source vs imported, merges, skips with reasons,
+  link coverage, doc-type mapping, income per year, full source inventory).
+- Accounting rule (`Modules/Import/AccountingRule`): 300/305/320 = income;
+  400 receipt = income only if no invoice-type doc of the same client with the
+  same amount is available to pair with it (1:1, nearest date). Code→kind
+  mapping is taken from the data (`documentKind`); unknown codes are flagged.
+- Vault: secrets are encrypted with AES-256-GCM (openssl) using
+  `HUBOS_VAULT_KEY` (32 bytes, base64 or 64 hex). Without a key only metadata
+  is imported — plaintext is never stored.
+- i18n: UI/report strings live in `lang/he.php` (`Core\Lang::t()`).

@@ -7,3 +7,7 @@ storage/*
 # Root .gitignore ignores *.sql; migrations must be tracked
 !database/migrations/
 !database/migrations/*.sql
+
+# Synthetic test fixtures (ZZ_ data only)
+!tests/fixtures/
+!tests/fixtures/*.sql

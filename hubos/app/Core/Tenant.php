@@ -16,7 +16,13 @@ use Throwable;
 final class Tenant
 {
     /** Tables that carry tenant_id and may be accessed through this scope. */
-    private const TABLES = ['clients', 'users', 'events', 'tenant_modules', 'tenant_settings', 'user_permissions'];
+    public const TABLES = [
+        'clients', 'users', 'events', 'tenant_modules', 'tenant_settings', 'user_permissions',
+        // M1 business roots (002_business.sql)
+        'client_contacts', 'suppliers', 'projects', 'tasks', 'hours_banks', 'time_entries',
+        'active_timers', 'finance_documents', 'expenses', 'leads', 'quotes', 'assets',
+        'vault_items', 'interactions',
+    ];
 
     public function __construct(private PDO $pdo, private int $tenantId)
     {
@@ -76,6 +82,52 @@ final class Tenant
         $sql = 'INSERT INTO ' . $this->table($table) . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $marks) . ')';
         DB::run($this->pdo, $sql, $params);
         return (int) $this->pdo->lastInsertId();
+    }
+
+    /**
+     * Idempotent INSERT ... ON CONFLICT(tenant_id, keys) DO UPDATE.
+     * Requires a UNIQUE index on (tenant_id, ...keys). Columns in $insertOnly
+     * are written on first insert only (never overwritten on re-run).
+     *
+     * @param array<string, scalar|null> $data
+     * @param list<string> $keys
+     * @param list<string> $insertOnly
+     * @return int id of the inserted/updated row
+     */
+    public function upsert(string $table, array $data, array $keys = ['legacy_id'], array $insertOnly = ['created_at']): int
+    {
+        unset($data['tenant_id'], $data['id']);
+        if ($keys === []) {
+            throw new InvalidArgumentException('upsert requires key columns');
+        }
+        $where = [];
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $data) || $data[$key] === null) {
+                throw new InvalidArgumentException('upsert key must be present and not null');
+            }
+            $where[$key] = $data[$key];
+        }
+        $data = ['tenant_id' => $this->tenantId] + $data;
+        $cols = [];
+        $marks = [];
+        $params = [];
+        $sets = [];
+        foreach ($data as $col => $value) {
+            $ident = self::ident((string) $col);
+            $cols[] = $ident;
+            $marks[] = '?';
+            $params[] = $value;
+            if ($col !== 'tenant_id' && !in_array($col, $keys, true) && !in_array($col, $insertOnly, true)) {
+                $sets[] = $ident . ' = excluded.' . $ident;
+            }
+        }
+        $target = implode(', ', array_map(static fn (string $k): string => self::ident($k), ['tenant_id', ...$keys]));
+        $sql = 'INSERT INTO ' . $this->table($table) . ' (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $marks) . ')'
+            . ' ON CONFLICT (' . $target . ') DO ' . ($sets === [] ? 'NOTHING' : 'UPDATE SET ' . implode(', ', $sets));
+        DB::run($this->pdo, $sql, $params);
+
+        [$clause, $whereParams] = $this->where($where);
+        return (int) DB::run($this->pdo, 'SELECT id FROM ' . $this->table($table) . ' WHERE ' . $clause, $whereParams)->fetchColumn();
     }
 
     /**
