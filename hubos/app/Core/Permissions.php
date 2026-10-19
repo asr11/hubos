@@ -34,7 +34,7 @@ final class Permissions
                             'time.view', 'time.track', 'work.view', 'work.create', 'work.update', 'work.archive',
                             'assets.view', 'assets.create', 'assets.update', 'assets.inspect',
                             'vault.view', 'vault.create', 'vault.update', 'vault.reveal'],
-        'agent'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update',
+        'agent'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update', 'events.view',
                             'time.view', 'time.track', 'work.view', 'work.create', 'work.update',
                             'assets.view', 'assets.create', 'assets.update', 'assets.inspect', 'vault.view'],
         // Read-only, scoped to the linked client (client-visible tasks + time totals + own assets only; NEVER vault).

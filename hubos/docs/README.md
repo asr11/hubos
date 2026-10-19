@@ -149,3 +149,42 @@ Environment: `HUBOS_DB_PATH`, `HUBOS_SESSION_PATH`, `HUBOS_LOG_PATH`,
   only; no timer, no writes.
 - `bash tests/e2e_m3.sh [db]` — curl E2E on a migrated COPY (sha256 of the source
   verified). `SHOTS=/abs/dir` adds headless-Chrome screenshots.
+
+## M5 & M6 — Finance, CRM, Assets, Vault, Morning Cockpit & Client Portal
+
+- `database/migrations/004_m5_m6.sql`: indexes and module permissions for Finance,
+  CRM (`leads`, `quotes`, `interactions`), `assets`, `vault_items`, and Client Portal.
+- Morning Cockpit (`/dashboard`): unified morning briefing — open tasks, active timers,
+  hours-bank warnings, unpaid finance documents, expiring assets, and recent events.
+- Finance (`/finance`), CRM (`/crm`), Assets (`/assets`), Vault (`/vault` — metadata
+  only unless `HUBOS_VAULT_KEY` is configured and explicit reveal is authorized),
+  and Settings (`/settings`).
+- `bash tests/e2e_m5_m6.sh [db]` — curl E2E covering M5 & M6 modules and RBAC.
+
+## M7 — GitOps, CloudPanel Deploy, Digital-CEO Agent API & Data Provenance
+
+- `database/migrations/005_data_provenance.sql`: `sync_runs` table (`source_system`,
+  `source_identifier`, `source_sha256`, `started_at`, `finished_at`, `status`,
+  `clients_synced`, `docs_synced`) + provenance columns on `clients` and
+  `finance_documents`.
+- Data Provenance UI & Sync (`Modules/Import/SyncService`):
+  - Provenance banner on `/dashboard` (`#provenance-banner`) and `/clients/{id}`
+    (`#client-provenance-banner`) showing verified source (`Cloudflare D1 (hub-os-d1)`),
+    exact `Asia/Jerusalem` timestamp (`YYYY-MM-DD HH:MM:SS`), relative age, 12-char
+    `source_sha256`, and a `POST /settings/sync-d1` ("סנכרון ואימות עכשיו") button.
+- Digital-CEO Agent API (`Modules/AgentApi`):
+  - Bearer token auth (`Authorization: Bearer <token>`) matched via `hash_equals`
+    against `HUBOS_AGENT_TOKEN` or active `agent`/`owner` user.
+  - `GET /api/agent/status` — system health, schema version, counts, and `data_provenance`.
+  - `GET /api/agent/morning` — full JSON morning briefing + `data_provenance`.
+  - `GET /api/agent/clients?q=...` — Hebrew root-aware client search.
+  - `GET /api/agent/clients/{id}` — Client 360 JSON (zero `secret_ciphertext` / `data_json` leakage) + `client_provenance` & `system_provenance`.
+  - `POST /api/agent/event` — append-only `agent.*` event logging.
+- CloudPanel + Nginx (`deploy/nginx-cloudpanel.conf`, `deploy/install_cloudpanel.sh`):
+  `root` pointed strictly to `public/`, internal directories denied (`404`), idempotent
+  installer with pre-migration SQLite `.backup` and nightly cron helper.
+- CI/CD & Codespaces (`.github/workflows/ci-deploy.yml`, `.devcontainer/devcontainer.json`):
+  GitHub Actions runs `php -l`, unit tests, and all E2E suites (`e2e.sh`, `e2e_m2.sh`,
+  `e2e_m3.sh`, `e2e_m5_m6.sh`, `e2e_m7.sh`), with conditional SSH deploy when
+  `VPS_SSH_KEY` is configured.
+

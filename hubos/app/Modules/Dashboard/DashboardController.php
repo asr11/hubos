@@ -34,4 +34,18 @@ final class DashboardController
             'active' => 'dashboard',
         ]);
     }
+
+    public function syncD1(Context $ctx): Response
+    {
+        $user = $ctx->requireUser();
+        $prov = (new \HubOS\Modules\Import\SyncService($ctx->tenant(), $ctx->permissions(), $ctx->pdo))->syncNow($user);
+        $ctx->flash(sprintf(
+            'סנכרון ואימות הושלמו בהצלחה · מקור: %s · זמן שליפה: %s · חתימת SHA-256: %s',
+            (string) $prov['source_label'],
+            (string) $prov['fetched_at_il'],
+            (string) $prov['sha256_short']
+        ));
+        $returnTo = $ctx->input('_return');
+        return Response::redirect($returnTo !== '' ? $returnTo : '/dashboard');
+    }
 }

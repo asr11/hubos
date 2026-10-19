@@ -1,23 +1,27 @@
 #!/usr/bin/env bash
 # M5 & M6 E2E (Assets, Inspector, Encrypted Vault, Accounting 300 Refinement,
 # CEO Morning Dashboard, Users/Permissions, and Client Portal) against a COPY
-# of storage/hubos.sqlite. Source DB sha256 is verified before/after.
+# of the DB (or synthetic fixture in CI). Zero real client names in this script.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="${1:-$ROOT/storage/hubos.sqlite}"
 TMP="$(mktemp -d)"
-PORT="${PORT:-8099}"
+PORT="${PORT:-8098}"
 BASE="http://127.0.0.1:${PORT}"
 JAR_OWNER="$TMP/cookies_owner.txt"
 JAR_VIEWER="$TMP/cookies_viewer.txt"
 PID=""
 
-[[ -f "$SRC" ]] || { echo "source DB not found: $SRC"; exit 2; }
-srcsum() { { cat "$SRC"; [[ -f "$SRC-wal" ]] && cat "$SRC-wal"; true; } | sha256sum | cut -d' ' -f1; }
-SRC_SUM_BEFORE=$(srcsum)
-cp "$SRC" "$TMP/copy.sqlite"
-[[ -f "$SRC-wal" ]] && cp "$SRC-wal" "$TMP/copy.sqlite-wal"
+HAS_SRC=0
+SRC_SUM_BEFORE=""
+if [[ -f "$SRC" ]]; then
+  HAS_SRC=1
+  srcsum() { { cat "$SRC"; [[ -f "$SRC-wal" ]] && cat "$SRC-wal"; true; } | sha256sum | cut -d' ' -f1; }
+  SRC_SUM_BEFORE=$(srcsum)
+  cp "$SRC" "$TMP/copy.sqlite"
+  [[ -f "$SRC-wal" ]] && cp "$SRC-wal" "$TMP/copy.sqlite-wal"
+fi
 
 export HUBOS_DB_PATH="$TMP/copy.sqlite"
 export HUBOS_SESSION_PATH="$TMP/sessions"
@@ -28,6 +32,7 @@ export HUBOS_MOCK_INSPECTOR=1
 mkdir -p "$HUBOS_SESSION_PATH" "$HUBOS_LOG_PATH"
 
 php "$ROOT/bin/migrate.php" >/dev/null
+php "$ROOT/bin/import_d1.php" "$ROOT/tests/fixtures/d1_mini.sql" >/dev/null
 
 cleanup() {
   if [[ -n "$PID" ]]; then kill "$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true; fi
@@ -42,24 +47,23 @@ csrf_from() { grep -o 'name="_csrf" value="[0-9a-f]*"' "$1" | head -n1 | sed 's/
 q() { php -r '$p=new PDO("sqlite:".getenv("HUBOS_DB_PATH")); echo $p->query($argv[1])->fetchColumn();' "$1"; }
 
 PW="zz-$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-MANO=$(q "SELECT id FROM clients WHERE legacy_id='gi_mano_123'")
-OTHER_CLIENT=$(q "SELECT id FROM clients WHERE id != $MANO LIMIT 1")
-TENANT=$(q "SELECT tenant_id FROM clients WHERE id=$MANO")
+CHILD_ID=$(q "SELECT id FROM clients WHERE legacy_id='gi_zz_child'")
+OTHER_CLIENT=$(q "SELECT id FROM clients WHERE id != $CHILD_ID LIMIT 1")
+TENANT=$(q "SELECT tenant_id FROM clients WHERE id=$CHILD_ID")
 
-# 1. Verify Accounting Rule Refinement on migrated copy
+# 1. Verify Accounting Rule Refinement
 check "zero 300 docs counted as realized income" 0 "$(q "SELECT COUNT(*) FROM finance_documents WHERE doc_type='300' AND counts_as_income=1")"
 OPEN_300=$(q "SELECT COUNT(*) FROM finance_documents WHERE doc_type='300' AND income_reason='proforma_open'")
 MATCHED_300=$(q "SELECT COUNT(*) FROM finance_documents WHERE doc_type='300' AND income_reason='proforma_matched'")
 TOTAL_300=$(q "SELECT COUNT(*) FROM finance_documents WHERE doc_type='300'")
 check "all 300 docs classified as proforma_open or proforma_matched" "$TOTAL_300" "$((OPEN_300 + MATCHED_300))"
-echo "  300 docs: total=$TOTAL_300 open=$OPEN_300 matched=$MATCHED_300"
 
 HUBOS_APP_ROOT="$ROOT" php -r '
 require getenv("HUBOS_APP_ROOT")."/app/bootstrap.php";
 $pdo = HubOS\Core\DB::connect(getenv("HUBOS_DB_PATH"));
 HubOS\Core\Provisioning::createUser($pdo, (int)$argv[1], "zz_owner_m5@hubos.test", "ZZ_Owner", "owner", $argv[2]);
 HubOS\Core\Provisioning::createUser($pdo, (int)$argv[1], "zz_viewer_m5@hubos.test", "ZZ_Viewer", "client_viewer", $argv[2], null, (int)$argv[3]);
-' "$TENANT" "$PW" "$MANO"
+' "$TENANT" "$PW" "$CHILD_ID"
 
 php -S "127.0.0.1:${PORT}" -t "$ROOT/public" >"$TMP/server.log" 2>&1 &
 PID=$!
@@ -86,7 +90,7 @@ TOKEN=$(csrf_from "$TMP/dash.html")
 # 3. Assets & DNS/SSL/WHOIS Inspection (/assets)
 code=$(curl -s -b "$JAR_OWNER" -c "$JAR_OWNER" -o "$TMP/assets.html" -w '%{http_code}' "$BASE/assets")
 check "GET /assets" 200 "$code"
-code=$(curl -s -b "$JAR_OWNER" -c "$JAR_OWNER" -o /dev/null -w '%{http_code}' --data-urlencode "_csrf=$TOKEN" --data-urlencode "client_id=$MANO" --data-urlencode "kind=domain" --data-urlencode "domain=zz-m5-test.co.il" --data-urlencode "expiry_date=2026-11-01" "$BASE/assets")
+code=$(curl -s -b "$JAR_OWNER" -c "$JAR_OWNER" -o /dev/null -w '%{http_code}' --data-urlencode "_csrf=$TOKEN" --data-urlencode "client_id=$CHILD_ID" --data-urlencode "kind=domain" --data-urlencode "domain=zz-m5-test.co.il" --data-urlencode "expiry_date=2026-11-01" "$BASE/assets")
 check "POST /assets create" 303 "$code"
 ASSET_ID=$(q "SELECT id FROM assets WHERE domain='zz-m5-test.co.il' ORDER BY id DESC LIMIT 1")
 check "asset created in DB" 1 "$([[ -n "$ASSET_ID" && "$ASSET_ID" -gt 0 ]] && echo 1 || echo 0)"
@@ -102,7 +106,7 @@ check "GET /vault" 200 "$code"
 SECRET_PLAIN="ZZ_TopSecret_Vault_E2E_98765!"
 code=$(curl -s -b "$JAR_OWNER" -c "$JAR_OWNER" -o /dev/null -w '%{http_code}' \
   --data-urlencode "_csrf=$TOKEN" \
-  --data-urlencode "client_id=$MANO" \
+  --data-urlencode "client_id=$CHILD_ID" \
   --data-urlencode "asset_id=$ASSET_ID" \
   --data-urlencode "title=ZZ_SSH_Access" \
   --data-urlencode "service=SSH" \
@@ -151,7 +155,7 @@ check "viewer login" 303 "$(login zz_viewer_m5@hubos.test "$JAR_VIEWER")"
 code=$(curl -s -b "$JAR_VIEWER" -c "$JAR_VIEWER" -o "$TMP/portal.html" -w '%{http_code}' "$BASE/dashboard")
 check "GET /dashboard as client_viewer renders portal" 200 "$code"
 check "portal hero rendered" 1 "$(grep -c 'id="client-portal-hero"' "$TMP/portal.html")"
-check "portal shows linked client name" 1 "$(grep -c 'id="portal-client-name".*קבוצת מנו ספנות' "$TMP/portal.html")"
+check "portal shows linked client name" 1 "$(grep -c 'id="portal-client-name".*ZZ_Child Co' "$TMP/portal.html")"
 check "portal never leaks vault title or secret" 0 "$(grep -c 'ZZ_SSH_Access\|'"$SECRET_PLAIN" "$TMP/portal.html" || true)"
 VTOKEN=$(csrf_from "$TMP/portal.html")
 
@@ -160,8 +164,10 @@ check "viewer blocked from POST /vault/$VAULT_ID/reveal (403)" 403 "$(curl -s -b
 check "viewer blocked from GET /settings/users (403)" 403 "$(curl -s -b "$JAR_VIEWER" -o /dev/null -w '%{http_code}' "$BASE/settings/users")"
 check "viewer blocked from foreign client card (403)" 403 "$(curl -s -b "$JAR_VIEWER" -o /dev/null -w '%{http_code}' "$BASE/clients/$OTHER_CLIENT")"
 
-SRC_SUM_AFTER=$(srcsum)
-check "source DB untouched (sha256)" "$SRC_SUM_BEFORE" "$SRC_SUM_AFTER"
+if [[ "$HAS_SRC" -eq 1 ]]; then
+  SRC_SUM_AFTER=$(srcsum)
+  check "source DB untouched (sha256)" "$SRC_SUM_BEFORE" "$SRC_SUM_AFTER"
+fi
 
 echo "E2E M5/M6: ${PASS} passed, ${FAIL} failed"
 [[ "$FAIL" -eq 0 ]]

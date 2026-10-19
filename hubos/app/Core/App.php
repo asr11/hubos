@@ -16,15 +16,24 @@ final class App
         self::securityHeaders($https);
         $view = new View(HUBOS_ROOT . '/views');
 
+        $rawPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+        $isApiPath = is_string($rawPath) && str_starts_with($rawPath, '/api/');
+
         try {
             $response = self::handle($config, $https, $view);
         } catch (HttpException $e) {
-            $response = $e->status === 401
-                ? Response::redirect('/login')
-                : self::errorPage($view, $config, $e->status, $e->getMessage());
+            if ($isApiPath) {
+                $response = Response::json(['ok' => false, 'status' => $e->status, 'error' => $e->getMessage()], $e->status);
+            } else {
+                $response = $e->status === 401
+                    ? Response::redirect('/login')
+                    : self::errorPage($view, $config, $e->status, $e->getMessage());
+            }
         } catch (Throwable $e) {
             self::log($config, $e);
-            $response = self::errorPage($view, $config, 500, 'אירעה שגיאה פנימית');
+            $response = $isApiPath
+                ? Response::json(['ok' => false, 'status' => 500, 'error' => 'אירעה שגיאה פנימית'], 500)
+                : self::errorPage($view, $config, 500, 'אירעה שגיאה פנימית');
         }
         $response->send();
     }
@@ -46,21 +55,29 @@ final class App
             throw new HttpException(404, 'הדף לא נמצא');
         }
         if ($match['status'] === 405) {
-            $resp = self::errorPage($view, $config, 405, 'שיטת בקשה לא נתמכת');
+            if (str_starts_with($path, '/api/')) {
+                $resp = Response::json(['ok' => false, 'status' => 405, 'error' => 'שיטת בקשה לא נתמכת'], 405);
+            } else {
+                $resp = self::errorPage($view, $config, 405, 'שיטת בקשה לא נתמכת');
+            }
             $resp->headers['Allow'] = implode(', ', $match['allow'] ?? []);
             return $resp;
         }
 
-        Auth::startSession($config, $https);
+        $opts = $match['opts'] ?? [];
+        $isBearerApi = !empty($opts['api']);
 
-        // CSRF on every state-changing request, before touching the database.
-        if ($method !== 'GET' && $method !== 'HEAD' && !Csrf::verify(Csrf::fromRequest())) {
-            throw new HttpException(403, 'הבקשה נדחתה: אסימון אבטחה חסר או שגוי (CSRF)');
+        if (!$isBearerApi) {
+            Auth::startSession($config, $https);
+
+            // CSRF on every state-changing browser request, before touching the database.
+            if ($method !== 'GET' && $method !== 'HEAD' && !Csrf::verify(Csrf::fromRequest())) {
+                throw new HttpException(403, 'הבקשה נדחתה: אסימון אבטחה חסר או שגוי (CSRF)');
+            }
         }
 
         $pdo = DB::connect((string) $config['db_path']);
         $ctx = new Context($config, $pdo, new Auth($pdo, $config), $view);
-        $opts = $match['opts'] ?? [];
 
         if (!empty($opts['auth']) && $ctx->user() === null) {
             return Response::redirect('/login');

@@ -1,0 +1,65 @@
+name: HubOS CI & Deploy
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: PHP Lint, Unit & E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, sqlite3, mbstring, openssl
+          coverage: none
+
+      - name: PHP Syntax Check (php -l)
+        run: |
+          find app bin public tests views lang -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Run Unit Tests
+        run: php tests/run.php
+
+      - name: Run E2E Suite (Phase 0, M2, M3/M4, M5/M6, M7)
+        env:
+          PORT: '8098'
+        run: |
+          bash tests/e2e.sh
+          bash tests/e2e_m2.sh
+          bash tests/e2e_m3.sh
+          bash tests/e2e_m5_m6.sh
+          bash tests/e2e_m7.sh
+
+  deploy:
+    name: Deploy to CloudPanel VPS
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH (when VPS_SSH_KEY is configured)
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+        run: |
+          if [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_HOST" ]; then
+            echo "Skipping SSH deploy: VPS_SSH_KEY / VPS_HOST secrets are not configured yet."
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          TARGET_USER="${VPS_USER:-hub-os}"
+          TARGET_DIR="${VPS_APP_DIR:-/home/hub-os/htdocs/os.hub.co.il}"
+          ssh "${TARGET_USER}@${VPS_HOST}" "cd '${TARGET_DIR}' && git fetch origin main && git reset --hard origin/main && bash deploy/install_cloudpanel.sh"

@@ -306,6 +306,7 @@ final class DashboardService
         }
 
         return [
+            'provenance'   => (new \HubOS\Modules\Import\SyncService($this->tenant, $this->perms))->latestProvenance($now),
             'clientsCount' => $canClients ? (new ClientService($this->tenant, $this->perms))->count($user) : null,
             'eventsCount'  => $canEvents ? $this->tenant->count('events') : null,
             'modules'      => $this->tenant->all('tenant_modules', ['enabled' => 1], 'module', 'ASC'),

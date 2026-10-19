@@ -55,6 +55,8 @@ $actionLabels = [
     'vault.item_updated'            => 'רשומת כספת עודכנה',
     'vault.secret_revealed'         => 'סוד נחשף בכספת',
     'vault.metadata_viewed'         => 'צפייה ברשימת כספת',
+    'sync.completed'                => 'סנכרון ואימות נתונים הושלם',
+    'import.completed'              => 'ייבוא נתונים הושלם',
 ];
 $moduleLabels = Permissions::SWITCHABLE_MODULES;
 $overdueCount = count($urgent['overdue_tasks'] ?? []);
@@ -65,6 +67,7 @@ $assetKpis = $breaking['asset_kpis'] ?? ['total' => 0, 'expired' => 0, 'expiring
 $breakingAssets = $breaking['assets'] ?? [];
 $alertBanks = $breaking['banks'] ?? [];
 $sep = $money['separation'] ?? [];
+$prov = $provenance ?? null;
 ?>
 <section class="hero card" aria-labelledby="hero-title">
     <div>
@@ -74,6 +77,22 @@ $sep = $money['separation'] ?? [];
     </div>
     <div class="hero-glow" aria-hidden="true"></div>
 </section>
+
+<?php if (is_array($prov)): ?>
+<section class="card" id="provenance-banner" aria-label="אימות מקור נתונים וחותמת זמן" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;padding:0.85rem 1.25rem;border-right:4px solid var(--ok, #16a34a)">
+    <div class="cluster" style="gap:1.25rem;flex-wrap:wrap">
+        <span class="pill pill-ok" id="prov-verified">✔ מקור נתונים מאומת</span>
+        <span><strong>מקור:</strong> <bdi dir="ltr" id="prov-source"><?= e((string) ($prov['source_label'] ?? 'Cloudflare D1 (hub-os-d1)')) ?></bdi></span>
+        <span><strong>תאריך וזמן שליפה מדויק:</strong> <bdi dir="ltr" id="prov-timestamp"><?= e((string) ($prov['fetched_at_il'] ?? '')) ?></bdi> <span class="muted small">(<?= e((string) ($prov['relative_age'] ?? '')) ?>)</span></span>
+        <span><strong>חתימת אימות (SHA-256):</strong> <code dir="ltr" id="prov-sha256" title="<?= e((string) ($prov['source_sha256'] ?? '')) ?>"><?= e((string) ($prov['sha256_short'] ?? '')) ?></code></span>
+    </div>
+    <form method="post" action="/settings/sync-d1" style="margin:0">
+        <?= \HubOS\Core\Csrf::field() ?>
+        <input type="hidden" name="_return" value="/dashboard">
+        <button type="submit" class="btn btn-sm" id="btn-sync-d1">סנכרון ואימות עכשיו ↻</button>
+    </form>
+</section>
+<?php endif; ?>
 
 <section class="stats" aria-label="נתונים מרכזיים">
     <article class="stat card">

@@ -223,6 +223,7 @@ final class Client360Service
 
         unset($client['data_json']);
         return [
+            'provenance'   => $internal ? (new \HubOS\Modules\Import\SyncService($this->tenant, $this->perms))->latestProvenance($now) : null,
             'client'       => $client,
             'registry'     => $this->registryData($clientId),
             'scope'        => $internal ? 'family' : 'self',

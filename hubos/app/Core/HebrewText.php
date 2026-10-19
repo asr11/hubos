@@ -8,7 +8,7 @@ namespace HubOS\Core;
  * Hebrew-safe text normalization and matching (no mbstring required).
  *
  * SQL LIKE is not enough for Hebrew: a word is often glued to a one-letter
- * prefix (ו/ה/ב/כ/ל/מ/ש — "ולמנו", "בספנות"). We normalize both sides
+ * prefix (ו/ה/ב/כ/ל/מ/ש — "וללקוח", "בחברה"). We normalize both sides
  * (niqqud, final letters, quotes/geresh, punctuation, case) and, as an
  * alternative match, strip ONE leading prefix letter from the query token
  * and from the haystack words.
