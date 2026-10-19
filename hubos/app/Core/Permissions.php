@@ -25,10 +25,15 @@ final class Permissions
     private const ROLE_PERMISSIONS = [
         'owner'         => ['*'],
         'admin'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update', 'clients.archive',
-                            'events.view', 'users.view', 'users.manage', 'permissions.manage'],
-        'staff'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update', 'events.view'],
-        'agent'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update'],
-        'client_viewer' => ['dashboard.view', 'clients.view'],
+                            'events.view', 'users.view', 'users.manage', 'permissions.manage',
+                            'time.view', 'time.track', 'time.manage',
+                            'work.view', 'work.create', 'work.update', 'work.archive', 'work.link'],
+        'staff'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update', 'events.view',
+                            'time.view', 'time.track', 'work.view', 'work.create', 'work.update', 'work.archive'],
+        'agent'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update',
+                            'time.view', 'time.track', 'work.view', 'work.create', 'work.update'],
+        // Read-only, scoped to the linked client (client-visible tasks + time totals only).
+        'client_viewer' => ['dashboard.view', 'clients.view', 'time.view', 'work.view'],
     ];
 
     /** Modules that are always on (not switchable per tenant). */

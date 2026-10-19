@@ -26,6 +26,8 @@ export HUBOS_LOG_PATH="$TMP/logs"
 export HUBOS_COOKIE_SECURE=0
 export HUBOS_REGISTRY_URL="http://127.0.0.1:9/registry?resource_id=x"
 mkdir -p "$HUBOS_SESSION_PATH"
+# Bring the COPY to the current schema (M3/M4 migrations); the source is never opened.
+php "$ROOT/bin/migrate.php" >/dev/null
 
 cleanup() {
   if [[ -n "$PID" ]]; then kill "$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true; fi

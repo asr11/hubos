@@ -22,6 +22,8 @@ final class Tenant
         'client_contacts', 'suppliers', 'projects', 'tasks', 'hours_banks', 'time_entries',
         'active_timers', 'finance_documents', 'expenses', 'leads', 'quotes', 'assets',
         'vault_items', 'interactions',
+        // M4 (003_time_work.sql)
+        'recurring_task_templates',
     ];
 
     public function __construct(private PDO $pdo, private int $tenantId)

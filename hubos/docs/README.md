@@ -111,3 +111,41 @@ Environment: `HUBOS_DB_PATH`, `HUBOS_SESSION_PATH`, `HUBOS_LOG_PATH`,
   tests mock `Core\Http\HttpClient`).
 - `bash tests/e2e_m2.sh [db]` — curl E2E on a COPY of `storage/hubos.sqlite`
   (sha256 of the source verified unchanged; ZZ_ users created in the copy only).
+
+## M3 — live timer, time entries, hours banks
+
+- `database/migrations/003_time_work.sql` (additive): `active_timers` pause fields,
+  `hours_banks.period/rollover/rollover_cap_hours/starts_on`, task priority /
+  client_visible / assignee_user_id / archived_at / recurring keys, project
+  description / client_visible / archived_at, `recurring_task_templates`, and the
+  `time` + `work` module switches for every tenant.
+- `Modules/Time/TimerService`: one timer per user (service check + UNIQUE index),
+  server is the source of truth (`elapsed = accumulated + now - started_at`), so it
+  survives refresh/navigation. start / pause / resume / stop / discard, all logged.
+  **Stop requires a description** and creates a `time_entries` row (source `timer`).
+- `TimeEntryService`: manual create/edit/delete (own entries with `time.track`,
+  any with `time.manage`); every write → event with before/after. Entries are
+  deducted from the client's oldest **active** bank (`hours_bank_id`).
+- `HoursBankService`: levels ok / warn80 / warn90 / over; a crossing writes
+  `hours_bank.threshold_crossed`. Monthly banks with rollover: unused hours carry
+  to the next month (optional cap, overuse never carries negative) — `rollover()`.
+- UI: global header widget (`public/assets/timer.js`, vanilla, re-syncs with
+  `GET /timer` every 30s), `/time` (filters user/client/date + totals, manual entry,
+  bank settings), Client 360 header (timer + bank used/allowance + badge) and time tab.
+
+## M4 — tasks & projects
+
+- `/tasks`, `/projects` list/create/edit/archive. **client_id is required** on every
+  create/edit (and must agree with the project). Statuses todo/doing/done
+  (imported `in_progress` shown as doing), priority, due date, assignee, internal vs
+  client-visible flag. Shown in the Client 360 work tab (archived hidden).
+- `/work/linking` (admin, `work.link`): imported rows without client. Suggestions by
+  domain / domain label / client name in the title (`LinkingService::suggest`) are
+  **shown only**; a click links one row and logs `task.linked` / `project.linked`
+  (`used_suggestion`, `suggested_client_ids`).
+- `/work/recurring` + `php bin/recurring.php [--month=YYYY-MM] [--tenant=slug]`:
+  one task per template per month (UNIQUE index) → safe to re-run / cron.
+- client_viewer: own client's client-visible tasks/projects and time **totals**
+  only; no timer, no writes.
+- `bash tests/e2e_m3.sh [db]` — curl E2E on a migrated COPY (sha256 of the source
+  verified). `SHOTS=/abs/dir` adds headless-Chrome screenshots.

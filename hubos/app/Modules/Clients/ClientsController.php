@@ -10,6 +10,7 @@ use HubOS\Core\HttpException;
 use HubOS\Core\Response;
 use HubOS\Core\Str;
 use HubOS\Core\ValidationException;
+use HubOS\Modules\Time\TimerService;
 
 final class ClientsController
 {
@@ -59,6 +60,11 @@ final class ClientsController
             'canEnrich'     => $card['internal'] && $ctx->can('clients.update'),
             'suggestion'    => is_array($registry) ? $registry : null,
             'registryError' => is_string($registryError) ? $registryError : null,
+            // M3/M4: live timer + work actions on the card (never for client_viewer)
+            'canTrack'      => $card['internal'] && $ctx->can('time.track'),
+            'canWork'       => $card['internal'] && $ctx->can('work.create'),
+            'timer'         => $card['internal'] && $ctx->can('time.track')
+                ? (new TimerService($ctx->tenant(), $ctx->permissions()))->current($user) : null,
         ]);
     }
 
