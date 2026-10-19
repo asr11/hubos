@@ -65,15 +65,17 @@ final class D1Importer
     }
 
     /** @return array<string, mixed> summary */
-    public function run(string $dumpPath, ?string $reportPath = null): array
+    public function run(string $dumpPath, ?string $reportPath = null, ?int $actorUserId = null): array
     {
+        $startedAtUtc = gmdate('Y-m-d\TH:i:s\Z');
         $this->loadStaging($dumpPath);
+        $sourceSha256 = (string) hash_file('sha256', $dumpPath);
         try {
             $tenantId = Provisioning::ensureTenant($this->target, self::TENANT_SLUG, self::TENANT_NAME);
             $this->t = new Tenant($this->target, $tenantId);
             $this->clients = new ClientResolver();
 
-            $this->t->transaction(function () use ($dumpPath): void {
+            $this->t->transaction(function () use ($dumpPath, $startedAtUtc, $sourceSha256, $actorUserId): void {
                 $this->importClients();
                 $this->importContacts();
                 $this->importSuppliers();
@@ -89,19 +91,51 @@ final class D1Importer
                 $this->importVault();
                 $this->importInteractions();
                 $this->buildInventory();
-                Events::record($this->t, null, 'import', null, null, 'import.completed', null, [
-                    'dump'   => basename($dumpPath),
-                    'counts' => $this->targetCounts(),
+                $counts = $this->targetCounts();
+                Events::record($this->t, $actorUserId, 'import', null, null, 'import.completed', null, [
+                    'dump'          => basename($dumpPath),
+                    'source_sha256' => $sourceSha256,
+                    'counts'        => $counts,
                 ]);
+
+                $completedAtUtc = gmdate('Y-m-d\TH:i:s\Z');
+                $totalRead = 0;
+                $totalImported = 0;
+                foreach ($this->stats as $st) {
+                    $totalRead += (int) ($st['source'] ?? 0);
+                    $totalImported += (int) ($st['imported'] ?? 0);
+                }
+                DB::run(
+                    $this->target,
+                    'UPDATE clients SET source_system = ?, source_sha256 = ?, fetched_at = COALESCE(fetched_at, updated_at, created_at) WHERE tenant_id = ?',
+                    [SyncService::SOURCE_SYSTEM, $sourceSha256, $this->t->id()]
+                );
+                DB::run(
+                    $this->target,
+                    'UPDATE finance_documents SET source_system = ?, source_sha256 = ?, fetched_at = COALESCE(fetched_at, created_at) WHERE tenant_id = ?',
+                    [SyncService::SOURCE_SYSTEM, $sourceSha256, $this->t->id()]
+                );
+                SyncService::recordRun(
+                    $this->t,
+                    $actorUserId,
+                    SyncService::SOURCE_SYSTEM,
+                    $startedAtUtc,
+                    $completedAtUtc,
+                    $totalRead,
+                    $totalImported,
+                    $sourceSha256,
+                    ['dump' => basename($dumpPath), 'counts' => $counts]
+                );
             });
 
             $summary = [
-                'tenant_id' => $tenantId,
-                'counts'    => $this->targetCounts(),
-                'stats'     => $this->stats,
-                'finance'   => $this->finance,
-                'flags'     => $this->flags,
-                'inventory' => $this->inventory,
+                'tenant_id'     => $tenantId,
+                'source_sha256' => $sourceSha256,
+                'counts'        => $this->targetCounts(),
+                'stats'         => $this->stats,
+                'finance'       => $this->finance,
+                'flags'         => $this->flags,
+                'inventory'     => $this->inventory,
             ];
             if ($reportPath !== null) {
                 $this->writeReport($reportPath, $summary);

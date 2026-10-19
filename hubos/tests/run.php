@@ -31,6 +31,7 @@ use HubOS\Core\Tenant;
 use HubOS\Core\ValidationException;
 use HubOS\Core\Vault;
 use HubOS\Core\View;
+use HubOS\Modules\AgentApi\AgentApiService;
 use HubOS\Modules\Assets\AssetInspector;
 use HubOS\Modules\Assets\AssetService;
 use HubOS\Modules\Assets\NativeAssetInspector;
@@ -451,7 +452,7 @@ function dbFingerprint(PDO $pdo): string
 {
     $h = '';
     foreach (Tenant::TABLES as $table) {
-        if (in_array($table, ['events', 'users', 'tenant_modules', 'tenant_settings', 'user_permissions'], true)) {
+        if (in_array($table, ['events', 'sync_runs', 'users', 'tenant_modules', 'tenant_settings', 'user_permissions'], true)) {
             continue;
         }
         $h .= $table . ':' . md5(json_encode($pdo->query("SELECT * FROM {$table} ORDER BY id")->fetchAll(), JSON_THROW_ON_ERROR)) . ';';
@@ -588,8 +589,8 @@ test('tenant isolation: every M1 table is scoped; cross-tenant references are re
 function family360(): array
 {
     [$pdo, $ta, $tb, $ownerA, $ownerB] = world();
-    $p = $ta->insert('clients', ['name' => 'ZZ_Parent אוונגרד', 'tax_id' => '513028068']);
-    $c = $ta->insert('clients', ['name' => 'ZZ_Child קבוצת מנו ספנות', 'tax_id' => '513028068', 'parent_client_id' => $p]);
+    $p = $ta->insert('clients', ['name' => 'ZZ_Parent אלפא אחזקות', 'tax_id' => '511111118']);
+    $c = $ta->insert('clients', ['name' => 'ZZ_Child קבוצת בטא טכנולוגיות', 'tax_id' => '511111118', 'parent_client_id' => $p]);
     $u = $ta->insert('clients', ['name' => 'ZZ_Unrelated']);
     $doc = static fn (int $cid, string $code, string $kind, float $amt, int $income, string $date, string $status = 'paid') => $ta->insert('finance_documents', [
         'client_id' => $cid, 'doc_type' => $code, 'doc_kind' => $kind, 'amount' => $amt, 'counts_as_income' => $income,
@@ -601,8 +602,8 @@ function family360(): array
     $doc($c, '320', 'tax_invoice_receipt', 500, 1, '2026-02-01');
     $doc($c, '305', 'tax_invoice', 200, 1, '2026-05-01', 'unpaid');
     $doc($u, '320', 'tax_invoice_receipt', 999, 1, '2026-01-01');
-    $ta->insert('client_contacts', ['client_id' => $c, 'name' => 'ZZ_כפיר', 'is_primary' => 1]);
-    $ta->insert('assets', ['client_id' => $c, 'kind' => 'hosting', 'domain' => 'zz-av-re.test']);
+    $ta->insert('client_contacts', ['client_id' => $c, 'name' => 'ZZ_Contact', 'is_primary' => 1]);
+    $ta->insert('assets', ['client_id' => $c, 'kind' => 'hosting', 'domain' => 'zz-alpha.test']);
     $bank = $ta->insert('hours_banks', ['client_id' => $c, 'name' => 'ZZ_Bank', 'total_hours' => 10, 'status' => 'active']);
     $ta->insert('time_entries', ['client_id' => $c, 'hours_bank_id' => $bank, 'entry_date' => '2026-10-05', 'duration_seconds' => 5400]);
     $ta->insert('time_entries', ['client_id' => $c, 'entry_date' => '2026-09-05', 'duration_seconds' => 3600]);
@@ -627,7 +628,7 @@ test('client360: family roll-up, origin labels, accounting-rule income, tenant i
     eq([$w['c'], $w['p']], array_keys($child['family']));
     eq(4, count($child['finance']), 'child card rolls up the parent docs (and not the unrelated client)');
     eq(2, count(array_filter($child['finance'], static fn (array $d): bool => $d['origin_client_id'] === $w['p'])), 'parent docs labeled with parent');
-    ok(in_array('ZZ_Parent אוונגרד', array_column($child['finance'], 'origin_name'), true));
+    ok(in_array('ZZ_Parent אלפא אחזקות', array_column($child['finance'], 'origin_name'), true));
     eq(1700.0, $child['metrics']['income_total'], 'income uses counts_as_income (receipt not double counted; naive sum would be 2700)');
     eq(700.0, $child['metrics']['income_this_year']);
     eq(['2026' => 700.0, '2025' => 1000.0], $child['metrics']['income_by_year']);
@@ -714,24 +715,24 @@ test('hebrew search: normalization, one-letter prefix stripping, ranking', funct
     eq('בעמ', HebrewText::normalize('בע״מ'));
     eq('שלומ', HebrewText::normalize('שָׁלוֹם'), 'niqqud removed, final mem normalized');
     eq('אבג דה', HebrewText::normalize('  אבג - דה! '));
-    eq('מנו', HebrewText::stripPrefix('למנו'));
-    eq(null, HebrewText::stripPrefix('מנו'), 'no strip when < 3 letters remain');
+    eq('בטא', HebrewText::stripPrefix('לבטא'));
+    eq(null, HebrewText::stripPrefix('בטא'), 'no strip when < 3 letters remain');
     eq(null, HebrewText::stripPrefix('abc'));
-    ok(HebrewText::score('מנו', 'קבוצת מנו ספנות') > 0);
-    ok(HebrewText::score('למנו', 'קבוצת מנו ספנות') > 0, 'query prefix ל stripped');
-    ok(HebrewText::score('הספנות', 'קבוצת מנו ספנות') > 0, 'query prefix ה stripped');
-    ok(HebrewText::score('ספנות', 'קבוצת מנו והספנות') > 0, 'haystack word prefix stripped');
-    ok(HebrewText::score('מנו ספנ', 'קבוצת מנו ספנות') > 0, 'all tokens must match (prefix)');
-    eq(0, HebrewText::score('מנו רכב', 'קבוצת מנו ספנות'), 'every token must match');
+    ok(HebrewText::score('בטא', 'קבוצת בטא טכנולוגיות') > 0);
+    ok(HebrewText::score('לבטא', 'קבוצת בטא טכנולוגיות') > 0, 'query prefix ל stripped');
+    ok(HebrewText::score('הטכנולוגיות', 'קבוצת בטא טכנולוגיות') > 0, 'query prefix ה stripped');
+    ok(HebrewText::score('טכנולוגיות', 'קבוצת בטא והטכנולוגיות') > 0, 'haystack word prefix stripped');
+    ok(HebrewText::score('בטא טכנ', 'קבוצת בטא טכנולוגיות') > 0, 'all tokens must match (prefix)');
+    eq(0, HebrewText::score('בטא רכב', 'קבוצת בטא טכנולוגיות'), 'every token must match');
     eq(0, HebrewText::score('', 'x'));
-    ok(HebrewText::score('מנו', 'קבוצת מנו ספנות') > HebrewText::score('מנו', 'מנוהלים'), 'exact word outranks prefix');
+    ok(HebrewText::score('בטא', 'קבוצת בטא טכנולוגיות') > HebrewText::score('בטא', 'בטאון'), 'exact word outranks prefix');
 
     $w = family360();
     $cs = new ClientService($w['ta'], new Permissions($w['ta']));
-    foreach (['מנו', 'למנו', 'הספנות', 'ספנות', '513028068'] as $q) {
-        ok(in_array($w['c'], array_map('intval', array_column($cs->search($w['ownerA'], $q), 'id')), true), "search '{$q}' finds the Mano client");
+    foreach (['בטא', 'לבטא', 'הטכנולוגיות', 'טכנולוגיות', '511111118'] as $q) {
+        ok(in_array($w['c'], array_map('intval', array_column($cs->search($w['ownerA'], $q), 'id')), true), "search '{$q}' finds the Beta client");
     }
-    eq($w['c'], (int) $cs->search($w['ownerA'], 'מנו')[0]['id'], 'best match first');
+    eq($w['c'], (int) $cs->search($w['ownerA'], 'בטא')[0]['id'], 'best match first');
     eq(3, count($cs->search($w['ownerA'], '')), 'empty query lists all');
 });
 
@@ -757,26 +758,26 @@ final class ZzMockHttp implements HttpClient
 
 test('registry enrichment: mocked HTTP, suggestions only, explicit apply is stored + logged, failures graceful', function (): void {
     $body = json_encode(['success' => true, 'result' => ['records' => [
-        ['מספר חברה' => 513028069, 'שם חברה' => 'ZZ_אחרת בע~מ'],
-        ['מספר חברה' => 513028068, 'שם חברה' => 'ZZ_אוונגרד רזידנס בע~מ', 'שם באנגלית' => 'ZZ AVANTGARDE', 'סטטוס חברה' => 'פעילה',
+        ['מספר חברה' => 511111119, 'שם חברה' => 'ZZ_אחרת בע~מ'],
+        ['מספר חברה' => 511111118, 'שם חברה' => 'ZZ_אלפא אחזקות בע~מ', 'שם באנגלית' => 'ZZ ALPHA HOLDINGS', 'סטטוס חברה' => 'פעילה',
          'סוג תאגיד' => 'ישראלית חברה פרטית', 'תאריך התאגדות' => '31/10/2000', 'שם עיר' => 'חיפה', 'שם רחוב' => 'פלי~ם', 'מספר בית' => '2', 'מיקוד' => 3309502],
     ]]], JSON_UNESCAPED_UNICODE);
     $http = new ZzMockHttp(['status' => 200, 'body' => (string) $body]);
     $reg = new CompanyRegistry($http, 'https://registry.invalid/api?resource_id=x');
-    $r = $reg->lookup('51-302806-8');
+    $r = $reg->lookup('51-111111-8');
     ok($r['ok'], 'lookup ok');
     eq(1, count($http->urls));
-    ok(str_contains($http->urls[0], '&q=513028068'), 'tax id sent as q');
-    eq('ZZ_אוונגרד רזידנס בע"מ', $r['suggestion']['name'], 'exact tax-id record chosen; ~ decoded');
+    ok(str_contains($http->urls[0], '&q=511111118'), 'tax id sent as q');
+    eq('ZZ_אלפא אחזקות בע"מ', $r['suggestion']['name'], 'exact tax-id record chosen; ~ decoded');
     eq('פלי"ם 2', $r['suggestion']['address']);
     eq('חיפה', $r['suggestion']['city']);
     eq('2000-10-31', $r['suggestion']['incorporation_date']);
     eq('פעילה', $r['suggestion']['status']);
 
-    $fail = (new CompanyRegistry(new ZzMockHttp(new HttpClientException('down'))))->lookup('513028068');
+    $fail = (new CompanyRegistry(new ZzMockHttp(new HttpClientException('down'))))->lookup('511111118');
     ok(!$fail['ok'] && str_contains($fail['error'], 'לא ניתן להתחבר'), 'network failure is graceful');
-    ok(!(new CompanyRegistry(new ZzMockHttp(['status' => 503, 'body' => ''])))->lookup('513028068')['ok']);
-    ok(!(new CompanyRegistry(new ZzMockHttp(['status' => 200, 'body' => 'not json'])))->lookup('513028068')['ok']);
+    ok(!(new CompanyRegistry(new ZzMockHttp(['status' => 503, 'body' => ''])))->lookup('511111118')['ok']);
+    ok(!(new CompanyRegistry(new ZzMockHttp(['status' => 200, 'body' => 'not json'])))->lookup('511111118')['ok']);
     ok(!(new CompanyRegistry(new ZzMockHttp(['status' => 200, 'body' => (string) $body])))->lookup('999999999')['ok'], 'no exact match → not found');
     $noCall = new ZzMockHttp(['status' => 200, 'body' => '']);
     ok(!(new CompanyRegistry($noCall))->lookup(null)['ok']);
@@ -819,7 +820,7 @@ test('router: M2 client card routes are protected', function (): void {
 function workWorld(): array
 {
     [$pdo, $ta, $tb, $ownerA, $ownerB] = world();
-    $c = $ta->insert('clients', ['name' => 'ZZ_Mano קבוצת מנו', 'domain' => 'zz-av-re.co.il']);
+    $c = $ta->insert('clients', ['name' => 'ZZ_Beta קבוצת בטא', 'domain' => 'zz-alpha.co.il']);
     $d = $ta->insert('clients', ['name' => 'ZZ_Other']);
     $bank = $ta->insert('hours_banks', ['client_id' => $c, 'name' => 'ZZ_Bank 10', 'total_hours' => 10, 'status' => 'active', 'created_at' => '2026-08-01T00:00:00Z']);
     $staff = userRow($pdo, Provisioning::createUser($pdo, $ta->id(), 'zz_staff_w@hubos.test', 'ZZ_Staff', 'staff', 'zz-password-123S'));
@@ -1007,17 +1008,17 @@ test('tasks & projects: client_id is required on create and edit; references mus
 
 test('needs linking: suggestions by domain/name are never auto-applied; explicit link is logged', function (): void {
     $w = workWorld();
-    $parent = $w['ta']->insert('clients', ['name' => 'ZZ_אוונגרד', 'domain' => 'www.zz-av-re.co.il']);
-    $t1 = $w['ta']->insert('tasks', ['title' => 'בניית תיק לקוח ZZ-AV-RE.CO.IL']);
+    $parent = $w['ta']->insert('clients', ['name' => 'ZZ_AlphaParent', 'domain' => 'www.zz-alpha.co.il']);
+    $t1 = $w['ta']->insert('tasks', ['title' => 'בניית תיק לקוח ZZ-ALPHA.CO.IL']);
     $t2 = $w['ta']->insert('tasks', ['title' => 'פגישה עם ZZ_Other מחר']);
     $t3 = $w['ta']->insert('tasks', ['title' => 'משהו כללי']);
-    $p1 = $w['ta']->insert('projects', ['name' => 'zz-av-re.com']);
+    $p1 = $w['ta']->insert('projects', ['name' => 'zz-alpha.com']);
     $svc = new LinkingService($w['ta'], $w['perms']);
     $q = $svc->queue($w['ownerA']);
     $byId = array_column($q['tasks'], null, 'id');
     $sug = array_map('intval', array_column($byId[$t1]['suggestions'], 'client_id'));
     sort($sug);
-    eq([$w['c'], $parent], $sug, 'domain match suggests both av-re clients');
+    eq([$w['c'], $parent], $sug, 'domain match suggests both alpha clients');
     eq(100, $byId[$t1]['suggestions'][0]['score']);
     eq($w['d'], $byId[$t2]['suggestions'][0]['client_id'] ?? null, 'name match');
     eq([], $byId[$t3]['suggestions'], 'no suggestion for generic title');
@@ -1273,7 +1274,7 @@ test('accounting recalculate: updates DB rows in place (300 proforma_open vs pro
     $r400M = $w['ta']->find('finance_documents', $id400Matched);
     eq(0, (int) $r400M['counts_as_income']);
     eq('receipt_matched', $r400M['income_reason']);
-    eq($id305, (int) $r400M['matched_document_id']);
+    eq($id305, (int) $r300Closed['matched_document_id']);
 
     $r400S = $w['ta']->find('finance_documents', $id400Standalone);
     eq(1, (int) $r400S['counts_as_income']);
@@ -1364,6 +1365,86 @@ test('users & permissions: UserService create/update, last-owner guard, override
     eq('users.manage', $perm('POST', '/settings/users/5'));
     eq('permissions.manage', $perm('POST', '/settings/users/5/permissions'));
     eq('permissions.manage', $perm('POST', '/settings/modules'));
+});
+
+// ---------------------------------------------------------------- M7: Digital-CEO Agent API
+
+test('agent api: Bearer token auth (401 without/wrong token, 200 with valid token), morning JSON, client360 zero vault leakage, event log', function (): void {
+    $w = family360();
+    $token = 'zz_agent_bearer_token_m7_secret_1234567890';
+    $svc = new AgentApiService($w['pdo'], ['agent_token' => $token, 'agent_tenant' => 'zz-a']);
+
+    // 401 when missing or wrong token or viewer session
+    eq(401, throws(fn () => $svc->authenticate(null, null), HttpException::class)->status);
+    eq(401, throws(fn () => $svc->authenticate('Bearer wrong_token_value_1234567890', null), HttpException::class)->status);
+
+    // Valid Bearer token
+    $auth = $svc->authenticate('Bearer ' . $token);
+    eq($w['ta']->id(), $auth['tenant']->id());
+    eq('agent', $auth['user']['role']);
+
+    $status = $svc->status($auth);
+    ok($status['ok'] === true && $status['version'] === 'm7');
+
+    // Morning dashboard JSON
+    $now = new DateTimeImmutable('2026-10-19 10:00:00', new DateTimeZone('Asia/Jerusalem'));
+    $morning = $svc->morning($auth, $now);
+    ok($morning['ok'] === true);
+    eq(3, $morning['clientsCount']);
+    eq(1699.0, (float) $morning['money']['income_this_year']);
+    eq(2699.0, (float) $morning['money']['income_total']);
+    ok(isset($morning['provenance']['source_sha256']), 'morning JSON includes verified provenance');
+
+    // Clients search
+    $search = $svc->clients($auth, 'לבטא');
+    ok($search['ok'] === true && $search['count'] === 1);
+    eq($w['c'], (int) $search['clients'][0]['id']);
+
+    // Client 360 JSON — verify zero vault secret leakage
+    $c360 = $svc->client360($auth, $w['c'], $now);
+    ok($c360['ok'] === true);
+    eq($w['c'], (int) $c360['client']['id']);
+    eq(1, count($c360['vault']));
+    $rawJson = (string) json_encode($c360, JSON_UNESCAPED_UNICODE);
+    foreach (['ZZ_CIPHERTEXT_LEAK', 'ZZ_SECRET_NOTE_LEAK', 'ZZ_SECRET_JSON_LEAK', 'secret_ciphertext', 'data_json'] as $forbidden) {
+        ok(!str_contains($rawJson, $forbidden), "Agent API client360 must never leak {$forbidden}");
+    }
+
+    // Record agent event
+    $evRes = $svc->recordEvent($auth, ['action' => 'agent.morning_brief', 'client_id' => $w['c'], 'summary' => 'ZZ_Daily digest sent']);
+    ok($evRes['ok'] === true && $evRes['event_id'] > 0);
+    eq(1, $w['ta']->count('events', ['action' => 'agent.morning_brief']));
+});
+
+test('data provenance: D1Importer & SyncService record sync_runs, exact timestamp, source_sha256, and sync.completed event', function (): void {
+    [$pdo, $s] = runImport();
+    $t = new Tenant($pdo, (int) $s['tenant_id']);
+    $perms = new Permissions($t);
+    $expectedSha = (string) hash_file('sha256', HUBOS_ROOT . '/tests/fixtures/d1_mini.sql');
+
+    eq($expectedSha, $s['source_sha256']);
+    eq(1, $t->count('sync_runs'));
+    eq(1, $t->count('events', ['action' => 'sync.completed']));
+
+    $syncSvc = new \HubOS\Modules\Import\SyncService($t, $perms, $pdo);
+    $prov = $syncSvc->latestProvenance(new DateTimeImmutable('2026-10-19 14:30:00', new DateTimeZone('Asia/Jerusalem')));
+    ok($prov['verified'] === true);
+    eq('Cloudflare D1 (hub-os-d1)', $prov['source_label']);
+    eq($expectedSha, $prov['source_sha256']);
+    eq(substr($expectedSha, 0, 12), $prov['sha256_short']);
+    eq(1, preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', (string) $prov['fetched_at_il']), 'exact YYYY-MM-DD HH:MM:SS format');
+
+    $owner = userRow($pdo, Provisioning::createUser($pdo, $t->id(), 'zz_prov_owner@hubos.test', 'ZZ_ProvOwner', 'owner', 'zz-password-123P'));
+    $cid = (int) $t->all('clients')[0]['id'];
+    $viewer = userRow($pdo, Provisioning::createUser($pdo, $t->id(), 'zz_prov_viewer@hubos.test', 'ZZ_ProvViewer', 'client_viewer', 'zz-password-123V', null, $cid));
+
+    eq(403, throws(fn () => $syncSvc->syncNow($viewer), HttpException::class)->status, 'viewer cannot trigger sync');
+
+    $nowSync = new DateTimeImmutable('2026-10-19 15:00:00', new DateTimeZone('Asia/Jerusalem'));
+    $afterSync = $syncSvc->syncNow($owner, null, $nowSync);
+    eq('2026-10-19 15:00:00', $afterSync['fetched_at_il']);
+    eq(2, $t->count('sync_runs'));
+    eq(2, $t->count('events', ['action' => 'sync.completed']));
 });
 
 // ---------------------------------------------------------------- Run

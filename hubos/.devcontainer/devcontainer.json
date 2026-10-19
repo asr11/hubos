@@ -1,0 +1,13 @@
+{
+  "name": "OS HUB v2 (hubos)",
+  "image": "mcr.microsoft.com/devcontainers/php:1-8.3-bookworm",
+  "forwardPorts": [8099],
+  "portsAttributes": {
+    "8099": {
+      "label": "OS HUB v2 Web UI",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "postCreateCommand": "php bin/migrate.php && php bin/import_d1.php tests/fixtures/d1_mini.sql",
+  "postStartCommand": "nohup php -S 0.0.0.0:8099 -t public >/tmp/hubos-codespace.log 2>&1 &"
+}

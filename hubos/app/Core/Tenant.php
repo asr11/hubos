@@ -24,6 +24,8 @@ final class Tenant
         'vault_items', 'interactions',
         // M4 (003_time_work.sql)
         'recurring_task_templates',
+        // M7 (005_data_provenance.sql)
+        'sync_runs',
     ];
 
     public function __construct(private PDO $pdo, private int $tenantId)

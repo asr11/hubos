@@ -23,4 +23,7 @@ return [
     'display_timezone'     => 'Asia/Jerusalem',
     // Company registry (data.gov.il). Override only for local testing.
     'registry_url'         => $env('HUBOS_REGISTRY_URL', 'https://data.gov.il/api/3/action/datastore_search?resource_id=f004176c-b85f-4542-8901-7b3176f9a054'),
+    // Digital-CEO Agent API Bearer token (never hardcoded; set via environment).
+    'agent_token'          => $env('HUBOS_AGENT_TOKEN', ''),
+    'agent_tenant'         => $env('HUBOS_AGENT_TENANT', 'hub'),
 ];

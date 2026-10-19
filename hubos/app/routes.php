@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use HubOS\Core\Router;
+use HubOS\Modules\AgentApi\AgentApiController;
 use HubOS\Modules\Assets\AssetsController;
 use HubOS\Modules\Auth\AuthController;
 use HubOS\Modules\Clients\ClientsController;
@@ -13,8 +14,8 @@ use HubOS\Modules\Vault\VaultController;
 use HubOS\Modules\Work\WorkController;
 
 /*
- * Route table. opts: auth => requires login, perm => required permission.
- * All POST routes are CSRF-protected by the kernel.
+ * Route table. opts: auth => requires login, perm => required permission, api => Bearer token API.
+ * All non-API POST routes are CSRF-protected by the kernel.
  */
 return static function (Router $r): void {
     $r->get('/', [DashboardController::class, 'home']);
@@ -82,4 +83,13 @@ return static function (Router $r): void {
     $r->post('/settings/users/{id:\d+}', [UsersController::class, 'update'], ['auth' => true, 'perm' => 'users.manage']);
     $r->post('/settings/users/{id:\d+}/permissions', [UsersController::class, 'setPermission'], ['auth' => true, 'perm' => 'permissions.manage']);
     $r->post('/settings/modules', [UsersController::class, 'setModule'], ['auth' => true, 'perm' => 'permissions.manage']);
+    $r->post('/settings/sync-d1', [DashboardController::class, 'syncD1'], ['auth' => true, 'perm' => 'clients.update']);
+
+    // M7 — Digital-CEO Agent API (Bearer token authenticated, read-only views + append-only event)
+    $r->get('/api/agent/status', [AgentApiController::class, 'status'], ['api' => true]);
+    $r->get('/api/agent/morning', [AgentApiController::class, 'morning'], ['api' => true]);
+    $r->get('/api/agent/clients', [AgentApiController::class, 'clients'], ['api' => true]);
+    $r->get('/api/agent/clients/{id:\d+}', [AgentApiController::class, 'client360'], ['api' => true]);
+    $r->get('/api/agent/client/{id:\d+}', [AgentApiController::class, 'client360'], ['api' => true]);
+    $r->post('/api/agent/event', [AgentApiController::class, 'recordEvent'], ['api' => true]);
 };

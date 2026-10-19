@@ -60,6 +60,20 @@ $familyRolled = count($card['family']) > 1;
             </nav>
             <p class="muted small">הנתונים בכרטיס מצורפים (Roll-up) מכל המשפחה: <?= e(implode(' · ', $card['family'])) ?>. כל שורה מסומנת בלקוח שממנו היא מגיעה.</p>
         <?php endif; ?>
+        <?php if (!empty($card['internal']) && is_array($card['provenance'] ?? null)): $prov = $card['provenance']; ?>
+            <div class="cluster small" id="client-provenance-banner" style="margin-top:0.5rem;gap:0.75rem;flex-wrap:wrap;padding:0.4rem 0.65rem;background:var(--surface-2, #f8fafc);border-radius:6px;border-right:3px solid var(--ok, #16a34a)">
+                <span class="pill pill-ok">✔ מקור מאומת: <bdi dir="ltr"><?= e((string) ($prov['source_label'] ?? 'Cloudflare D1 (hub-os-d1)')) ?></bdi></span>
+                <span>שליפה: <bdi dir="ltr" id="client-prov-timestamp"><?= e((string) ($prov['fetched_at_il'] ?? '')) ?></bdi> (<?= e((string) ($prov['relative_age'] ?? '')) ?>)</span>
+                <span>SHA-256: <code dir="ltr" id="client-prov-sha256"><?= e((string) ($prov['sha256_short'] ?? '')) ?></code></span>
+                <?php if ($canEnrich ?? false): ?>
+                <form method="post" action="/settings/sync-d1" style="margin:0;display:inline">
+                    <?= Csrf::field() ?>
+                    <input type="hidden" name="_return" value="/clients/<?= e($id) ?>">
+                    <button type="submit" class="btn btn-sm" style="padding:0.15rem 0.5rem;font-size:0.78rem">סנכרון ואימות עכשיו ↻</button>
+                </form>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
     <div class="kpis">
         <div class="kpi" id="kpi-balance">
