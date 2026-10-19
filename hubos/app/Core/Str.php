@@ -34,4 +34,13 @@ final class Str
         }
         return trim((string) preg_replace('/[\x00-\x1F\x7F]/u', '', $s));
     }
+
+    /** First $max UTF-8 characters of $s. */
+    public static function limit(string $s, int $max): string
+    {
+        if (!self::isUtf8($s) || $max < 1) {
+            return '';
+        }
+        return preg_match('/^.{0,' . $max . '}/su', $s, $m) === 1 ? $m[0] : '';
+    }
 }

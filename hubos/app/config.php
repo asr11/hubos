@@ -21,4 +21,6 @@ return [
     'cookie_secure'        => $env('HUBOS_COOKIE_SECURE', 'auto'),
     'session_idle_seconds' => (int) $env('HUBOS_SESSION_IDLE', '7200'),
     'display_timezone'     => 'Asia/Jerusalem',
+    // Company registry (data.gov.il). Override only for local testing.
+    'registry_url'         => $env('HUBOS_REGISTRY_URL', 'https://data.gov.il/api/3/action/datastore_search?resource_id=f004176c-b85f-4542-8901-7b3176f9a054'),
 ];
