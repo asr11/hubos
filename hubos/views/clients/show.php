@@ -304,18 +304,30 @@ $familyRolled = count($card['family']) > 1;
 <?php elseif ($tab === 'collection'): ?>
     <div class="alert alert-danger" role="note" id="collection-caveat">
         יתרת חוב מדויקת <strong>אינה ניתנת לחישוב אמין</strong> מהנתונים: אין התאמה מלאה בין חשבוניות לקבלות.
-        מוצגים כאן (1) השוואת חשבוניות מול קבלות לפי שנה, ו-(2) מסמכים שסטטוס Morning שלהם אינו "שולם".
+        חוק המסמך החשבונאי (מאושר בעלים): <strong>חשבון עסקה (300)</strong> הוא דרישת תשלום ואינו נספר כהכנסה; <strong>חשבונית מס (305)</strong> ו-<strong>חשבונית מס/קבלה (320)</strong> הם הכנסה מוכרת; <strong>קבלה (400)</strong> נספרת רק אם אין חשבונית תואמת.
     </div>
+    <h3>דרישות תשלום פתוחות — חשבונות עסקה (300) ללא תשלום תואם (<?= e(count($card['open_demands'] ?? [])) ?> · <?= e(fmt_money($m['open_demands_amount'] ?? 0)) ?>)</h3>
+    <?php if (($card['open_demands'] ?? []) === []): ?><p class="empty">אין חשבונות עסקה (300) פתוחים ללא מסמך סגירה תואם.</p><?php else: ?>
+    <div class="table-wrap"><table class="table" id="open-demands-table">
+        <thead><tr><th scope="col">תאריך</th><th scope="col">סוג</th><th scope="col">מספר</th><th scope="col">סכום דרישה</th><th scope="col">סטטוס Morning</th><th scope="col">לקוח</th></tr></thead>
+        <tbody><?php foreach ($card['open_demands'] as $od): ?>
+            <tr class="open-demand-row"><td><?= e(fmt_date($od['doc_date'])) ?></td><td><?= e($od['kind_label']) ?></td><td dir="ltr" class="ltr-cell"><?= e($od['doc_number'] ?? '') ?></td>
+                <td class="strong"><?= e(fmt_money($od['amount'], 2)) ?></td><td><?= e($docStatus[$od['status']] ?? ($od['status'] ?? 'פתוח')) ?></td><td><?= $origin($od) ?></td></tr>
+        <?php endforeach; ?></tbody>
+    </table></div>
+    <?php endif; ?>
     <h3>חשבוניות מול קבלות לפי שנה</h3>
     <?php if ($card['collection'] === []): ?><p class="empty">אין מסמכים.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="collection-table">
-        <thead><tr><th scope="col">שנה</th><th scope="col">חשבון עסקה / חשבונית מס</th><th scope="col">חשבונית מס/קבלה</th><th scope="col">קבלות</th><th scope="col">קבלות שנספרו כהכנסה</th><th scope="col">קבלות שהותאמו לחשבונית</th><th scope="col">הכנסה (לפי החוק)</th></tr></thead>
+        <thead><tr><th scope="col">שנה</th><th scope="col">חשבון עסקה (300)</th><th scope="col">300 פתוחים</th><th scope="col">חשבונית מס (305)</th><th scope="col">חשבונית מס/קבלה (320)</th><th scope="col">קבלות (400)</th><th scope="col">קבלות כהכנסה</th><th scope="col">הכנסה מוכרת (לפי החוק)</th></tr></thead>
         <tbody><?php foreach ($card['collection'] as $y => $row): ?>
             <tr><td><?= e($y) ?></td>
+                <td><?= e($row['proformas'][0] ?? 0) ?> · <?= e(fmt_money($row['proformas'][1] ?? 0)) ?></td>
+                <td><?= e($row['proformas_open'][0] ?? 0) ?> · <?= e(fmt_money($row['proformas_open'][1] ?? 0)) ?></td>
                 <td><?= e($row['invoices'][0]) ?> · <?= e(fmt_money($row['invoices'][1])) ?></td>
                 <td><?= e($row['invoice_receipts'][0]) ?> · <?= e(fmt_money($row['invoice_receipts'][1])) ?></td>
                 <td><?= e($row['receipts'][0]) ?> · <?= e(fmt_money($row['receipts'][1])) ?></td>
-                <td><?= e($row['receipts_income']) ?></td><td><?= e($row['receipts_matched']) ?></td>
+                <td><?= e($row['receipts_income']) ?> (מתוך <?= e($row['receipts'][0]) ?>)</td>
                 <td class="strong"><?= e(fmt_money($row['income'])) ?></td></tr>
         <?php endforeach; ?></tbody>
     </table></div>
@@ -355,26 +367,54 @@ $familyRolled = count($card['family']) > 1;
     <?php endif; ?>
 
 <?php elseif ($tab === 'assets'): ?>
+    <?php if ($card['internal']): ?><p class="tab-actions"><a class="btn btn-ghost btn-sm" href="/assets?client_id=<?= e($id) ?>#new">+ נכס / דומיין חדש ללקוח</a></p><?php endif; ?>
     <?php if ($card['assets'] === []): ?><p class="empty">אין נכסים.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="assets-table">
-        <thead><tr><th scope="col">סוג</th><th scope="col">דומיין</th><th scope="col">ספק</th><th scope="col">IP</th><th scope="col">חידוש</th><th scope="col">סטטוס</th><th scope="col">לקוח</th></tr></thead>
+        <thead><tr><th scope="col">סוג</th><th scope="col">דומיין</th><th scope="col">ספק / רשם</th><th scope="col">IP</th><th scope="col">SSL</th><th scope="col">חידוש</th><th scope="col">סטטוס</th><th scope="col">לקוח</th><?php if ($card['internal']): ?><th scope="col">פעולות</th><?php endif; ?></tr></thead>
         <tbody><?php foreach ($card['assets'] as $a): ?>
-            <tr><td><?= e($assetKinds[$a['kind']] ?? $a['kind']) ?></td><td dir="ltr" class="ltr-cell"><?= e($a['domain'] ?? '') ?></td><td><?= e($a['provider'] ?? '') ?></td>
-                <td dir="ltr" class="ltr-cell"><?= e($a['ip_address'] ?? '') ?></td><td><?= e(fmt_date($a['expiry_date'] ?? null)) ?></td><td><?= e($a['status'] ?? '') ?></td><td><?= $origin($a) ?></td></tr>
+            <tr><td><?= e($assetKinds[$a['kind']] ?? $a['kind']) ?></td>
+                <td dir="ltr" class="ltr-cell strong"><?php if ($card['internal']): ?><a href="/assets/<?= e((int) $a['id']) ?>"><?= e($a['domain'] ?? '') ?></a><?php else: ?><?= e($a['domain'] ?? '') ?><?php endif; ?></td>
+                <td><?= e(implode(' · ', array_filter([$a['provider'] ?? null, $a['registrar'] ?? null]))) ?></td>
+                <td dir="ltr" class="ltr-cell"><?= e($a['ip_address'] ?? '') ?></td>
+                <td><?= e($a['ssl_status'] ?? '—') ?></td>
+                <td><?= e(fmt_date($a['expiry_date'] ?? null)) ?></td><td><?= e($a['status'] ?? '') ?></td><td><?= $origin($a) ?></td>
+                <?php if ($card['internal']): ?>
+                <td>
+                    <a class="btn btn-ghost btn-sm" href="/assets/<?= e((int) $a['id']) ?>">עריכה</a>
+                    <?php if (!empty($a['domain'])): ?>
+                    <form method="post" action="/assets/<?= e((int) $a['id']) ?>/inspect" class="inline-form">
+                        <?= Csrf::field() ?><input type="hidden" name="_return" value="/clients/<?= e($id) ?>?tab=assets">
+                        <button type="submit" class="btn btn-ghost btn-sm">🔍 בדיקה</button>
+                    </form>
+                    <?php endif; ?>
+                </td>
+                <?php endif; ?></tr>
         <?php endforeach; ?></tbody>
     </table></div>
     <?php endif; ?>
 
 <?php elseif ($tab === 'access' && $card['internal']): ?>
-    <p class="muted">מטא-דאטה בלבד מהכספת: הסיסמאות עצמן לעולם אינן מוצגות. הצפייה הזו נרשמה ביומן האירועים (vault.metadata_viewed).</p>
+    <?php $assetDomains = array_column($card['assets'], 'domain', 'id'); ?>
+    <p class="tab-actions"><a class="btn btn-ghost btn-sm" href="/vault?client_id=<?= e($id) ?>#new">+ גישה חדשה לכספת</a></p>
+    <p class="muted">מטא-דאטה בלבד מהכספת: הסיסמאות עצמן לעולם אינן מוצגות בטבלה. הצפייה הזו נרשמה ביומן האירועים (vault.metadata_viewed).</p>
     <?php if ($card['vault'] === []): ?><p class="empty">אין רשומות כספת.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="vault-table">
-        <thead><tr><th scope="col">כותרת</th><th scope="col">שירות</th><th scope="col">כתובת</th><th scope="col">משתמש</th><th scope="col">סוד שמור</th><th scope="col">הצפנה</th><th scope="col">סטטוס</th><th scope="col">לקוח</th></tr></thead>
+        <thead><tr><th scope="col">כותרת</th><th scope="col">שירות</th><th scope="col">נכס מקושר</th><th scope="col">כתובת</th><th scope="col">משתמש</th><th scope="col">סוד שמור</th><th scope="col">הצפנה</th><th scope="col">לקוח</th><th scope="col">פעולות</th></tr></thead>
         <tbody><?php foreach ($card['vault'] as $v): ?>
-            <tr><td class="strong"><?= e($v['title'] ?? '') ?></td><td><?= e($v['service'] ?? '') ?></td><td dir="ltr" class="ltr-cell"><?= e($v['url'] ?? '') ?></td>
+            <tr><td class="strong"><a href="/vault/<?= e((int) $v['id']) ?>"><?= e($v['title'] ?? '') ?></a></td><td><?= e($v['service'] ?? '') ?></td>
+                <td dir="ltr"><?php if (!empty($v['asset_id'])): ?><a href="/assets/<?= e((int) $v['asset_id']) ?>"><?= e($assetDomains[(int) $v['asset_id']] ?? ('#' . (int) $v['asset_id'])) ?></a><?php else: ?>—<?php endif; ?></td>
+                <td dir="ltr" class="ltr-cell"><?= e($v['url'] ?? '') ?></td>
                 <td dir="ltr" class="ltr-cell"><?= e($v['username'] ?? '') ?></td>
                 <td><?= (int) $v['has_secret'] === 1 ? ($v['encryption'] === 'aes-256-gcm' ? 'מוצפן' : 'קיים במקור, לא יובא') : '—' ?></td>
-                <td><?= e($v['encryption']) ?></td><td><?= e($v['status'] ?? '') ?></td><td><?= $origin($v) ?></td></tr>
+                <td><?= e($v['encryption']) ?></td><td><?= $origin($v) ?></td>
+                <td>
+                    <a class="btn btn-ghost btn-sm" href="/vault/<?= e((int) $v['id']) ?>">פרטים ויומן</a>
+                    <?php if ($v['encryption'] === 'aes-256-gcm'): ?>
+                        <form method="post" action="/vault/<?= e((int) $v['id']) ?>/reveal" class="inline-form">
+                            <?= Csrf::field() ?><button type="submit" class="btn btn-ghost btn-sm">🔓 חשיפה</button>
+                        </form>
+                    <?php endif; ?>
+                </td></tr>
         <?php endforeach; ?></tbody>
     </table></div>
     <?php endif; ?>

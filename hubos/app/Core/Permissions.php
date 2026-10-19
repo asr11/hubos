@@ -27,13 +27,54 @@ final class Permissions
         'admin'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update', 'clients.archive',
                             'events.view', 'users.view', 'users.manage', 'permissions.manage',
                             'time.view', 'time.track', 'time.manage',
-                            'work.view', 'work.create', 'work.update', 'work.archive', 'work.link'],
+                            'work.view', 'work.create', 'work.update', 'work.archive', 'work.link',
+                            'assets.view', 'assets.create', 'assets.update', 'assets.inspect',
+                            'vault.view', 'vault.create', 'vault.update', 'vault.reveal'],
         'staff'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update', 'events.view',
-                            'time.view', 'time.track', 'work.view', 'work.create', 'work.update', 'work.archive'],
+                            'time.view', 'time.track', 'work.view', 'work.create', 'work.update', 'work.archive',
+                            'assets.view', 'assets.create', 'assets.update', 'assets.inspect',
+                            'vault.view', 'vault.create', 'vault.update', 'vault.reveal'],
         'agent'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update',
-                            'time.view', 'time.track', 'work.view', 'work.create', 'work.update'],
-        // Read-only, scoped to the linked client (client-visible tasks + time totals only).
-        'client_viewer' => ['dashboard.view', 'clients.view', 'time.view', 'work.view'],
+                            'time.view', 'time.track', 'work.view', 'work.create', 'work.update',
+                            'assets.view', 'assets.create', 'assets.update', 'assets.inspect', 'vault.view'],
+        // Read-only, scoped to the linked client (client-visible tasks + time totals + own assets only; NEVER vault).
+        'client_viewer' => ['dashboard.view', 'clients.view', 'time.view', 'work.view', 'assets.view'],
+    ];
+
+    /** Switchable tenant modules (customisation level 1). */
+    public const SWITCHABLE_MODULES = [
+        'clients' => 'לקוחות וכרטיס 360',
+        'time'    => 'שעות, טיימר ובנקי שעות',
+        'work'    => 'משימות, פרויקטים ותחזוקה',
+        'assets'  => 'נכסים, דומיינים ו-SSL',
+        'vault'   => 'כספת גישות מוצפנת',
+    ];
+
+    /** Known permissions for per-user override UI. */
+    public const ALL_PERMISSIONS = [
+        'clients.view'       => 'צפייה בלקוחות',
+        'clients.create'     => 'יצירת לקוח',
+        'clients.update'     => 'עריכת לקוח',
+        'time.view'          => 'צפייה בשעות',
+        'time.track'         => 'דיווח שעות וטיימר',
+        'time.manage'        => 'ניהול שעות ובנקי שעות',
+        'work.view'          => 'צפייה במשימות ופרויקטים',
+        'work.create'        => 'יצירת משימות ופרויקטים',
+        'work.update'        => 'עריכת משימות ופרויקטים',
+        'work.archive'       => 'ארכוב משימות ופרויקטים',
+        'work.link'          => 'שיוך משימות ופרויקטים ללקוח',
+        'assets.view'        => 'צפייה בנכסים ודומיינים',
+        'assets.create'      => 'יצירת נכס',
+        'assets.update'      => 'עריכת נכס',
+        'assets.inspect'     => 'בדיקת DNS/SSL/WHOIS לנכס',
+        'vault.view'         => 'צפייה במטא-דאטה בכספת',
+        'vault.create'       => 'יצירת רשומת כספת',
+        'vault.update'       => 'עריכת רשומת כספת',
+        'vault.reveal'       => 'חשיפת סוד מוצפן (נרשם ביומן)',
+        'events.view'        => 'צפייה ביומן אירועים',
+        'users.view'         => 'צפייה במשתמשים',
+        'users.manage'       => 'ניהול משתמשים',
+        'permissions.manage' => 'ניהול הרשאות ומודולים',
     ];
 
     /** Modules that are always on (not switchable per tenant). */
@@ -50,6 +91,10 @@ final class Permissions
             return false;
         }
         if ((int) ($user['tenant_id'] ?? 0) !== $this->tenant->id() || ($user['status'] ?? '') !== 'active') {
+            return false;
+        }
+        // Hard security invariant: client_viewer can NEVER access or reveal vault items.
+        if (($user['role'] ?? '') === 'client_viewer' && str_starts_with($permission, 'vault.')) {
             return false;
         }
         $module = substr($permission, 0, (int) strpos($permission, '.'));

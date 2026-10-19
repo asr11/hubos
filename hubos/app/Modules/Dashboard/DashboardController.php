@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace HubOS\Modules\Dashboard;
 
 use HubOS\Core\Context;
-use HubOS\Core\Events;
 use HubOS\Core\Response;
-use HubOS\Modules\Clients\ClientService;
 
 final class DashboardController
 {
@@ -19,18 +17,21 @@ final class DashboardController
     public function index(Context $ctx): Response
     {
         $user = $ctx->requireUser();
-        $tenant = $ctx->tenant();
-        $perms = $ctx->permissions();
-        $canEvents = $perms->can($user, 'events.view');
-        $canClients = $perms->can($user, 'clients.view');
+        $svc = new DashboardService($ctx->tenant(), $ctx->permissions());
 
-        return $ctx->render('dashboard/index', [
-            'title'        => 'לוח בקרה',
-            'active'       => 'dashboard',
-            'clientsCount' => $canClients ? (new ClientService($tenant, $perms))->count($user) : null,
-            'eventsCount'  => $canEvents ? $tenant->count('events') : null,
-            'modules'      => $tenant->all('tenant_modules', ['enabled' => 1], 'module', 'ASC'),
-            'events'       => $canEvents ? Events::recent($tenant, 8) : [],
+        if (($user['role'] ?? '') === 'client_viewer') {
+            $portal = $svc->portal($user);
+            return $ctx->render('dashboard/portal', [
+                'title'  => 'פורטל לקוח · ' . ($portal['client']['name'] ?? 'ללא לקוח'),
+                'active' => 'dashboard',
+                'portal' => $portal,
+            ]);
+        }
+
+        $data = $svc->ceo($user);
+        return $ctx->render('dashboard/index', $data + [
+            'title'  => 'מסך הבוקר · לוח בקרה למנכ״ל',
+            'active' => 'dashboard',
         ]);
     }
 }

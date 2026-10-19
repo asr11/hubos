@@ -29,7 +29,9 @@ return [
     'doc_kind.receipt'             => 'קבלה',
 
     // Income reasons
-    'income.invoice'           => 'מסמך עסקה — נספר כהכנסה',
+    'income.invoice'           => 'מסמך עסקה (305/320) — נספר כהכנסה',
+    'income.proforma_open'     => 'חשבון עסקה פתוח (300) — דרישת תשלום, לא הכנסה',
+    'income.proforma_matched'  => 'חשבון עסקה (300) שנסגר בחשבונית/קבלה — לא הכנסה',
     'income.receipt_matched'   => 'קבלה עם חשבונית תואמת (לקוח+סכום) — לא נספרת',
     'income.receipt_unmatched' => 'קבלה ללא חשבונית תואמת — נספרת כהכנסה',
     'income.unknown_type'      => 'סוג מסמך לא מזוהה — מסומן לבדיקה, לא נספר',
