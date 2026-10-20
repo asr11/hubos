@@ -36,7 +36,7 @@ final class Permissions
                             'vault.view', 'vault.create', 'vault.update', 'vault.reveal'],
         'agent'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update', 'events.view',
                             'time.view', 'time.track', 'work.view', 'work.create', 'work.update',
-                            'assets.view', 'assets.create', 'assets.update', 'assets.inspect', 'vault.view'],
+                            'assets.view', 'assets.create', 'assets.update', 'assets.inspect', 'vault.view', 'finance.view'],
         // Read-only, scoped to the linked client (client-visible tasks + time totals + own assets only; NEVER vault).
         'client_viewer' => ['dashboard.view', 'clients.view', 'time.view', 'work.view', 'assets.view'],
     ];
@@ -71,6 +71,7 @@ final class Permissions
         'vault.create'       => 'יצירת רשומת כספת',
         'vault.update'       => 'עריכת רשומת כספת',
         'vault.reveal'       => 'חשיפת סוד מוצפן (נרשם ביומן)',
+        'finance.view'       => 'צפייה בנתונים פיננסיים, הכנסות וחובות (בעלים בלבד)',
         'events.view'        => 'צפייה ביומן אירועים',
         'users.view'         => 'צפייה במשתמשים',
         'users.manage'       => 'ניהול משתמשים',
@@ -78,7 +79,7 @@ final class Permissions
     ];
 
     /** Modules that are always on (not switchable per tenant). */
-    private const CORE_MODULES = ['dashboard', 'events', 'users', 'permissions'];
+    private const CORE_MODULES = ['dashboard', 'events', 'users', 'permissions', 'finance'];
 
     public function __construct(private Tenant $tenant)
     {
@@ -95,6 +96,10 @@ final class Permissions
         }
         // Hard security invariant: client_viewer can NEVER access or reveal vault items.
         if (($user['role'] ?? '') === 'client_viewer' && str_starts_with($permission, 'vault.')) {
+            return false;
+        }
+        // Hard security invariant: finance data is strictly locked to role 'owner' (and 'agent' for CEO bot reporting).
+        if (str_starts_with($permission, 'finance.') && !in_array($user['role'] ?? '', ['owner', 'agent'], true)) {
             return false;
         }
         $module = substr($permission, 0, (int) strpos($permission, '.'));
@@ -125,6 +130,19 @@ final class Permissions
     public static function isWrite(string $permission): bool
     {
         return !str_ends_with($permission, '.view');
+    }
+
+    /** @param array<string, mixed> $user */
+    public static function isOwner(array $user): bool
+    {
+        return ($user['role'] ?? '') === 'owner';
+    }
+
+    /** @param array<string, mixed> $user */
+    public function canFinance(array $user): bool
+    {
+        $role = (string) ($user['role'] ?? '');
+        return ($role === 'owner' || $role === 'agent') && $this->can($user, 'finance.view');
     }
 
     public function moduleEnabled(string $module): bool

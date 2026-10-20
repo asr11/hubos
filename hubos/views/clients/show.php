@@ -75,6 +75,8 @@ $familyRolled = count($card['family']) > 1;
             </div>
         <?php endif; ?>
     </div>
+    <div class="kpis">
+        <?php if (!empty($m['can_finance'])): ?>
         <div class="kpi" id="kpi-balance">
             <span class="kpi-label">יתרת חוב</span>
             <?php if (($m['open_docs_amount'] ?? 0) > 0 || ($m['open_demands_amount'] ?? 0) > 0): ?>
@@ -85,6 +87,7 @@ $familyRolled = count($card['family']) > 1;
                 <span class="kpi-hint">אין חוב פתוח · שולם במלואו</span>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
         <div class="kpi" id="kpi-hours-month">
             <span class="kpi-label">שעות החודש</span>
             <span class="kpi-value"><?= e(fmt_hours($m['hours_this_month'])) ?></span>
@@ -96,11 +99,13 @@ $familyRolled = count($card['family']) > 1;
             <span class="kpi-value" id="bank-remaining"><?= $m['bank_remaining'] === null ? '—' : e(fmt_hours($m['bank_remaining'])) ?></span>
             <span class="kpi-hint"><?php if ($ownBank !== null): ?>נוצלו <?= e(fmt_hours($ownBank['used_hours'])) ?> מתוך <?= e(fmt_hours($ownBank['allowance_hours'])) ?><?php elseif ($m['bank_remaining'] === null): ?>אין בנק שעות פעיל<?php else: ?>שעות בבנקים פעילים<?php endif; ?></span>
         </div>
+        <?php if (!empty($m['can_finance'])): ?>
         <div class="kpi" id="kpi-income">
             <span class="kpi-label">הכנסה <?= e($m['year']) ?></span>
             <span class="kpi-value"><?= e(fmt_money($m['income_this_year'])) ?></span>
             <span class="kpi-hint">לפי חוק המסמך החשבונאי · ברוטו</span>
         </div>
+        <?php endif; ?>
     </div>
     <?php if ($canTrack): ?>
     <div class="client-timer" id="client-timer">
@@ -167,6 +172,7 @@ $familyRolled = count($card['family']) > 1;
 <nav class="tabs" aria-label="לשוניות כרטיס לקוח" id="client-tabs">
     <?php foreach (Client360Service::TABS as $key => $label): ?>
         <?php if ($key === 'access' && !$card['internal']) { continue; } ?>
+        <?php if (in_array($key, ['finance', 'collection'], true) && empty($card['metrics']['can_finance'])) { continue; } ?>
         <a id="tab-<?= e($key) ?>" href="/clients/<?= e($id) ?>?tab=<?= e($key) ?>" class="tab<?= $tab === $key ? ' is-active' : '' ?>"
             <?= $tab === $key ? 'aria-current="page"' : '' ?>><?= e($label) ?> <span class="badge"><?= e($card['counts'][$key]) ?></span></a>
     <?php endforeach; ?>

@@ -695,7 +695,8 @@ test('client360: client_viewer sees only its own client (no roll-up, no vault, n
     $own = $svc->build($viewer, $w['c']);
     eq('self', $own['scope']);
     eq([$w['c']], array_keys($own['family']), 'no family roll-up for viewer');
-    eq(2, count($own['finance']), 'only own docs');
+    eq(0, count($own['finance']), 'no finance docs for viewer (owner only)');
+    eq(false, $own['metrics']['can_finance']);
     eq([], $own['vault'], 'no vault for viewer');
     eq([], $own['events'], 'no audit events for viewer');
     eq(null, $own['parent']);
@@ -708,6 +709,8 @@ test('client360: client_viewer sees only its own client (no roll-up, no vault, n
 
     $s = $svc->build($staff, $w['u']);
     eq('family', $s['scope'], 'staff sees any tenant client');
+    eq(0, count($s['finance']), 'staff cannot view finance (owner only)');
+    eq(false, $s['metrics']['can_finance']);
 });
 
 test('hebrew search: normalization, one-letter prefix stripping, ranking', function (): void {

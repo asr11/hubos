@@ -47,6 +47,7 @@ final class DashboardService
         $canWork = $this->perms->can($user, 'work.view');
         $canTime = $this->perms->can($user, 'time.view');
         $canAssets = $this->perms->can($user, 'assets.view');
+        $canFinance = $this->perms->canFinance($user);
 
         // ------------------------------------------------------------------ 1. Urgent today (מה דחוף היום)
         $overdueTasks = [];
@@ -89,7 +90,7 @@ final class DashboardService
         }
 
         $openDemandsSummary = ['count' => 0, 'amount' => 0.0, 'top_clients' => [], 'recent' => []];
-        if ($canClients) {
+        if ($canFinance) {
             $odRow = $this->tenant->selectOne(
                 "SELECT COUNT(*) AS n, COALESCE(SUM(amount - COALESCE(paid_amount, 0)), 0) AS total
                  FROM finance_documents
@@ -182,8 +183,9 @@ final class DashboardService
                 'proforma_matched'           => ['count' => 0, 'amount' => 0.0],
                 'proforma_paid_in_morning'   => ['count' => 0, 'amount' => 0.0],
             ],
+            'can_finance'       => $canFinance,
         ];
-        if ($canClients) {
+        if ($canFinance) {
             $byYearRows = $this->tenant->select(
                 "SELECT COALESCE( NULLIF(substr(doc_date, 1, 4), ''), '—' ) AS yr,
                         COUNT(*) AS docs_count,
@@ -310,9 +312,11 @@ final class DashboardService
         }
 
         return [
-            'provenance'   => (new \HubOS\Modules\Import\SyncService($this->tenant, $this->perms))->latestProvenance($now),
-            'clientsCount' => $canClients ? (new ClientService($this->tenant, $this->perms))->count($user) : null,
-            'eventsCount'  => $canEvents ? $this->tenant->count('events') : null,
+            'provenance'         => (new \HubOS\Modules\Import\SyncService($this->tenant, $this->perms))->latestProvenance($now),
+            'clientsCount'       => $canClients ? (new ClientService($this->tenant, $this->perms))->count($user) : null,
+            'clientsActiveCount' => $canClients ? count((new ClientService($this->tenant, $this->perms))->list($user, 1000, 'active')) : null,
+            'canFinance'         => $canFinance,
+            'eventsCount'        => $canEvents ? $this->tenant->count('events') : null,
             'modules'      => $this->tenant->all('tenant_modules', ['enabled' => 1], 'module', 'ASC'),
             'events'       => $canEvents ? Events::recent($this->tenant, 15) : [],
             'urgent'       => [

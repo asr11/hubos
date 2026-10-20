@@ -97,9 +97,11 @@ $prov = $provenance ?? null;
 <section class="stats" aria-label="נתונים מרכזיים">
     <article class="stat card">
         <span class="stat-label">לקוחות פעילים</span>
-        <strong class="stat-value" id="stat-clients"><?= $clientsCount === null ? '—' : e($clientsCount) ?></strong>
+        <strong class="stat-value" id="stat-clients"><?= $clientsActiveCount !== null ? e($clientsActiveCount) : ($clientsCount === null ? '—' : e($clientsCount)) ?></strong>
+        <span class="stat-hint">מתוך <?= e($clientsCount ?? 0) ?> רשומות במערכת</span>
         <a class="stat-link" href="/clients">לרשימת הלקוחות ←</a>
     </article>
+    <?php if (!empty($canFinance)): ?>
     <article class="stat card">
         <span class="stat-label">הכנסה ממומשת (<?= e($money['year'] ?? '') ?>)</span>
         <strong class="stat-value" id="stat-income-year" dir="ltr">₪<?= e(number_format((float) ($money['income_this_year'] ?? 0), 0)) ?></strong>
@@ -110,6 +112,7 @@ $prov = $provenance ?? null;
         <strong class="stat-value" id="stat-open-demands" dir="ltr">₪<?= e(number_format((float) ($openDemands['amount'] ?? 0), 0)) ?></strong>
         <span class="stat-hint"><?= e((int) ($openDemands['count'] ?? 0)) ?> חשבונות עסקה ללא קבלה/חשבונית מס</span>
     </article>
+    <?php endif; ?>
     <article class="stat card">
         <span class="stat-label">אירועים ביומן</span>
         <strong class="stat-value" id="stat-events"><?= $eventsCount === null ? '—' : e($eventsCount) ?></strong>
@@ -177,6 +180,7 @@ $prov = $provenance ?? null;
             <?php endif; ?>
         </div>
 
+        <?php if (!empty($canFinance)): ?>
         <div>
             <h3>מועמדים לגבייה · דרישות תשלום פתוחות (חשבון עסקה 300)</h3>
             <p class="muted" style="margin-bottom:.5rem">
@@ -215,6 +219,7 @@ $prov = $provenance ?? null;
                 </div>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -320,6 +325,7 @@ $prov = $provenance ?? null;
 <!-- ===================================================================== -->
 <!-- 3. כמה כסף (Money — Realized Income vs Open Demands)                  -->
 <!-- ===================================================================== -->
+<?php if (!empty($canFinance)): ?>
 <section class="card" id="sec-money" aria-labelledby="money-title">
     <div class="card-head">
         <div>
@@ -413,6 +419,7 @@ $prov = $provenance ?? null;
         </div>
     </div>
 </section>
+<?php endif; ?>
 
 <!-- ===================================================================== -->
 <!-- 4. מה הצוות עשה (What the Team Did)                                   -->
