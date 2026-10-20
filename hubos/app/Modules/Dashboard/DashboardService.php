@@ -91,7 +91,7 @@ final class DashboardService
         $openDemandsSummary = ['count' => 0, 'amount' => 0.0, 'top_clients' => [], 'recent' => []];
         if ($canClients) {
             $odRow = $this->tenant->selectOne(
-                "SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total
+                "SELECT COUNT(*) AS n, COALESCE(SUM(amount - COALESCE(paid_amount, 0)), 0) AS total
                  FROM finance_documents
                  WHERE tenant_id = :tenant_id AND counts_as_income = 0 AND income_reason = 'proforma_open'
                    AND COALESCE(LOWER(status), '') != 'paid'"
@@ -100,7 +100,7 @@ final class DashboardService
             $openDemandsSummary['amount'] = (float) ($odRow['total'] ?? 0.0);
             $openDemandsSummary['top_clients'] = $this->tenant->select(
                 "SELECT f.client_id, COALESCE(c.name, f.client_name_raw, 'ללא שיוך') AS client_name,
-                        COUNT(*) AS docs_count, SUM(f.amount) AS total_amount,
+                        COUNT(*) AS docs_count, SUM(f.amount - COALESCE(f.paid_amount, 0)) AS total_amount,
                         MAX(f.doc_date) AS latest_date
                  FROM finance_documents f
                  LEFT JOIN clients c ON c.tenant_id = f.tenant_id AND c.id = f.client_id
@@ -111,7 +111,7 @@ final class DashboardService
             );
             $openDemandsSummary['recent'] = $this->tenant->select(
                 "SELECT f.id, f.client_id, COALESCE(c.name, f.client_name_raw, 'ללא שיוך') AS client_name,
-                        f.doc_number, f.doc_date, f.amount, f.currency
+                        f.doc_number, f.doc_date, (f.amount - COALESCE(f.paid_amount, 0)) AS amount, f.currency
                  FROM finance_documents f
                  LEFT JOIN clients c ON c.tenant_id = f.tenant_id AND c.id = f.client_id
                  WHERE f.tenant_id = :tenant_id AND f.counts_as_income = 0 AND f.income_reason = 'proforma_open'
