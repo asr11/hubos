@@ -79,17 +79,15 @@ $prov = $provenance ?? null;
 </section>
 
 <?php if (is_array($prov)): ?>
-<section class="card" id="provenance-banner" aria-label="אימות מקור נתונים וחותמת זמן" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;padding:0.85rem 1.25rem;border-right:4px solid var(--ok, #16a34a)">
-    <div class="cluster" style="gap:1.25rem;flex-wrap:wrap">
-        <span class="pill pill-ok" id="prov-verified">✔ מקור נתונים מאומת</span>
-        <span><strong>מקור:</strong> <bdi dir="ltr" id="prov-source"><?= e((string) ($prov['source_label'] ?? 'Cloudflare D1 (hub-os-d1)')) ?></bdi></span>
-        <span><strong>תאריך וזמן שליפה מדויק:</strong> <bdi dir="ltr" id="prov-timestamp"><?= e((string) ($prov['fetched_at_il'] ?? '')) ?></bdi> <span class="muted small">(<?= e((string) ($prov['relative_age'] ?? '')) ?>)</span></span>
-        <span><strong>חתימת אימות (SHA-256):</strong> <code dir="ltr" id="prov-sha256" title="<?= e((string) ($prov['source_sha256'] ?? '')) ?>"><?= e((string) ($prov['sha256_short'] ?? '')) ?></code></span>
+<section class="card provenance-bar-clean" aria-label="סנכרון נתונים" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0.6rem 1.25rem;border-right:4px solid var(--ok, #16a34a);background:#ffffff;">
+    <div class="cluster" style="gap:1rem;align-items:center">
+        <span class="pill pill-ok" style="font-size:0.8rem;padding:0.2rem 0.6rem">✔ נתונים מאומתים (Morning SSOT)</span>
+        <span class="muted small">סנכרון אחרון: <bdi dir="ltr"><?= e((string) ($prov['fetched_at_il'] ?? '')) ?></bdi> <span class="muted">(<?= e((string) ($prov['relative_age'] ?? '')) ?>)</span></span>
     </div>
     <form method="post" action="/settings/sync-d1" style="margin:0">
         <?= \HubOS\Core\Csrf::field() ?>
         <input type="hidden" name="_return" value="/dashboard">
-        <button type="submit" class="btn btn-sm" id="btn-sync-d1">סנכרון ואימות עכשיו ↻</button>
+        <button type="submit" class="btn btn-sm btn-ghost" id="btn-sync-d1" style="font-size:0.8rem">סנכרון נתונים ↻</button>
     </form>
 </section>
 <?php endif; ?>
@@ -510,10 +508,16 @@ $prov = $provenance ?? null;
 <!-- ===================================================================== -->
 <!-- 5. פעילות אחרונה ביומן האירועים (Audit Trail)                         -->
 <!-- ===================================================================== -->
-<section class="card" id="sec-events" aria-labelledby="events-title">
-    <div class="card-head">
-        <h2 id="events-title">יומן פעולות אחרונות (Append-Only Audit Log)</h2>
-    </div>
+<details class="card" id="sec-events" aria-labelledby="events-title" style="margin-top:1.5rem">
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0;">
+        <div style="display:flex;align-items:center;gap:0.75rem">
+            <span style="font-size:1.1rem">📋</span>
+            <h2 id="events-title" style="font-size:1.05rem;display:inline">יומן פעולות מערכת ואבטחה</h2>
+            <span class="badge" style="font-size:0.75rem"><?= e(count($events)) ?></span>
+        </div>
+        <span class="muted small" style="font-weight:600">לחץ לצפייה בלוגים ▼</span>
+    </summary>
+    <div style="padding-top:1rem;margin-top:0.75rem;border-top:1px solid var(--border,#e2e8f0)">
     <?php if ($events === []): ?>
         <p class="empty">אין אירועים להצגה.</p>
     <?php else: ?>
@@ -524,11 +528,11 @@ $prov = $provenance ?? null;
                     <div>
                         <strong><?= e($actionLabels[$ev['action']] ?? $ev['action']) ?></strong>
                         <span class="muted">· <?= e($ev['actor_name'] ?? 'מערכת') ?></span>
-                        <code class="muted" dir="ltr" style="font-size:.75rem">(<?= e($ev['action']) ?>)</code>
                     </div>
                     <time class="muted" datetime="<?= e($ev['created_at']) ?>" dir="ltr"><?= e(fmt_dt($ev['created_at'])) ?></time>
                 </li>
             <?php endforeach; ?>
         </ol>
     <?php endif; ?>
-</section>
+    </div>
+</details>
