@@ -75,11 +75,15 @@ $familyRolled = count($card['family']) > 1;
             </div>
         <?php endif; ?>
     </div>
-    <div class="kpis">
         <div class="kpi" id="kpi-balance">
             <span class="kpi-label">יתרת חוב</span>
-            <span class="kpi-value kpi-na">לא ניתנת לחישוב אמין</span>
-            <span class="kpi-hint"><?= e($m['open_docs_count']) ?> מסמכים "לא שולם" לפי Morning (<?= e(fmt_money($m['open_docs_amount'])) ?>)</span>
+            <?php if (($m['open_docs_amount'] ?? 0) > 0 || ($m['open_demands_amount'] ?? 0) > 0): ?>
+                <span class="kpi-value kpi-alert"><?= e(fmt_money($m['open_docs_amount'] > 0 ? $m['open_docs_amount'] : $m['open_demands_amount'])) ?></span>
+                <span class="kpi-hint"><?= e($m['open_docs_count'] ?: $m['open_demands_count']) ?> מסמכים פתוחים לגבייה</span>
+            <?php else: ?>
+                <span class="kpi-value kpi-ok">₪0</span>
+                <span class="kpi-hint">אין חוב פתוח · שולם במלואו</span>
+            <?php endif; ?>
         </div>
         <div class="kpi" id="kpi-hours-month">
             <span class="kpi-label">שעות החודש</span>
