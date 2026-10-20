@@ -17,7 +17,7 @@ $statusLabels = ['active' => 'פעיל', 'inactive' => 'לא פעיל', 'archive
     <form method="post" action="/clients" class="form form-inline" id="client-create-form" novalidate>
         <?= Csrf::field() ?>
         <label class="field">
-            <span>שם</span>
+            <span>שם *</span>
             <input type="text" name="name" id="client-name" value="<?= e($old['name'] ?? '') ?>" required maxlength="200"
                    <?= isset($errors['name']) ? 'aria-invalid="true"' : '' ?>>
             <?php if (isset($errors['name'])): ?><small class="field-error"><?= e($errors['name']) ?></small><?php endif; ?>
@@ -34,7 +34,23 @@ $statusLabels = ['active' => 'פעיל', 'inactive' => 'לא פעיל', 'archive
                    <?= isset($errors['phone']) ? 'aria-invalid="true"' : '' ?>>
             <?php if (isset($errors['phone'])): ?><small class="field-error"><?= e($errors['phone']) ?></small><?php endif; ?>
         </label>
-        <button type="submit" class="btn btn-primary" id="client-create-submit">הוספה</button>
+        <label class="field">
+            <span>בנק שעות ראשוני</span>
+            <input type="number" step="0.5" min="0" max="1000" name="initial_hours" id="client-initial-hours" value="<?= e($old['initial_hours'] ?? '') ?>" placeholder="0">
+            <?php if (isset($errors['initial_hours'])): ?><small class="field-error"><?= e($errors['initial_hours']) ?></small><?php endif; ?>
+        </label>
+        <label class="field">
+            <span>סוג בנק</span>
+            <select name="bank_type" id="client-bank-type">
+                <option value="one_time" <?= ($old['bank_type'] ?? '') === 'one_time' ? 'selected' : '' ?>>חד-פעמי</option>
+                <option value="monthly" <?= ($old['bank_type'] ?? '') === 'monthly' ? 'selected' : '' ?>>ריטיינר חודשי</option>
+            </select>
+        </label>
+        <label class="field">
+            <span>מקור פנייה</span>
+            <input type="text" name="source" id="client-source" value="<?= e($old['source'] ?? '') ?>" placeholder="טלפון / וואטסאפ" maxlength="100">
+        </label>
+        <button type="submit" class="btn btn-primary" id="client-create-submit">הוספת לקוח</button>
     </form>
 </section>
 <?php endif; ?>

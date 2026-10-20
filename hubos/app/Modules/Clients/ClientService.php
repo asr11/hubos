@@ -119,10 +119,31 @@ final class ClientService
         $this->perms->authorize($user, 'clients.create');
         $data = self::validate($input);
 
-        return $this->tenant->transaction(function (Tenant $t) use ($user, $data): int {
+        return $this->tenant->transaction(function (Tenant $t) use ($user, $data, $input): int {
             $id = $t->insert('clients', $data);
             $after = $t->find('clients', $id);
             Events::record($t, (int) $user['id'], 'client', $id, $id, 'client.created', null, $after);
+
+            $initialHours = isset($input['initial_hours']) && is_numeric($input['initial_hours']) ? (float) $input['initial_hours'] : 0.0;
+            if ($initialHours > 0) {
+                $bankType = in_array($input['bank_type'] ?? '', ['one_time', 'monthly'], true) ? $input['bank_type'] : 'one_time';
+                $bankName = 'בנק שעות - ' . $data['name'];
+                $sourceNote = !empty($input['source']) ? 'מקור: ' . Str::clean((string) $input['source']) : 'נוצר במעמד פתיחת לקוח';
+                $bankData = [
+                    'tenant_id'   => $t->id(),
+                    'client_id'   => $id,
+                    'name'        => $bankName,
+                    'total_hours' => $initialHours,
+                    'type'        => $bankType,
+                    'status'      => 'active',
+                    'notes'       => $sourceNote,
+                    'created_at'  => gmdate('Y-m-d\TH:i:s\Z'),
+                    'updated_at'  => gmdate('Y-m-d\TH:i:s\Z'),
+                ];
+                $bankId = $t->insert('hours_banks', $bankData);
+                Events::record($t, (int) $user['id'], 'hours_bank', $bankId, $id, 'hours_bank.created', null, $bankData);
+            }
+
             return $id;
         });
     }
@@ -146,6 +167,11 @@ final class ClientService
         }
         if ($phone !== '' && preg_match('/^[0-9+\-() ]{6,25}$/', $phone) !== 1) {
             $errors['phone'] = 'מספר טלפון לא תקין';
+        }
+        if (isset($input['initial_hours']) && $input['initial_hours'] !== '') {
+            if (!is_numeric($input['initial_hours']) || (float) $input['initial_hours'] < 0 || (float) $input['initial_hours'] > 10000) {
+                $errors['initial_hours'] = 'שעות בנק חייב להיות מספר חיובי (עד 10,000)';
+            }
         }
         if ($errors !== []) {
             throw new ValidationException($errors);
