@@ -15,8 +15,17 @@ use HubOS\Modules\Work\TaskService;
 $archivedView = ($filters['archived'] ?? '') === '1';
 ?>
 <?php if ($canCreate): ?>
-<section class="card" aria-labelledby="new-task-title" id="new">
-    <div class="card-head"><h2 id="new-task-title">משימה חדשה</h2><span class="muted small">שיוך ללקוח הוא חובה</span></div>
+<div style="margin-bottom:1.25rem;display:flex;justify-content:flex-start;">
+    <button type="button" class="btn btn-primary" onclick="var el = document.getElementById('new-task-section'); el.style.display = (el.style.display === 'none' ? 'block' : 'none'); if (el.style.display !== 'none') el.scrollIntoView({behavior:'smooth'});" id="btn-toggle-new-task" style="display:flex;align-items:center;gap:0.5rem;font-weight:700;">
+        <span>+</span> פתיחת משימה חדשה
+    </button>
+</div>
+<section class="card" aria-labelledby="new-task-title" id="new-task-section" style="<?= $errors === [] ? 'display:none;' : '' ?>margin-bottom:1.5rem;padding:1.75rem;border-top:3px solid var(--primary);">
+    <div class="card-head">
+        <h2 id="new-task-title" style="font-size:1.25rem;font-weight:800;color:#0f172a;">משימה חדשה</h2>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('new-task-section').style.display='none';">✕ סגירה</button>
+    </div>
+    <span class="muted small" style="display:block;margin-bottom:1rem;">שיוך ללקוח הוא חובה</span>
     <?php if ($errors !== []): ?><div class="alert alert-danger" role="alert" id="task-errors"><?= e(implode(' · ', $errors)) ?></div><?php endif; ?>
     <?php $formAction = '/tasks'; $formId = 'task-create-form'; $submitLabel = 'יצירת משימה'; $returnTo = null;
     include __DIR__ . '/_task_form.php'; ?>
