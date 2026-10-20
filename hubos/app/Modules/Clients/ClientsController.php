@@ -48,6 +48,9 @@ final class ClientsController
         if (!array_key_exists($tab, Client360Service::TABS)) {
             $tab = 'overview';
         }
+        if (in_array($tab, ['finance', 'collection'], true) && ($user['role'] ?? '') !== 'owner') {
+            $tab = 'overview';
+        }
         $service = new Client360Service($ctx->tenant(), $ctx->permissions());
         $card = $service->build($user, $id);
 
@@ -123,15 +126,25 @@ final class ClientsController
     {
         $user = $ctx->requireUser();
         $service = new ClientService($ctx->tenant(), $ctx->permissions());
+        $statusFilter = is_string($_GET['status'] ?? null) && in_array($_GET['status'], ['active', 'inactive', 'all'], true)
+            ? $_GET['status']
+            : 'active'; // Default to active clients!
         $q = is_string($_GET['q'] ?? null) ? Str::limit(Str::clean($_GET['q']), 100) : '';
+        $effectiveFilter = ($q !== '' && !isset($_GET['status'])) ? 'all' : $statusFilter;
+        $clients = $service->search($user, $q, $effectiveFilter === 'all' ? null : $effectiveFilter);
+        $counts = $service->countsByStatus($user);
+
         return $ctx->render('clients/index', [
-            'title'     => 'לקוחות',
-            'active'    => 'clients',
-            'clients'   => $service->search($user, $q),
-            'q'         => $q,
-            'canCreate' => $ctx->can('clients.create'),
-            'errors'    => $errors,
-            'old'       => $old,
+            'title'        => 'לקוחות',
+            'active'       => 'clients',
+            'clients'      => $clients,
+            'q'            => $q,
+            'statusFilter' => $statusFilter,
+            'counts'       => $counts,
+            'canCreate'    => $ctx->can('clients.create'),
+            'canFinance'   => ($user['role'] ?? '') === 'owner',
+            'errors'       => $errors,
+            'old'          => $old,
         ], $status);
     }
 }

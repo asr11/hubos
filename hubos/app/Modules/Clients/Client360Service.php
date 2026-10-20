@@ -110,7 +110,8 @@ final class Client360Service
         $tasks = array_values(array_filter($tasks, $visible));
         $timeEntries = $this->label($this->rows('time_entries', $ids, 'COALESCE(entry_date, started_at, created_at) DESC'), $names, $clientId);
         $banks = $this->label($this->rows('hours_banks', $ids, 'status ASC, id ASC'), $names, $clientId);
-        $finance = $this->label($this->rows('finance_documents', $ids, 'doc_date DESC, id DESC'), $names, $clientId);
+        $canFinance = ($user['role'] ?? '') === 'owner' && $this->perms->can($user, 'finance.view');
+        $finance = $canFinance ? $this->label($this->rows('finance_documents', $ids, 'doc_date DESC, id DESC'), $names, $clientId) : [];
         $leads = $this->label($this->rows('leads', $ids, 'created_at DESC'), $names, $clientId);
         $quotes = $this->label($this->rows('quotes', $ids, 'created_at DESC'), $names, $clientId);
         $assets = $this->label($this->rows('assets', $ids, 'expiry_date IS NULL, expiry_date ASC, id ASC'), $names, $clientId);
@@ -158,49 +159,54 @@ final class Client360Service
         $incomeByOrigin = [];
         $collection = [];
         $openDocs = [];
-        foreach ($finance as $doc) {
-            $y = $doc['year'];
-            $amount = (float) $doc['amount'];
-            if ((int) $doc['counts_as_income'] === 1) {
-                $incomeByYear[$y] = ($incomeByYear[$y] ?? 0.0) + $amount;
-                $incomeByOrigin[$doc['origin_name']] = ($incomeByOrigin[$doc['origin_name']] ?? 0.0) + $amount;
+        $openDemands = [];
+        $openAmount = 0.0;
+        $openDemandsAmount = 0.0;
+        if ($canFinance) {
+            foreach ($finance as $doc) {
+                $y = $doc['year'];
+                $amount = (float) $doc['amount'];
+                if ((int) $doc['counts_as_income'] === 1) {
+                    $incomeByYear[$y] = ($incomeByYear[$y] ?? 0.0) + $amount;
+                    $incomeByOrigin[$doc['origin_name']] = ($incomeByOrigin[$doc['origin_name']] ?? 0.0) + $amount;
+                }
+                $bucket = match ($doc['doc_kind'] ?? null) {
+                    'transaction_account' => 'proformas',
+                    'tax_invoice'         => 'invoices',
+                    'tax_invoice_receipt' => 'invoice_receipts',
+                    'receipt'             => 'receipts',
+                    default               => 'other',
+                };
+                $collection[$y] ??= ['proformas' => [0, 0.0], 'proformas_open' => [0, 0.0], 'invoices' => [0, 0.0], 'invoice_receipts' => [0, 0.0], 'receipts' => [0, 0.0], 'other' => [0, 0.0],
+                    'receipts_income' => 0, 'receipts_matched' => 0, 'income' => 0.0];
+                $collection[$y][$bucket][0]++;
+                $collection[$y][$bucket][1] += $amount;
+                if ($bucket === 'receipts') {
+                    $collection[$y]['receipts_income'] += (int) $doc['counts_as_income'];
+                    $collection[$y]['receipts_matched'] += $doc['matched_document_id'] !== null ? 1 : 0;
+                }
+                if ((int) $doc['counts_as_income'] === 1) {
+                    $collection[$y]['income'] += $amount;
+                }
+                if ($bucket !== 'receipts' && in_array((string) $doc['status'], self::OPEN_STATUSES, true)) {
+                    $doc['open_amount'] = max(0.0, $amount - (float) ($doc['paid_amount'] ?? 0));
+                    $openDocs[] = $doc;
+                }
             }
-            $bucket = match ($doc['doc_kind'] ?? null) {
-                'transaction_account' => 'proformas',
-                'tax_invoice'         => 'invoices',
-                'tax_invoice_receipt' => 'invoice_receipts',
-                'receipt'             => 'receipts',
-                default               => 'other',
-            };
-            $collection[$y] ??= ['proformas' => [0, 0.0], 'proformas_open' => [0, 0.0], 'invoices' => [0, 0.0], 'invoice_receipts' => [0, 0.0], 'receipts' => [0, 0.0], 'other' => [0, 0.0],
-                'receipts_income' => 0, 'receipts_matched' => 0, 'income' => 0.0];
-            $collection[$y][$bucket][0]++;
-            $collection[$y][$bucket][1] += $amount;
-            if ($bucket === 'receipts') {
-                $collection[$y]['receipts_income'] += (int) $doc['counts_as_income'];
-                $collection[$y]['receipts_matched'] += $doc['matched_document_id'] !== null ? 1 : 0;
+            $openDemands = \HubOS\Modules\Import\AccountingRule::openDemands($finance);
+            foreach ($openDemands as $od) {
+                $y = $od['year'] ?? '—';
+                if (isset($collection[$y])) {
+                    $collection[$y]['proformas_open'][0]++;
+                    $collection[$y]['proformas_open'][1] += (float) $od['amount'];
+                }
             }
-            if ((int) $doc['counts_as_income'] === 1) {
-                $collection[$y]['income'] += $amount;
-            }
-            if ($bucket !== 'receipts' && in_array((string) $doc['status'], self::OPEN_STATUSES, true)) {
-                $doc['open_amount'] = max(0.0, $amount - (float) ($doc['paid_amount'] ?? 0));
-                $openDocs[] = $doc;
-            }
+            krsort($incomeByYear);
+            krsort($collection);
+            arsort($incomeByOrigin);
+            $openAmount = array_sum(array_map(static fn (array $d): float => $d['open_amount'], $openDocs));
+            $openDemandsAmount = array_sum(array_map(static fn (array $d): float => (float) $d['amount'], $openDemands));
         }
-        $openDemands = \HubOS\Modules\Import\AccountingRule::openDemands($finance);
-        foreach ($openDemands as $od) {
-            $y = $od['year'] ?? '—';
-            if (isset($collection[$y])) {
-                $collection[$y]['proformas_open'][0]++;
-                $collection[$y]['proformas_open'][1] += (float) $od['amount'];
-            }
-        }
-        krsort($incomeByYear);
-        krsort($collection);
-        arsort($incomeByOrigin);
-        $openAmount = array_sum(array_map(static fn (array $d): float => $d['open_amount'], $openDocs));
-        $openDemandsAmount = array_sum(array_map(static fn (array $d): float => (float) $d['amount'], $openDemands));
 
         // ---------------------------------------------------------- overview + timeline
         $openTasks = array_values(array_filter($tasks, static fn (array $t): bool => !in_array($t['status'], ['done', 'cancelled', 'closed'], true)));
@@ -213,8 +219,8 @@ final class Client360Service
             'interactions' => count($interactions),
             'work'         => count($projects) + count($tasks),
             'time'         => $timeEntryCount,
-            'finance'      => count($finance),
-            'collection'   => count($openDocs) + count($openDemands),
+            'finance'      => $canFinance ? count($finance) : 0,
+            'collection'   => $canFinance ? (count($openDocs) + count($openDemands)) : 0,
             'sales'        => count($leads) + count($quotes),
             'assets'       => count($assets),
             'access'       => count($vault),
@@ -256,6 +262,7 @@ final class Client360Service
             'metrics'      => [
                 'year'                => $year,
                 'month'               => $month,
+                'can_finance'         => $canFinance,
                 'income_this_year'    => $incomeByYear[$year] ?? 0.0,
                 'income_by_year'      => $incomeByYear,
                 'income_by_origin'    => $incomeByOrigin,

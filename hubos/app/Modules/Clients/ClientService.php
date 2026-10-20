@@ -23,7 +23,7 @@ final class ClientService
      * @param array<string, mixed> $user
      * @return list<array<string, mixed>>
      */
-    public function list(array $user, int $limit = 1000): array
+    public function list(array $user, int $limit = 1000, ?string $status = null): array
     {
         $this->perms->authorize($user, 'clients.view');
         if ($user['role'] === 'client_viewer') {
@@ -33,7 +33,11 @@ final class ClientService
             $row = $this->tenant->find('clients', (int) $user['client_id']);
             return $row === null ? [] : [$row];
         }
-        return $this->tenant->all('clients', [], 'name', 'ASC', $limit);
+        $where = [];
+        if ($status !== null && $status !== 'all') {
+            $where['status'] = $status;
+        }
+        return $this->tenant->all('clients', $where, 'name', 'ASC', $limit);
     }
 
     /**
@@ -43,9 +47,9 @@ final class ClientService
      * @param array<string, mixed> $user
      * @return list<array<string, mixed>>
      */
-    public function search(array $user, string $query): array
+    public function search(array $user, string $query, ?string $status = null): array
     {
-        $rows = $this->list($user);
+        $rows = $this->list($user, 1000, $status);
         if (HebrewText::tokens($query) === []) {
             return $rows;
         }
@@ -69,6 +73,31 @@ final class ClientService
     public function count(array $user): int
     {
         return count($this->list($user, 1000));
+    }
+
+    /** @param array<string, mixed> $user
+     * @return array{active: int, inactive: int, all: int}
+     */
+    public function countsByStatus(array $user): array
+    {
+        $this->perms->authorize($user, 'clients.view');
+        if ($user['role'] === 'client_viewer') {
+            $c = $user['client_id'] !== null ? 1 : 0;
+            return ['active' => $c, 'inactive' => 0, 'all' => $c];
+        }
+        $rows = $this->tenant->select(
+            "SELECT status, COUNT(*) AS cnt FROM clients WHERE tenant_id = :tenant_id GROUP BY status"
+        );
+        $counts = ['active' => 0, 'inactive' => 0, 'all' => 0];
+        foreach ($rows as $r) {
+            $st = (string) $r['status'];
+            $cnt = (int) $r['cnt'];
+            if (isset($counts[$st])) {
+                $counts[$st] = $cnt;
+            }
+            $counts['all'] += $cnt;
+        }
+        return $counts;
     }
 
     /**

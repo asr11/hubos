@@ -57,17 +57,34 @@ $statusLabels = ['active' => 'פעיל', 'inactive' => 'לא פעיל', 'archive
 
 <section class="card" aria-labelledby="clients-title">
     <div class="card-head">
-        <h2 id="clients-title"><?= ($q ?? '') !== '' ? 'תוצאות חיפוש' : 'כל הלקוחות' ?></h2>
+        <h2 id="clients-title"><?= ($q ?? '') !== '' ? 'תוצאות חיפוש' : (($statusFilter ?? 'active') === 'active' ? 'לקוחות פעילים' : (($statusFilter ?? '') === 'inactive' ? 'לקוחות בארכיון / לא פעילים' : 'כל הלקוחות')) ?></h2>
         <span class="badge" id="clients-count"><?= e(count($clients)) ?></span>
     </div>
+
+    <div class="tabs" style="margin: 0.5rem 0 1rem;" id="client-status-tabs">
+        <a href="/clients?status=active<?= ($q ?? '') !== '' ? '&q=' . urlencode($q) : '' ?>"
+           class="tab <?= ($statusFilter ?? 'active') === 'active' ? 'is-active' : '' ?>">
+            פעילים <span class="badge"><?= e($counts['active'] ?? 0) ?></span>
+        </a>
+        <a href="/clients?status=inactive<?= ($q ?? '') !== '' ? '&q=' . urlencode($q) : '' ?>"
+           class="tab <?= ($statusFilter ?? '') === 'inactive' ? 'is-active' : '' ?>">
+            ארכיון / לא פעילים <span class="badge"><?= e($counts['inactive'] ?? 0) ?></span>
+        </a>
+        <a href="/clients?status=all<?= ($q ?? '') !== '' ? '&q=' . urlencode($q) : '' ?>"
+           class="tab <?= ($statusFilter ?? '') === 'all' ? 'is-active' : '' ?>">
+            הכל <span class="badge"><?= e($counts['all'] ?? 0) ?></span>
+        </a>
+    </div>
+
     <form method="get" action="/clients" class="form form-inline search-form" role="search" id="client-search-form">
+        <input type="hidden" name="status" value="<?= e($statusFilter ?? 'active') ?>">
         <label class="field">
             <span>חיפוש</span>
             <input type="search" name="q" id="client-search" value="<?= e($q ?? '') ?>" maxlength="100"
                    placeholder="שם, ח.פ, טלפון, אימייל, עיר או דומיין">
         </label>
         <button type="submit" class="btn btn-primary" id="client-search-submit">חיפוש</button>
-        <?php if (($q ?? '') !== ''): ?><a class="btn btn-ghost" href="/clients" id="client-search-clear">ניקוי</a><?php endif; ?>
+        <?php if (($q ?? '') !== ''): ?><a class="btn btn-ghost" href="/clients?status=<?= e($statusFilter ?? 'active') ?>" id="client-search-clear">ניקוי</a><?php endif; ?>
     </form>
     <?php if ($clients === []): ?>
         <p class="empty"><?= ($q ?? '') !== '' ? 'לא נמצאו לקוחות תואמים.' : 'עדיין אין לקוחות.' ?></p>
