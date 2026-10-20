@@ -119,6 +119,11 @@ final class AccountingRule
 
         usort($proformas, static fn (array $a, array $b): int => [(string) $a['date'], $a['key']] <=> [(string) $b['date'], $b['key']]);
         foreach ($proformas as $p) {
+            $st = strtolower(trim((string) ($p['status'] ?? '')));
+            if ($st === 'cancelled') {
+                $out[$p['key']] = ['counts' => false, 'reason' => 'proforma_cancelled', 'matched' => null];
+                continue;
+            }
             $bucket = $p['client_key'] === null ? null : $p['client_key'] . '|' . self::cents($p['amount']);
             if ($bucket === null || empty($closingPool[$bucket])) {
                 $reason = self::isPaidInMorning($p) ? 'proforma_paid_in_morning' : 'proforma_open';
