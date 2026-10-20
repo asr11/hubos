@@ -274,6 +274,8 @@ h3 { font-size: 1.02rem; margin-bottom: .5rem; }
 .kpi-label { color: var(--muted); font-size: .8rem; font-weight: 600; }
 .kpi-value { font-size: 1.35rem; font-weight: 800; color: var(--text); }
 .kpi-na { font-size: .95rem; color: var(--warning); }
+.kpi-ok { color: var(--ok, #16a34a); }
+.kpi-alert { color: var(--danger, #dc2626); }
 .kpi-hint { color: var(--muted); font-size: .75rem; }
 
 .tabs { display: flex; flex-wrap: wrap; gap: .35rem; margin: 1rem 0 .5rem; }
