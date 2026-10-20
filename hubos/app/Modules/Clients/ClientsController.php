@@ -16,13 +16,20 @@ final class ClientsController
 {
     public function index(Context $ctx): Response
     {
-        return $this->renderList($ctx, [], ['name' => '', 'email' => '', 'phone' => '']);
+        return $this->renderList($ctx, [], ['name' => '', 'email' => '', 'phone' => '', 'initial_hours' => '', 'bank_type' => 'one_time', 'source' => '']);
     }
 
     public function store(Context $ctx): Response
     {
         $user = $ctx->requireUser();
-        $input = ['name' => $ctx->input('name'), 'email' => $ctx->input('email'), 'phone' => $ctx->input('phone')];
+        $input = [
+            'name'          => $ctx->input('name'),
+            'email'         => $ctx->input('email'),
+            'phone'         => $ctx->input('phone'),
+            'initial_hours' => $ctx->input('initial_hours'),
+            'bank_type'     => $ctx->input('bank_type'),
+            'source'        => $ctx->input('source'),
+        ];
         try {
             (new ClientService($ctx->tenant(), $ctx->permissions()))->create($user, $input);
         } catch (ValidationException $e) {

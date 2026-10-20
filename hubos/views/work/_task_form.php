@@ -20,6 +20,25 @@ $curStatus = TaskService::statusKey($old['status'] ?? 'todo');
 <form method="post" action="<?= e($formAction) ?>" class="form form-inline" id="<?= e($formId) ?>" novalidate>
     <?= Csrf::field() ?>
     <?php if (!empty($returnTo)): ?><input type="hidden" name="_return" value="<?= e($returnTo) ?>"><?php endif; ?>
+    <div class="field-wide" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem;background:#f8fafc;padding:0.5rem 0.75rem;border-radius:6px;border:1px solid #e2e8f0;">
+        <span class="muted small" style="font-weight:600;">⚡ מילוי מהיר לפי שירות:</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="hubFillTask_<?= preg_replace('/[^a-zA-Z0-9_]/', '_', $formId) ?>('הוספת קופון הנחה לחנות', 'יצירת קופון הנחה במערכת בהתאם לבקשת הלקוח, הגדרת אחוזי הנחה/סכום ובדיקת תקינות בסל הקניות.', 'normal')">🏷️ הוספת קופון</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="hubFillTask_<?= preg_replace('/[^a-zA-Z0-9_]/', '_', $formId) ?>('אופטימיזציית מהירות וביצועים לאתר', 'ניתוח מדדי Core Web Vitals (LCP, CLS, INP), כיווץ תמונות, ניקוי מטמון ושיפור זמני טעינה במובייל.', 'high')">🚀 אופטימיזציה לאתר</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="hubFillTask_<?= preg_replace('/[^a-zA-Z0-9_]/', '_', $formId) ?>('תחזוקה ובדיקת מערכות שוטפת', 'בדיקת גיבויים שוטפים, בדיקת תקינות טפסים, עדכוני תוספים ובדיקת אבטחה.', 'normal')">🛠️ תחזוקה שוטפת</button>
+    </div>
+    <script>
+    function hubFillTask_<?= preg_replace('/[^a-zA-Z0-9_]/', '_', $formId) ?>(title, desc, priority) {
+        var form = document.getElementById('<?= e($formId) ?>');
+        if (!form) return;
+        var t = form.querySelector('input[name="title"]');
+        var d = form.querySelector('textarea[name="description"]');
+        var p = form.querySelector('select[name="priority"]');
+        if (t) t.value = title;
+        if (d) d.value = desc;
+        if (p && priority) p.value = priority;
+        if (t) t.focus();
+    }
+    </script>
     <label class="field field-wide"><span>כותרת *</span>
         <input type="text" name="title" value="<?= e($old['title'] ?? '') ?>" required maxlength="300" <?= isset($errors['title']) ? 'aria-invalid="true"' : '' ?>><?= $err('title') ?>
     </label>
