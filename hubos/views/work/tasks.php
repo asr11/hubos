@@ -15,17 +15,17 @@ use HubOS\Modules\Work\TaskService;
 $archivedView = ($filters['archived'] ?? '') === '1';
 ?>
 <?php if ($canCreate): ?>
-<div style="margin-bottom:1.25rem;display:flex;justify-content:flex-start;">
-    <button type="button" class="btn btn-primary" onclick="var el = document.getElementById('new-task-section'); el.style.display = (el.style.display === 'none' ? 'block' : 'none'); if (el.style.display !== 'none') el.scrollIntoView({behavior:'smooth'});" id="btn-toggle-new-task" style="display:flex;align-items:center;gap:0.5rem;font-weight:700;">
-        <span>+</span> פתיחת משימה חדשה
+<div class="page-toolbar">
+    <button type="button" class="btn btn-primary" data-toggle-target="new-task-section" id="btn-toggle-new-task">
+        + פתיחת משימה חדשה
     </button>
 </div>
-<section class="card" aria-labelledby="new-task-title" id="new-task-section" style="<?= $errors === [] ? 'display:none;' : '' ?>margin-bottom:1.5rem;padding:1.75rem;border-top:3px solid var(--primary);">
+<section class="card task-drawer-card<?= $errors === [] ? ' is-hidden' : '' ?>" aria-labelledby="new-task-title" id="new-task-section">
     <div class="card-head">
-        <h2 id="new-task-title" style="font-size:1.25rem;font-weight:800;color:#0f172a;">משימה חדשה</h2>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('new-task-section').style.display='none';">✕ סגירה</button>
+        <h2 id="new-task-title" class="task-drawer-title">משימה חדשה</h2>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-target="new-task-section">✕ סגירה</button>
     </div>
-    <span class="muted small" style="display:block;margin-bottom:1rem;">שיוך ללקוח הוא חובה</span>
+    <p class="muted small mb-md">שיוך ללקוח הוא חובה</p>
     <?php if ($errors !== []): ?><div class="alert alert-danger" role="alert" id="task-errors"><?= e(implode(' · ', $errors)) ?></div><?php endif; ?>
     <?php $formAction = '/tasks'; $formId = 'task-create-form'; $submitLabel = 'יצירת משימה'; $returnTo = null;
     include __DIR__ . '/_task_form.php'; ?>
@@ -55,14 +55,14 @@ $archivedView = ($filters['archived'] ?? '') === '1';
     <?php endif; ?>
     <?php if ($tasks === []): ?><p class="empty">אין משימות.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="tasks-list">
-        <thead><tr><th scope="col">משימה</th><th scope="col">לקוח</th><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">עדיפות</th><th scope="col">יעד</th>
+        <thead><tr><th scope="col">משימה</th><?php if ($internal): ?><th scope="col">לקוח</th><?php endif; ?><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">עדיפות</th><th scope="col">יעד</th>
             <?php if ($internal): ?><th scope="col">אחראי</th><th scope="col">נראות</th><th scope="col"></th><?php endif; ?></tr></thead>
         <tbody>
         <?php foreach ($tasks as $t): $sk = TaskService::statusKey((string) $t['status']); ?>
             <tr class="task-row" id="task-<?= e((int) $t['id']) ?>">
-                <td class="strong"><a href="/tasks/<?= e((int) $t['id']) ?>"><?= e($t['title']) ?></a></td>
-                <td><?php if ($t['client_id'] !== null): ?><a class="client-link" href="/clients/<?= e((int) $t['client_id']) ?>?tab=work"><?= e($t['client_name'] ?? '') ?></a><?php else: ?><span class="level level-warn80">ממתין לשיוך</span><?php endif; ?></td>
-                <td><?= e($t['project_name'] ?? '') ?></td>
+                <td class="strong"><a href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a></td>
+                <?php if ($internal): ?><td><?php if ($t['client_id'] !== null): ?><a class="client-link" href="/clients/<?= e((int) $t['client_id']) ?>?tab=work"><?= e($t['client_name'] ?? '') ?></a><?php else: ?><span class="level level-warn80">ממתין לשיוך</span><?php endif; ?></td><?php endif; ?>
+                <td><?php if (!empty($t['project_id'])): ?><a class="client-link" href="/projects/<?= e((int) $t['project_id']) ?>"><?= fmt_inline_bidi((string) ($t['project_name'] ?? '')) ?></a><?php else: ?><?= fmt_inline_bidi((string) ($t['project_name'] ?? '')) ?><?php endif; ?></td>
                 <td><span class="tstatus tstatus-<?= e($sk) ?>"><?= e(TaskService::STATUSES[$sk] ?? $t['status']) ?></span></td>
                 <td><?= e(TaskService::PRIORITIES[$t['priority']] ?? $t['priority']) ?></td>
                 <td><?= e(fmt_date($t['due_at'] ?? null)) ?></td>

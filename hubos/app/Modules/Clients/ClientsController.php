@@ -16,6 +16,10 @@ final class ClientsController
 {
     public function index(Context $ctx): Response
     {
+        $user = $ctx->requireUser();
+        if (($user['role'] ?? '') === 'client_viewer') {
+            return Response::redirect($user['client_id'] !== null ? '/clients/' . (int) $user['client_id'] : '/dashboard');
+        }
         return $this->renderList($ctx, [], ['name' => '', 'email' => '', 'phone' => '', 'initial_hours' => '', 'bank_type' => 'one_time', 'source' => '']);
     }
 

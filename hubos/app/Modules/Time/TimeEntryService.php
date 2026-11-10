@@ -185,7 +185,7 @@ final class TimeEntryService
         $rows = $this->tenant->select(
             "SELECT te.id, te.client_id, te.project_id, te.task_id, te.hours_bank_id, te.user_id, te.legacy_user_ref,
                     te.description, {$dateExpr} AS day, te.started_at, te.ended_at, te.duration_seconds, te.source,
-                    c.name AS client_name, u.name AS user_name, t.title AS task_title, p.name AS project_name
+                    c.name AS client_name, u.name AS user_name, t.title AS task_title, t.client_visible AS task_client_visible, p.name AS project_name
                FROM time_entries te
           LEFT JOIN clients c  ON c.tenant_id = te.tenant_id AND c.id = te.client_id
           LEFT JOIN users u    ON u.tenant_id = te.tenant_id AND u.id = te.user_id
@@ -207,8 +207,23 @@ final class TimeEntryService
         }
         arsort($byClient);
         arsort($byUser);
+        if ($viewer) {
+            $byClient = [];
+            $byUser = [];
+            $rows = array_map(static function (array $r): array {
+                $r['user_id'] = null;
+                $r['user_name'] = null;
+                $r['legacy_user_ref'] = null;
+                $r['source'] = null;
+                if ((int) ($r['task_client_visible'] ?? 0) !== 1) {
+                    $r['task_id'] = null;
+                    $r['task_title'] = null;
+                }
+                return $r;
+            }, $rows);
+        }
         return [
-            'rows'          => $viewer ? [] : $rows,
+            'rows'          => $rows,
             'total_seconds' => $total,
             'by_client'     => $byClient,
             'by_user'       => $viewer ? [] : $byUser,

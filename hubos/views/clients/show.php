@@ -27,17 +27,21 @@ $projStatus = ['active' => 'פעיל', 'done' => 'הסתיים', 'paused' => 'מ
 $docStatus = ['paid' => 'שולם', 'unpaid' => 'לא שולם', 'pending' => 'ממתין', 'partial' => 'שולם חלקית'];
 $interactionKinds = ['note' => 'הערה', 'call' => 'שיחה', 'meeting' => 'פגישה', 'whatsapp' => 'ווטסאפ', 'email' => 'מייל', 'task_note' => 'הערת משימה', 'task_activity' => 'פעילות משימה'];
 $assetKinds = ['domain' => 'דומיין', 'hosting' => 'אחסון', 'server' => 'שרת', 'other' => 'אחר'];
-$origin = static function (array $row): string {
+$sslLabels = \HubOS\Modules\Assets\AssetService::SSL_STATUSES;
+$familyRolled = count($card['family']) > 1;
+$origin = static function (array $row) use ($familyRolled): string {
+    if (!$familyRolled) {
+        return '';
+    }
     if ($row['is_own'] || $row['origin_client_id'] === null) {
         return '<span class="origin origin-own">' . e($row['origin_name']) . '</span>';
     }
     return '<a class="origin origin-family" href="/clients/' . e($row['origin_client_id']) . '">' . e($row['origin_name']) . '</a>';
 };
-$familyRolled = count($card['family']) > 1;
 ?>
 <section class="card client-head" aria-labelledby="client-name">
     <div class="client-id">
-        <p class="eyebrow"><a href="/clients">← כל הלקוחות</a></p>
+        <p class="eyebrow"><?php if ($card['internal']): ?><a href="/clients">← כל הלקוחות</a><?php else: ?><a href="/dashboard">← לוח בקרה</a><?php endif; ?></p>
         <h2 id="client-name"><?= e($c['name']) ?></h2>
         <p class="client-meta">
             <span>ח.פ: <bdi dir="ltr" id="client-tax-id"><?= e($c['tax_id'] ?? '—') ?></bdi></span>
@@ -61,14 +65,14 @@ $familyRolled = count($card['family']) > 1;
             <p class="muted small">הנתונים בכרטיס מצורפים (Roll-up) מכל המשפחה: <?= e(implode(' · ', $card['family'])) ?>. כל שורה מסומנת בלקוח שממנו היא מגיעה.</p>
         <?php endif; ?>
         <?php if (!empty($card['internal']) && is_array($card['provenance'] ?? null)): $prov = $card['provenance']; ?>
-            <div class="cluster small" id="client-provenance-banner" style="margin-top:0.5rem;gap:0.75rem;align-items:center;padding:0.35rem 0.75rem;background:#ffffff;border-radius:6px;border-right:3px solid var(--ok, #16a34a)">
-                <span class="pill pill-ok" style="font-size:0.78rem">✔ מקור מאומת</span>
+            <div class="cluster small client-prov-banner" id="client-provenance-banner">
+                <span class="pill pill-ok pill-sm">✔ מקור מאומת</span>
                 <span class="muted small">עודכן: <bdi dir="ltr" id="client-prov-timestamp"><?= e((string) ($prov['fetched_at_il'] ?? '')) ?></bdi></span>
                 <?php if ($canEnrich ?? false): ?>
-                <form method="post" action="/settings/sync-d1" style="margin:0;display:inline">
+                <form method="post" action="/settings/sync-d1" class="inline-form">
                     <?= Csrf::field() ?>
                     <input type="hidden" name="_return" value="/clients/<?= e($id) ?>">
-                    <button type="submit" class="btn btn-sm btn-ghost" style="padding:0.15rem 0.5rem;font-size:0.75rem">סנכרון ↻</button>
+                    <button type="submit" class="btn btn-sm btn-ghost btn-xs">סנכרון ↻</button>
                 </form>
                 <?php endif; ?>
             </div>
@@ -170,7 +174,7 @@ $familyRolled = count($card['family']) > 1;
 
 <nav class="tabs" aria-label="לשוניות כרטיס לקוח" id="client-tabs">
     <?php foreach (Client360Service::TABS as $key => $label): ?>
-        <?php if ($key === 'access' && !$card['internal']) { continue; } ?>
+        <?php if (!$card['internal'] && in_array($key, ['interactions', 'sales', 'access', 'timeline'], true)) { continue; } ?>
         <?php if (in_array($key, ['finance', 'collection'], true) && empty($card['metrics']['can_finance'])) { continue; } ?>
         <a id="tab-<?= e($key) ?>" href="/clients/<?= e($id) ?>?tab=<?= e($key) ?>" class="tab<?= $tab === $key ? ' is-active' : '' ?>"
             <?= $tab === $key ? 'aria-current="page"' : '' ?>><?= e($label) ?> <span class="badge"><?= e($card['counts'][$key]) ?></span></a>
@@ -182,51 +186,55 @@ $familyRolled = count($card['family']) > 1;
     <div class="grid-2">
         <div>
             <h3>התראות</h3>
-            <?php if ($card['alerts'] === []): ?><p class="empty">אין התראות.</p><?php endif; ?>
+            <?php if ($card['alerts'] === []): ?><p class="empty">אין התראות פתוחות.</p><?php endif; ?>
             <ul class="alerts">
-                <?php foreach ($card['alerts'] as $al): ?><li class="alert-<?= e($al['level']) ?>"><?= e($al['text']) ?></li><?php endforeach; ?>
+                <?php foreach ($card['alerts'] as $al): ?><li class="alert-<?= e($al['level']) ?>"><?= fmt_inline_bidi((string) $al['text']) ?></li><?php endforeach; ?>
             </ul>
             <h3>משימות פתוחות (<?= e(count($card['open_tasks'])) ?>)</h3>
-            <?php if ($card['open_tasks'] === []): ?><p class="empty">אין משימות פתוחות.</p><?php endif; ?>
+            <?php if ($card['open_tasks'] === []): ?><p class="empty">אין משימות פתוחות.</p><?php else: ?>
             <ul class="list">
-                <?php foreach (array_slice($card['open_tasks'], 0, 10) as $t): ?>
-                    <li><?= e($t['title']) ?> <span class="muted">· <?= e($taskStatus[$t['status']] ?? $t['status']) ?> · <?= $origin($t) ?></span></li>
+                <?php foreach (array_slice($card['open_tasks'], 0, 10) as $t): $sk = \HubOS\Modules\Work\TaskService::statusKey((string) $t['status']); ?>
+                    <li><a href="/tasks/<?= e((int) $t['id']) ?>" class="strong"><?= fmt_inline_bidi((string) $t['title']) ?></a> <span class="tstatus tstatus-<?= e($sk) ?>"><?= e($taskStatus[$t['status']] ?? $t['status']) ?></span><?= $familyRolled ? ' ' . $origin($t) : '' ?></li>
                 <?php endforeach; ?>
             </ul>
+            <?php endif; ?>
         </div>
         <div>
             <h3>אנשי קשר עיקריים</h3>
             <ul class="list">
                 <?php foreach (array_slice($card['contacts'], 0, 5) as $p): ?>
-                    <li><strong><?= e($p['name']) ?></strong> <span class="muted"><?= e($p['role'] ?? '') ?></span> <?= $origin($p) ?></li>
+                    <li><strong><?= e($p['name']) ?></strong><?php if (!empty($p['role'])): ?> <span class="muted">· <?= e($p['role']) ?></span><?php endif; ?><?= $familyRolled ? ' ' . $origin($p) : '' ?></li>
                 <?php endforeach; ?>
                 <?php if ($card['contacts'] === []): ?><li class="empty">אין אנשי קשר.</li><?php endif; ?>
             </ul>
             <h3>פעילות אחרונה</h3>
+            <?php if ($card['timeline'] === []): ?><p class="empty">אין פעילות חדשה.</p><?php else: ?>
             <ul class="list">
                 <?php foreach (array_slice($card['timeline'], 0, 8) as $it): ?>
-                    <li><span class="muted"><?= e(fmt_date($it['date'])) ?></span> · <?= e($it['kind']) ?>: <?= e($it['text']) ?></li>
+                    <li><span class="muted"><?= e(fmt_date($it['date'])) ?></span> · <?= e($it['kind']) ?>: <?= fmt_inline_bidi((string) $it['text']) ?></li>
                 <?php endforeach; ?>
             </ul>
+            <?php endif; ?>
         </div>
     </div>
 
 <?php elseif ($tab === 'contacts'): ?>
     <?php if ($card['contacts'] === []): ?><p class="empty">אין אנשי קשר.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="contacts-table">
-        <thead><tr><th scope="col">שם</th><th scope="col">תפקיד</th><th scope="col">טלפון</th><th scope="col">נייד</th><th scope="col">אימייל</th><th scope="col">ראשי</th><th scope="col">הערות</th><th scope="col">לקוח</th></tr></thead>
+        <thead><tr><th scope="col">שם</th><th scope="col">תפקיד</th><th scope="col">טלפון</th><th scope="col">נייד</th><th scope="col">אימייל</th><th scope="col">ראשי</th><?php if ($card['internal']): ?><th scope="col">הערות</th><?php endif; ?><?php if ($familyRolled): ?><th scope="col">לקוח</th><?php endif; ?></tr></thead>
         <tbody>
         <?php foreach ($card['contacts'] as $p): ?>
             <tr><td class="strong"><?= e($p['name']) ?></td><td><?= e($p['role'] ?? '') ?></td>
                 <td dir="ltr" class="ltr-cell"><?= e($p['phone'] ?? '') ?></td><td dir="ltr" class="ltr-cell"><?= e($p['mobile'] ?? '') ?></td>
                 <td dir="ltr" class="ltr-cell"><?= e($p['email'] ?? '') ?></td><td><?= (int) $p['is_primary'] === 1 ? '✓' : '' ?></td>
-                <td><?= e($p['notes'] ?? '') ?></td><td><?= $origin($p) ?></td></tr>
+                <?php if ($card['internal']): ?><td><?= e($p['notes'] ?? '') ?></td><?php endif; ?>
+                <?php if ($familyRolled): ?><td><?= $origin($p) ?></td><?php endif; ?></tr>
         <?php endforeach; ?>
         </tbody>
     </table></div>
     <?php endif; ?>
 
-<?php elseif ($tab === 'interactions'): ?>
+<?php elseif ($tab === 'interactions' && $card['internal']): ?>
     <?php if ($card['interactions'] === []): ?><p class="empty">אין רישומי תקשורת.</p><?php endif; ?>
     <ol class="timeline" id="interactions-list">
         <?php foreach ($card['interactions'] as $i): ?>
@@ -243,21 +251,23 @@ $familyRolled = count($card['family']) > 1;
     <h3>פרויקטים (<?= e(count($card['projects'])) ?>)</h3>
     <?php if ($card['projects'] === []): ?><p class="empty">אין פרויקטים.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="projects-table">
-        <thead><tr><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">נוצר</th><th scope="col">לקוח</th></tr></thead>
+        <thead><tr><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">נוצר</th><?php if ($familyRolled): ?><th scope="col">לקוח</th><?php endif; ?></tr></thead>
         <tbody><?php foreach ($card['projects'] as $p): ?>
-            <tr><td class="strong"><?php if ($card['internal']): ?><a href="/projects/<?= e((int) $p['id']) ?>"><?= e($p['name']) ?></a><?php else: ?><?= e($p['name']) ?><?php endif; ?></td><td><?= e($projStatus[$p['status']] ?? $p['status']) ?></td><td class="muted"><?= e(fmt_dt($p['created_at'])) ?></td><td><?= $origin($p) ?></td></tr>
+            <tr><td class="strong"><a href="/projects/<?= e((int) $p['id']) ?>"><?= fmt_inline_bidi((string) $p['name']) ?></a></td><td><span class="pstatus pstatus-<?= e((string) $p['status']) ?>"><?= e($projStatus[$p['status']] ?? $p['status']) ?></span></td><td class="muted"><?= e(fmt_date($p['created_at'])) ?></td><?php if ($familyRolled): ?><td><?= $origin($p) ?></td><?php endif; ?></tr>
         <?php endforeach; ?></tbody>
     </table></div>
     <?php endif; ?>
     <h3>משימות (<?= e(count($card['tasks'])) ?>)</h3>
     <?php if ($card['tasks'] === []): ?><p class="empty">אין משימות.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="tasks-table">
-        <thead><tr><th scope="col">משימה</th><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">עדיפות</th><?php if ($card['internal']): ?><th scope="col">נראות</th><?php endif; ?><th scope="col">יעד</th><th scope="col">לקוח</th><?php if ($canTrack): ?><th scope="col"></th><?php endif; ?></tr></thead>
-        <tbody><?php foreach ($card['tasks'] as $t): ?>
-            <tr class="work-task" id="work-task-<?= e((int) $t['id']) ?>"><td class="strong"><a href="/tasks/<?= e((int) $t['id']) ?>"><?= e($t['title']) ?></a></td><td><?= e($t['project_name'] ?? '') ?></td><td><?= e($taskStatus[$t['status']] ?? $t['status']) ?></td>
+        <thead><tr><th scope="col">משימה</th><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">עדיפות</th><?php if ($card['internal']): ?><th scope="col">נראות</th><?php endif; ?><th scope="col">יעד</th><?php if ($familyRolled): ?><th scope="col">לקוח</th><?php endif; ?><?php if ($canTrack): ?><th scope="col"></th><?php endif; ?></tr></thead>
+        <tbody><?php foreach ($card['tasks'] as $t): $sk = \HubOS\Modules\Work\TaskService::statusKey((string) $t['status']); ?>
+            <tr class="work-task" id="work-task-<?= e((int) $t['id']) ?>"><td class="strong"><a href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a></td>
+                <td><?php if (!empty($t['project_id'])): ?><a class="client-link" href="/projects/<?= e((int) $t['project_id']) ?>"><?= fmt_inline_bidi((string) ($t['project_name'] ?? '')) ?></a><?php else: ?><?= fmt_inline_bidi((string) ($t['project_name'] ?? '')) ?><?php endif; ?></td>
+                <td><span class="tstatus tstatus-<?= e($sk) ?>"><?= e($taskStatus[$t['status']] ?? $t['status']) ?></span></td>
                 <td><?= e($priorityLabels[$t['priority'] ?? 'normal'] ?? '') ?></td>
                 <?php if ($card['internal']): ?><td><?= (int) ($t['client_visible'] ?? 0) === 1 ? '<span class="visible-flag">גלוי ללקוח</span>' : '<span class="muted">פנימי</span>' ?></td><?php endif; ?>
-                <td><?= e(fmt_date($t['due_at'] ?? null)) ?></td><td><?= $origin($t) ?></td>
+                <td><?= e(fmt_date($t['due_at'] ?? null)) ?></td><?php if ($familyRolled): ?><td><?= $origin($t) ?></td><?php endif; ?>
                 <?php if ($canTrack): ?><td><?php if ($timer === null && $t['client_id'] !== null): ?><form method="post" action="/timer/start" class="inline-form"><?= Csrf::field() ?>
                     <input type="hidden" name="task_id" value="<?= e((int) $t['id']) ?>"><input type="hidden" name="_return" value="/clients/<?= e($id) ?>?tab=work">
                     <button type="submit" class="btn btn-ghost btn-sm" title="טיימר על המשימה">▶</button></form><?php endif; ?></td><?php endif; ?></tr>
@@ -269,16 +279,18 @@ $familyRolled = count($card['family']) > 1;
     <h3>בנקי שעות (<?= e(count($card['hours_banks'])) ?>)</h3>
     <?php if ($card['hours_banks'] === []): ?><p class="empty">אין בנק שעות.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="banks-table">
-        <thead><tr><th scope="col">בנק</th><th scope="col">סטטוס</th><th scope="col">תקופה</th><th scope="col">מכסה</th><th scope="col">נוצל</th><th scope="col">יתרה</th><th scope="col">מצב</th><th scope="col">תעריף</th><th scope="col">לקוח</th></tr></thead>
-        <tbody><?php foreach ($card['hours_banks'] as $b): ?>
-            <tr class="<?= $b['low'] ? 'row-warn' : '' ?>" id="card-bank-<?= e((int) $b['id']) ?>"><td class="strong"><?= e($b['name']) ?></td><td><?= e($b['status']) ?></td>
+        <thead><tr><th scope="col">בנק</th><th scope="col">סטטוס</th><th scope="col">תקופה</th><th scope="col">מכסה</th><th scope="col">נוצל</th><th scope="col">יתרה</th><th scope="col">מצב</th><?php if ($card['internal']): ?><th scope="col">תעריף</th><?php endif; ?><?php if ($familyRolled): ?><th scope="col">לקוח</th><?php endif; ?></tr></thead>
+        <tbody><?php foreach ($card['hours_banks'] as $b): $bst = ($b['status'] ?? '') === 'active' ? 'active' : 'closed'; ?>
+            <tr class="<?= $b['low'] ? 'row-warn' : '' ?>" id="card-bank-<?= e((int) $b['id']) ?>"><td class="strong"><?= fmt_inline_bidi((string) $b['name']) ?></td>
+                <td><span class="bstatus bstatus-<?= e($bst) ?>"><?= $bst === 'active' ? 'פעיל' : 'הסתיים' ?></span></td>
                 <td><?= ($b['period'] ?? 'one_time') === 'monthly' ? 'חודשי' . ((int) ($b['rollover'] ?? 0) === 1 ? ' + גלגול' : '') : 'חד-פעמי' ?></td>
                 <td><?= e(fmt_hours($b['allowance_hours'])) ?></td>
                 <td><?= e(fmt_hours($b['used_hours'])) ?> <span class="muted">(<?= e($b['pct']) ?>%)</span></td><td class="bank-remaining"><?= e(fmt_hours($b['remaining_hours'])) ?></td>
                 <td><span class="level level-<?= e($b['level']) ?>"><?= e($levelLabels[$b['level']] ?? '') ?></span></td>
-                <td><?= $b['rate'] !== null ? e(fmt_money($b['rate'])) : '' ?></td><td><?= $origin($b) ?></td></tr>
+                <?php if ($card['internal']): ?><td><?= $b['rate'] !== null ? e(fmt_money($b['rate'])) : '' ?></td><?php endif; ?>
+                <?php if ($familyRolled): ?><td><?= $origin($b) ?></td><?php endif; ?></tr>
             <?php if (($b['months'] ?? []) !== [] && (int) ($b['rollover'] ?? 0) === 1): ?>
-            <tr class="bank-months"><td colspan="9" class="muted small">גלגול: <?php foreach (array_slice($b['months'], -4) as $mo): ?><?= e($mo['month']) ?> — מכסה <?= e(fmt_hours($mo['allowance'])) ?> (מתוכה הועבר <?= e(fmt_hours($mo['carried_in'])) ?>), נוצל <?= e(fmt_hours($mo['used'])) ?> · <?php endforeach; ?></td></tr>
+            <tr class="bank-months"><td colspan="<?= 7 + ($card['internal'] ? 1 : 0) + ($familyRolled ? 1 : 0) ?>" class="muted small">גלגול: <?php foreach (array_slice($b['months'], -4) as $mo): ?><?= e($mo['month']) ?> — מכסה <?= e(fmt_hours($mo['allowance'])) ?> (מתוכה הועבר <?= e(fmt_hours($mo['carried_in'])) ?>), נוצל <?= e(fmt_hours($mo['used'])) ?> · <?php endforeach; ?></td></tr>
             <?php endif; ?>
         <?php endforeach; ?></tbody>
     </table></div>
@@ -299,10 +311,10 @@ $familyRolled = count($card['family']) > 1;
     <h3>רישומי זמן (<?= e($card['counts']['time']) ?> · סה"כ <?= e(fmt_hours($m['hours_total'])) ?> שעות · החודש <?= e(fmt_hours($m['hours_this_month'])) ?>)</h3>
     <?php if ($card['time_entries'] === []): ?><p class="empty"><?= $card['internal'] ? 'אין רישומי זמן.' : 'מוצגים סיכומי שעות בלבד.' ?></p><?php else: ?>
     <div class="table-wrap"><table class="table" id="time-table">
-        <thead><tr><th scope="col">תאריך</th><th scope="col">תיאור</th><th scope="col">שעות</th><th scope="col">מקור</th><th scope="col">לקוח</th><?php if ($canTrack): ?><th scope="col"></th><?php endif; ?></tr></thead>
+        <thead><tr><th scope="col">תאריך</th><th scope="col">תיאור</th><th scope="col">שעות</th><?php if ($card['internal']): ?><th scope="col">מקור</th><?php endif; ?><?php if ($familyRolled): ?><th scope="col">לקוח</th><?php endif; ?><?php if ($canTrack): ?><th scope="col"></th><?php endif; ?></tr></thead>
         <tbody><?php foreach ($card['time_entries'] as $te): ?>
-            <tr class="card-time-entry"><td><?= e(fmt_date($te['entry_date'] ?? $te['started_at'])) ?></td><td><?= e($te['description'] ?? '') ?></td>
-                <td><?= e(fmt_hours((int) $te['duration_seconds'] / 3600)) ?></td><td class="muted"><?= e($te['source'] ?? '') ?></td><td><?= $origin($te) ?></td>
+            <tr class="card-time-entry"><td><?= e(fmt_date($te['entry_date'] ?? $te['started_at'])) ?></td><td><?= fmt_inline_bidi((string) ($te['description'] ?? '')) ?></td>
+                <td><?= e(fmt_hours((int) $te['duration_seconds'] / 3600)) ?></td><?php if ($card['internal']): ?><td class="muted"><?= e($te['source'] ?? '') ?></td><?php endif; ?><?php if ($familyRolled): ?><td><?= $origin($te) ?></td><?php endif; ?>
                 <?php if ($canTrack): ?><td><a class="btn btn-ghost btn-sm" href="/time/entries/<?= e((int) $te['id']) ?>">עריכה</a></td><?php endif; ?></tr>
         <?php endforeach; ?></tbody>
     </table></div>
@@ -393,14 +405,16 @@ $familyRolled = count($card['family']) > 1;
     <?php if ($card['internal']): ?><p class="tab-actions"><a class="btn btn-ghost btn-sm" href="/assets?client_id=<?= e($id) ?>#new">+ נכס / דומיין חדש ללקוח</a></p><?php endif; ?>
     <?php if ($card['assets'] === []): ?><p class="empty">אין נכסים.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="assets-table">
-        <thead><tr><th scope="col">סוג</th><th scope="col">דומיין</th><th scope="col">ספק / רשם</th><th scope="col">IP</th><th scope="col">SSL</th><th scope="col">חידוש</th><th scope="col">סטטוס</th><th scope="col">לקוח</th><?php if ($card['internal']): ?><th scope="col">פעולות</th><?php endif; ?></tr></thead>
+        <thead><tr><th scope="col">סוג</th><th scope="col">דומיין</th><th scope="col">ספק / רשם</th><?php if ($card['internal']): ?><th scope="col">IP</th><?php endif; ?><th scope="col">SSL</th><th scope="col">חידוש</th><?php if ($card['internal']): ?><th scope="col">סטטוס</th><?php endif; ?><?php if ($familyRolled): ?><th scope="col">לקוח</th><?php endif; ?><?php if ($card['internal']): ?><th scope="col">פעולות</th><?php endif; ?></tr></thead>
         <tbody><?php foreach ($card['assets'] as $a): ?>
             <tr><td><?= e($assetKinds[$a['kind']] ?? $a['kind']) ?></td>
                 <td dir="ltr" class="ltr-cell strong"><?php if ($card['internal']): ?><a href="/assets/<?= e((int) $a['id']) ?>"><?= e($a['domain'] ?? '') ?></a><?php else: ?><?= e($a['domain'] ?? '') ?><?php endif; ?></td>
-                <td><?= e(implode(' · ', array_filter([$a['provider'] ?? null, $a['registrar'] ?? null]))) ?></td>
-                <td dir="ltr" class="ltr-cell"><?= e($a['ip_address'] ?? '') ?></td>
-                <td><?= e($a['ssl_status'] ?? '—') ?></td>
-                <td><?= e(fmt_date($a['expiry_date'] ?? null)) ?></td><td><?= e($a['status'] ?? '') ?></td><td><?= $origin($a) ?></td>
+                <td><?= implode(' · ', array_map(static fn (string $s): string => '<bdi>' . e($s) . '</bdi>', array_filter([$a['provider'] ?? null, $a['registrar'] ?? null]))) ?: '—' ?></td>
+                <?php if ($card['internal']): ?><td dir="ltr" class="ltr-cell"><?= e($a['ip_address'] ?? '—') ?></td><?php endif; ?>
+                <td><?php if (!empty($a['ssl_status'])): ?><span class="level level-<?= $a['ssl_status'] === 'valid' ? 'ok' : ($a['ssl_status'] === 'expiring' ? 'warn80' : 'over') ?>"><?= e($sslLabels[$a['ssl_status']] ?? $a['ssl_status']) ?></span><?php else: ?>—<?php endif; ?></td>
+                <td><?= e(fmt_date($a['expiry_date'] ?? null) ?: '—') ?></td>
+                <?php if ($card['internal']): ?><td><span class="status status-<?= e($a['status'] ?? 'active') ?>"><?= e($statusLabels[$a['status'] ?? 'active'] ?? ($a['status'] ?? '')) ?></span></td><?php endif; ?>
+                <?php if ($familyRolled): ?><td><?= $origin($a) ?></td><?php endif; ?>
                 <?php if ($card['internal']): ?>
                 <td>
                     <a class="btn btn-ghost btn-sm" href="/assets/<?= e((int) $a['id']) ?>">עריכה</a>

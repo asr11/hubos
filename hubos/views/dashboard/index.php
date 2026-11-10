@@ -79,15 +79,15 @@ $prov = $provenance ?? null;
 </section>
 
 <?php if (is_array($prov)): ?>
-<section class="card provenance-bar-clean" aria-label="סנכרון נתונים" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0.6rem 1.25rem;border-right:4px solid var(--ok, #16a34a);background:#ffffff;">
-    <div class="cluster" style="gap:1rem;align-items:center">
-        <span class="pill pill-ok" style="font-size:0.8rem;padding:0.2rem 0.6rem">✔ נתונים מאומתים (Morning SSOT)</span>
+<section class="card provenance-bar-clean" aria-label="סנכרון נתונים">
+    <div class="provenance-cluster">
+        <span class="pill pill-ok pill-sm">✔ נתונים מאומתים (Morning SSOT)</span>
         <span class="muted small">סנכרון אחרון: <bdi dir="ltr"><?= e((string) ($prov['fetched_at_il'] ?? '')) ?></bdi> <span class="muted">(<?= e((string) ($prov['relative_age'] ?? '')) ?>)</span></span>
     </div>
-    <form method="post" action="/settings/sync-d1" style="margin:0">
+    <form method="post" action="/settings/sync-d1" class="m-0">
         <?= \HubOS\Core\Csrf::field() ?>
         <input type="hidden" name="_return" value="/dashboard">
-        <button type="submit" class="btn btn-sm btn-ghost" id="btn-sync-d1" style="font-size:0.8rem">סנכרון נתונים ↻</button>
+        <button type="submit" class="btn btn-sm btn-ghost" id="btn-sync-d1">סנכרון נתונים ↻</button>
     </form>
 </section>
 <?php endif; ?>
@@ -136,7 +136,7 @@ $prov = $provenance ?? null;
         </div>
     </div>
 
-    <div class="grid-2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1rem">
+    <div class="grid-2-wide">
         <div>
             <h3>משימות דחופות ובאיחור</h3>
             <?php $urgentTasks = array_slice(array_values(array_unique(array_merge($urgent['overdue_tasks'] ?? [], $urgent['high_tasks'] ?? []), SORT_REGULAR)), 0, 10); ?>
@@ -181,7 +181,7 @@ $prov = $provenance ?? null;
         <?php if (!empty($canFinance)): ?>
         <div>
             <h3>מועמדים לגבייה · דרישות תשלום פתוחות (חשבון עסקה 300)</h3>
-            <p class="muted" style="margin-bottom:.5rem">
+            <p class="muted mb-xs">
                 חשבונות עסקה (300) אינם הכנסה ממומשת. כאן מוצגים חשבונות עסקה שטרם נסגרו מול חשבונית מס (305), חשבונית מס/קבלה (320/330) או קבלה (400).
             </p>
             <?php if (($openDemands['top_clients'] ?? []) === []): ?>
@@ -237,7 +237,7 @@ $prov = $provenance ?? null;
         </div>
     </div>
 
-    <div class="grid-2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1rem">
+    <div class="grid-2-wide">
         <div>
             <h3>דומיינים, אחסון ו-SSL שפג תוקפם או מתחדשים בקרוב</h3>
             <?php if ($breakingAssets === []): ?>
@@ -333,7 +333,7 @@ $prov = $provenance ?? null;
         <span class="pill pill-ok">305/320/330 = הכנסה · 400 = תשלום · 300 = דרישת תשלום</span>
     </div>
 
-    <div class="grid-2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1rem">
+    <div class="grid-2-wide">
         <div>
             <h3>הפרדה חשבונאית מאומתת (כלל השנים)</h3>
             <div class="table-wrap">
@@ -436,7 +436,7 @@ $prov = $provenance ?? null;
         </div>
     </div>
 
-    <div class="grid-2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1rem">
+    <div class="grid-2-wide">
         <div>
             <h3>דיווח שעות לפי איש צוות</h3>
             <?php if (($team['by_user'] ?? []) === []): ?>
@@ -508,16 +508,16 @@ $prov = $provenance ?? null;
 <!-- ===================================================================== -->
 <!-- 5. פעילות אחרונה ביומן האירועים (Audit Trail)                         -->
 <!-- ===================================================================== -->
-<details class="card" id="sec-events" aria-labelledby="events-title" style="margin-top:1.5rem">
-    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0;">
-        <div style="display:flex;align-items:center;gap:0.75rem">
-            <span style="font-size:1.1rem">📋</span>
-            <h2 id="events-title" style="font-size:1.05rem;display:inline">יומן פעולות מערכת ואבטחה</h2>
-            <span class="badge" style="font-size:0.75rem"><?= e(count($events)) ?></span>
+<details class="card mt-lg" id="sec-events" aria-labelledby="events-title">
+    <summary class="details-summary-row">
+        <div class="details-summary-title">
+            <span>📋</span>
+            <h2 id="events-title">יומן פעולות מערכת ואבטחה</h2>
+            <span class="badge"><?= e(count($events)) ?></span>
         </div>
-        <span class="muted small" style="font-weight:600">לחץ לצפייה בלוגים ▼</span>
+        <span class="muted small strong">לחץ לצפייה בלוגים ▼</span>
     </summary>
-    <div style="padding-top:1rem;margin-top:0.75rem;border-top:1px solid var(--border,#e2e8f0)">
+    <div class="details-body">
     <?php if ($events === []): ?>
         <p class="empty">אין אירועים להצגה.</p>
     <?php else: ?>

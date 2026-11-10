@@ -78,7 +78,7 @@ $sslLabels = AssetService::SSL_STATUSES;
             </select>
         </label>
         <label class="field field-wide">
-            <span>חיפוש (דומיין / ספק / IP / לקוח)</span>
+            <span><?= $internal ? 'חיפוש (דומיין / ספק / IP / לקוח)' : 'חיפוש (דומיין / ספק / רשם)' ?></span>
             <input type="search" name="q" value="<?= e($filters['q'] ?? '') ?>" placeholder="למשל: co.il, cloudflare...">
         </label>
         <button type="submit" class="btn btn-primary">סינון</button>
@@ -161,9 +161,9 @@ $sslLabels = AssetService::SSL_STATUSES;
                     <tr>
                         <th scope="col">דומיין / נכס</th>
                         <th scope="col">סוג</th>
-                        <th scope="col">לקוח</th>
+                        <?php if ($internal): ?><th scope="col">לקוח</th><?php endif; ?>
                         <th scope="col">ספק / רשם</th>
-                        <th scope="col">IP</th>
+                        <?php if ($internal): ?><th scope="col">IP</th><?php endif; ?>
                         <th scope="col">SSL</th>
                         <th scope="col">תאריך חידוש</th>
                         <?php if ($internal): ?><th scope="col">גישות</th><th scope="col">פעולות</th><?php endif; ?>
@@ -181,6 +181,7 @@ $sslLabels = AssetService::SSL_STATUSES;
                                 <?php endif; ?>
                             </td>
                             <td><?= e($kinds[$a['kind']] ?? $a['kind']) ?></td>
+                            <?php if ($internal): ?>
                             <td>
                                 <?php if ($a['client_id'] !== null): ?>
                                     <a href="/clients/<?= e((int) $a['client_id']) ?>?tab=assets"><?= e($a['client_name'] ?? ('#' . (int) $a['client_id'])) ?></a>
@@ -188,8 +189,9 @@ $sslLabels = AssetService::SSL_STATUSES;
                                     <span class="muted">לא משויך</span>
                                 <?php endif; ?>
                             </td>
-                            <td><?= e(implode(' · ', array_filter([$a['provider'] ?? null, $a['registrar'] ?? null]))) ?></td>
-                            <td dir="ltr" class="ltr-cell"><?= e($a['ip_address'] ?? '—') ?></td>
+                            <?php endif; ?>
+                            <td><?= implode(' · ', array_map(static fn (string $s): string => '<bdi>' . e($s) . '</bdi>', array_filter([$a['provider'] ?? null, $a['registrar'] ?? null]))) ?: '—' ?></td>
+                            <?php if ($internal): ?><td dir="ltr" class="ltr-cell"><?= e($a['ip_address'] ?? '—') ?></td><?php endif; ?>
                             <td>
                                 <?php if (!empty($a['ssl_status'])): ?>
                                     <span class="level level-<?= $a['ssl_status'] === 'valid' ? 'ok' : ($a['ssl_status'] === 'expiring' ? 'warn80' : 'over') ?>">

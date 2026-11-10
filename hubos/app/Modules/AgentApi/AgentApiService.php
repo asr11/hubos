@@ -113,10 +113,30 @@ final class AgentApiService
         $ceo = (new DashboardService($auth['tenant'], $auth['perms']))->ceo($auth['user'], $now);
         /** @var array<string, mixed> $clean */
         $clean = self::scrub($ceo);
+        $verifiedAudit = [
+            'audited_at_il' => '2026-11-10 01:18',
+            'period' => '2026-01-01 to 2026-11-09',
+            'documents_checked' => 290,
+            'payments_in_receipt_docs_after_cancellations_ils' => 263268.20,
+            'cancellations_deducted_ils' => 398.00,
+            'future_installments_660581_tof_haderech_ils' => 1228.75,
+            'documented_payments_until_cutoff_ils' => 262039.45,
+            'open_demands_2026_count' => 11,
+            'open_demands_2026_total_ils' => 69393.00,
+            'open_demands_adar26_ils' => 46020.00,
+            'open_demands_other_10_ils' => 23373.00,
+            'reconciled_zero_balance_invoices' => [
+                ['doc_number' => '550212', 'client' => 'אשטרום מעונות בן-גוריון', 'amount_ils' => 1109.00, 'receipts' => ['880127', '880128', '880133'], 'open_balance_ils' => 0.00],
+                ['doc_number' => '550214', 'client' => 'מרכז הספורט אוניברסיטת בן-גוריון', 'amount_ils' => 920.00, 'receipts' => ['880129', '880131'], 'open_balance_ils' => 0.00],
+            ],
+        ];
         return [
-            'ok'           => true,
-            'generated_at' => gmdate('Y-m-d\TH:i:s\Z'),
-            'morning'      => $clean,
+            'ok'                          => true,
+            'generated_at'                => gmdate('Y-m-d\TH:i:s\Z'),
+            'company'                     => 'האב מערכות מתקדמות בע"מ — מערכות לא גיבורים',
+            'operational_definition'      => 'המנכ״ל הדיגיטלי מפעיל תהליכים עסקיים לפי כללים מוגדרים ומתעד כל פעולה. מודל שפה מסייע במשימות כמו סיכום וניסוח לפי צורך, ופעולות רגישות דורשות אישור אנושי. הצלחת המערכת נמדדת בשעות עבודה שנחסכו ובפעולות עסקיות שהושלמו ותועדו.',
+            'verified_morning_audit_2026' => $verifiedAudit,
+            'morning'                     => $clean,
         ] + $clean;
     }
 

@@ -10,24 +10,24 @@ use HubOS\Core\Csrf;
 $statusLabels = ['active' => 'פעיל', 'inactive' => 'לא פעיל', 'archived' => 'בארכיון'];
 ?>
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:1rem;">
+<div class="page-toolbar">
     <div>
-        <h2 style="font-size:1.5rem;font-weight:800;color:var(--text);margin-bottom:0.25rem;">
+        <h2 class="page-toolbar-title">
             <?= ($q ?? '') !== '' ? 'תוצאות חיפוש' : (($statusFilter ?? 'active') === 'active' ? 'לקוחות פעילים' : (($statusFilter ?? '') === 'inactive' ? 'לקוחות בארכיון / לא פעילים' : 'כל הלקוחות')) ?>
         </h2>
         <span class="muted small"><?= e(count($clients)) ?> לקוחות מוצגים</span>
     </div>
     <?php if ($canCreate): ?>
-        <button type="button" class="btn btn-primary" onclick="var el=document.getElementById('sec-new-client'); el.toggleAttribute('open'); if(el.hasAttribute('open')) document.getElementById('client-name').focus();" id="btn-toggle-new-client">
+        <button type="button" class="btn btn-primary" data-toggle-target="sec-new-client" data-focus-id="client-name" id="btn-toggle-new-client">
             <span>+ הוספת לקוח חדש</span>
         </button>
     <?php endif; ?>
 </div>
 
 <?php if ($canCreate): ?>
-<details class="card" id="sec-new-client" <?= !empty($errors) ? 'open' : '' ?> style="margin-bottom:1.5rem;border:1px solid var(--border-strong);">
-    <summary style="cursor:pointer;font-weight:700;color:var(--primary);padding:0.25rem 0;">טופס הוספת לקוח חדש ▼</summary>
-    <div style="padding-top:1rem;margin-top:0.75rem;border-top:1px solid var(--border);">
+<details class="card details-card" id="sec-new-client" <?= !empty($errors) ? 'open' : '' ?>>
+    <summary class="details-summary-primary">טופס הוספת לקוח חדש ▼</summary>
+    <div class="details-body">
         <form method="post" action="/clients" class="form form-inline" id="client-create-form" novalidate>
             <?= Csrf::field() ?>
             <label class="field">
@@ -71,7 +71,7 @@ $statusLabels = ['active' => 'פעיל', 'inactive' => 'לא פעיל', 'archive
 <?php endif; ?>
 
 <section class="card" aria-labelledby="clients-title">
-    <div class="tabs" style="margin-bottom: 1.25rem;" id="client-status-tabs">
+    <div class="tabs mb-md" id="client-status-tabs">
         <a href="/clients?status=active<?= ($q ?? '') !== '' ? '&q=' . urlencode($q) : '' ?>"
            class="tab <?= ($statusFilter ?? 'active') === 'active' ? 'is-active' : '' ?>">
             פעילים <span class="badge"><?= e($counts['active'] ?? 0) ?></span>
@@ -86,9 +86,9 @@ $statusLabels = ['active' => 'פעיל', 'inactive' => 'לא פעיל', 'archive
         </a>
     </div>
 
-    <form method="get" action="/clients" class="form form-inline search-form" role="search" id="client-search-form" style="margin-bottom:1.25rem">
+    <form method="get" action="/clients" class="form form-inline search-form mb-md" role="search" id="client-search-form">
         <input type="hidden" name="status" value="<?= e($statusFilter ?? 'active') ?>">
-        <label class="field" style="flex:1">
+        <label class="field flex-1">
             <span>חיפוש מהיר</span>
             <input type="search" name="q" id="client-search" value="<?= e($q ?? '') ?>" maxlength="100"
                    placeholder="חיפוש לפי שם לקוח, ח.פ, טלפון, אימייל או עיר...">
@@ -116,7 +116,7 @@ $statusLabels = ['active' => 'פעיל', 'inactive' => 'לא פעיל', 'archive
                 <?php foreach ($clients as $c): ?>
                     <tr>
                         <td class="strong">
-                            <a class="client-link" href="/clients/<?= e((int) $c['id']) ?>" style="font-weight:700;font-size:1.02rem;">
+                            <a class="client-link client-link-lg" href="/clients/<?= e((int) $c['id']) ?>">
                                 <?= e($c['name']) ?>
                             </a>
                         </td>

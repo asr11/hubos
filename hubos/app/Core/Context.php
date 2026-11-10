@@ -113,8 +113,12 @@ final class Context
             return [
                 'timer'   => null,
                 'clients' => $this->tenant()->select("SELECT id, name FROM clients WHERE tenant_id = :tenant_id AND status <> 'archived' ORDER BY name LIMIT 1000"),
-                'tasks'   => $this->tenant()->select("SELECT id, title, client_id FROM tasks WHERE tenant_id = :tenant_id AND client_id IS NOT NULL
-                                                       AND archived_at IS NULL AND status <> 'done' ORDER BY title LIMIT 1000"),
+                'tasks'   => $this->tenant()->select("SELECT t.id, t.title, t.client_id, c.name AS client_name
+                                                        FROM tasks t
+                                                  INNER JOIN clients c ON c.tenant_id = t.tenant_id AND c.id = t.client_id
+                                                       WHERE t.tenant_id = :tenant_id AND t.client_id IS NOT NULL
+                                                         AND t.archived_at IS NULL AND t.status <> 'done' AND c.status <> 'archived'
+                                                    ORDER BY c.name ASC, t.title ASC LIMIT 1000"),
             ];
         } catch (\PDOException) {
             return null; // schema not migrated yet: the page still renders without the widget

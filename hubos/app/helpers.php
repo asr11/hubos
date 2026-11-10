@@ -55,3 +55,70 @@ if (!function_exists('fmt_date')) {
         return $m[3] . '/' . $m[2] . '/' . $m[1];
     }
 }
+
+if (!function_exists('fmt_inline_bidi')) {
+    /**
+     * Escape plain text safely while isolating URLs, emails, and domain names
+     * in <bdi dir="ltr"> (or safe external links) so RTL Hebrew lines never break mid-domain.
+     */
+    function fmt_inline_bidi(string $line): string
+    {
+        $pattern = '/(https?:\/\/[^\s<>"\'\)\]\x{0590}-\x{05FF}]+|[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}|(?<![A-Za-z0-9])(?:[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?\.)+(?:co\.il|org\.il|net\.il|gov\.il|ac\.il|muni\.il|com|net|org|io|dev|cloud|ai)\b|#\d+\b)/u';
+        $parts = preg_split($pattern, $line, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if (!is_array($parts)) {
+            return e($line);
+        }
+        $out = '';
+        foreach ($parts as $i => $part) {
+            if ($part === '') {
+                continue;
+            }
+            if ($i % 2 === 1) {
+                $trail = '';
+                while ($part !== '' && str_contains('.,;:!?)]', substr($part, -1))) {
+                    $trail = substr($part, -1) . $trail;
+                    $part = substr($part, 0, -1);
+                }
+                if (str_starts_with($part, 'http://') || str_starts_with($part, 'https://')) {
+                    $esc = e($part);
+                    $out .= '<a href="' . $esc . '" target="_blank" rel="noopener noreferrer" dir="ltr" class="ltr-link">' . $esc . '</a>' . e($trail);
+                } else {
+                    $out .= '<bdi dir="ltr" class="ltr-token">' . e($part) . '</bdi>' . e($trail);
+                }
+            } else {
+                $out .= e($part);
+            }
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('fmt_rich_text')) {
+    /**
+     * Format multiline task/note text safely: normalizes literal \n sequences,
+     * renders numbered steps cleanly, and prevents RTL/LTR line-wrapping corruption.
+     */
+    function fmt_rich_text(?string $text): string
+    {
+        if ($text === null || trim($text) === '') {
+            return '';
+        }
+        $normalized = str_replace(["\r\n", "\r", "\\r\\n", "\\n"], "\n", trim($text));
+        $lines = explode("\n", $normalized);
+        $blocks = [];
+        foreach ($lines as $rawLine) {
+            $line = trim($rawLine);
+            if ($line === '') {
+                $blocks[] = '<div class="rich-gap" aria-hidden="true"></div>';
+                continue;
+            }
+            if (preg_match('/^(\d+[\.\)])\s+(.+)$/u', $line, $m) === 1) {
+                $blocks[] = '<div class="rich-step"><span class="rich-step-num" dir="ltr">' . e($m[1]) . '</span><span class="rich-step-body">' . fmt_inline_bidi($m[2]) . '</span></div>';
+            } else {
+                $blocks[] = '<p class="rich-line">' . fmt_inline_bidi($line) . '</p>';
+            }
+        }
+        return implode("\n", $blocks);
+    }
+}
+

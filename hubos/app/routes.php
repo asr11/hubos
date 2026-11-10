@@ -92,4 +92,6 @@ return static function (Router $r): void {
     $r->get('/api/agent/clients/{id:\d+}', [AgentApiController::class, 'client360'], ['api' => true]);
     $r->get('/api/agent/client/{id:\d+}', [AgentApiController::class, 'client360'], ['api' => true]);
     $r->post('/api/agent/event', [AgentApiController::class, 'recordEvent'], ['api' => true]);
+    $r->get('/mcp', [AgentApiController::class, 'mcp'], ['api' => true]);
+    $r->post('/mcp', [AgentApiController::class, 'mcp'], ['api' => true]);
 };

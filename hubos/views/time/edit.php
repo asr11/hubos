@@ -28,7 +28,7 @@ $err = static fn (string $k): string => isset($errors[$k]) ? '<small class="fiel
         <label class="field"><span>משימה</span>
             <select name="task_id" data-role="task-select">
                 <option value="">ללא</option>
-                <?php foreach ($tasks as $t): ?><option value="<?= e((int) $t['id']) ?>" data-client="<?= e((int) $t['client_id']) ?>" <?= ($old['task_id'] ?? '') === (string) $t['id'] ? 'selected' : '' ?>><?= e($t['title']) ?></option><?php endforeach; ?>
+                <?php foreach ($tasks as $t): ?><option value="<?= e((int) $t['id']) ?>" data-client="<?= e((int) $t['client_id']) ?>" data-client-name="<?= e($t['client_name'] ?? '') ?>" <?= ($old['task_id'] ?? '') === (string) $t['id'] ? 'selected' : '' ?>><?= e($t['title']) ?></option><?php endforeach; ?>
             </select><?= $err('task_id') ?>
         </label>
         <input type="hidden" name="project_id" value="<?= e($old['project_id'] ?? '') ?>">

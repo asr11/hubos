@@ -37,11 +37,11 @@ $enabledModules = count(array_filter($modules, static fn (array $m): bool => $m[
 <?php if ($canManageUsers): ?>
 <section class="card" aria-labelledby="new-user-title">
     <details>
-        <summary class="card-head" style="cursor:pointer">
+        <summary class="card-head cursor-pointer">
             <h2 id="new-user-title">+ הוספת משתמש חדש</h2>
             <span class="muted">בעלים · מנהל · צוות · סוכן · צופה (לקוח)</span>
         </summary>
-        <form method="post" action="/settings/users" class="form-grid" id="new-user-form" style="margin-top:.75rem">
+        <form method="post" action="/settings/users" class="form-grid mt-sm" id="new-user-form">
             <?= Csrf::field() ?>
             <label class="field">
                 <span>שם מלא <abbr title="שדה חובה">*</abbr></span>
@@ -133,8 +133,8 @@ $enabledModules = count(array_filter($modules, static fn (array $m): bool => $m[
                     <td>
                         <?php if ($canManageUsers || $canManagePerms): ?>
                             <details>
-                                <summary class="btn btn-ghost btn-sm" style="cursor:pointer">עריכה / הרשאות</summary>
-                                <div class="card" style="margin-top:.5rem;min-width:300px">
+                                <summary class="btn btn-ghost btn-sm cursor-pointer">עריכה / הרשאות</summary>
+                                <div class="card popover-card">
                                     <?php if ($canManageUsers && ($u['role'] !== 'owner' || ($user['role'] ?? '') === 'owner')): ?>
                                     <form method="post" action="/settings/users/<?= e($uid) ?>" class="form-grid">
                                         <?= Csrf::field() ?>
@@ -179,7 +179,7 @@ $enabledModules = count(array_filter($modules, static fn (array $m): bool => $m[
                                     <?php endif; ?>
 
                                     <?php if ($canManagePerms && ($u['role'] !== 'owner' || ($user['role'] ?? '') === 'owner')): ?>
-                                    <hr style="border:0;border-top:1px solid var(--border,#2a3244);margin:.75rem 0">
+                                    <hr class="divider-line">
                                     <form method="post" action="/settings/users/<?= e($uid) ?>/permissions" class="form-grid">
                                         <?= Csrf::field() ?>
                                         <label class="field">
@@ -216,7 +216,7 @@ $enabledModules = count(array_filter($modules, static fn (array $m): bool => $m[
     </div>
 </section>
 
-<section class="grid-2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem">
+<section class="grid-2-wide">
     <article class="card" aria-labelledby="modules-title">
         <div class="card-head">
             <h2 id="modules-title">מודולים פעילים בחברה (Tenant Modules)</h2>

@@ -104,6 +104,21 @@ final class TaskService
             && ((int) ($task['client_id'] ?? 0) !== (int) ($user['client_id'] ?? -1) || (int) $task['client_visible'] !== 1 || $task['archived_at'] !== null)) {
             throw new HttpException(403, 'אין הרשאה לצפות במשימה זו');
         }
+        if (($user['role'] ?? '') === 'client_viewer') {
+            $clean = WorkRefs::strip($task);
+            unset($clean['assignee'], $clean['assignee_user_id'], $clean['assignee_name']);
+            return $clean;
+        }
+        if (!empty($task['assignee_user_id'])) {
+            $u = $this->tenant->find('users', (int) $task['assignee_user_id']);
+            if ($u !== null) {
+                $task['assignee_name'] = $u['name'];
+            }
+        } elseif (!empty($task['assignee'])) {
+            if ($task['assignee'] === '00000000-0000-4000-a000-000000000001') {
+                $task['assignee_name'] = 'אשר';
+            }
+        }
         return WorkRefs::strip($task);
     }
 
@@ -173,7 +188,8 @@ final class TaskService
         if ($title === '' || Str::len($title) > 300) {
             $errors['title'] = 'כותרת היא שדה חובה (עד 300 תווים)';
         }
-        $description = trim(is_string($input['description'] ?? null) ? $input['description'] : '');
+        $rawDesc = is_string($input['description'] ?? null) ? $input['description'] : '';
+        $description = trim(str_replace(["\r\n", "\r", "\\r\\n", "\\n"], "\n", $rawDesc));
         if (Str::len($description) > 5000) {
             $errors['description'] = 'תיאור ארוך מדי';
         }

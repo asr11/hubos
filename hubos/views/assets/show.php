@@ -38,7 +38,7 @@ $insp = $asset['inspection'] ?? null;
             <div class="grid-2">
                 <div>
                     <p><strong>דומיין שנבדק:</strong> <span dir="ltr"><?= e($insp['host'] ?? '') ?></span></p>
-                    <p><strong>רשומות DNS A (IP):</strong> <span dir="ltr"><?= e(implode(', ', $insp['dns_a'] ?? []) ?: '—') ?></span></p>
+                    <?php if ($internal): ?><p><strong>רשומות DNS A (IP):</strong> <span dir="ltr"><?= e(implode(', ', $insp['dns_a'] ?? []) ?: '—') ?></span></p><?php endif; ?>
                     <p><strong>שרתי שמות (NS):</strong> <span dir="ltr"><?= e(implode(', ', $insp['dns_ns'] ?? []) ?: '—') ?></span></p>
                     <p><strong>שרתי דואר (MX):</strong> <span dir="ltr"><?= e(implode(', ', $insp['dns_mx'] ?? []) ?: '—') ?></span></p>
                 </div>

@@ -76,7 +76,7 @@ final class AssetService
                        (SELECT COUNT(*) FROM vault_items v WHERE v.tenant_id = a.tenant_id AND v.asset_id = a.id) AS vault_count
                   FROM assets a
              LEFT JOIN clients c ON c.tenant_id = a.tenant_id AND c.id = a.client_id
-                 WHERE a.tenant_id = :tenant_id';
+                 WHERE a.tenant_id = :tenant_id AND COALESCE(a.status, \'active\') <> \'archived\'';
         $params = [];
 
         if (!$internal) {
@@ -87,7 +87,7 @@ final class AssetService
                     'expiring_90d' => 0, 'expired' => 0, 'missing_expiry' => 0, 'ssl_issues' => 0,
                 ]];
             }
-            $sql .= ' AND a.client_id = :viewer_cid';
+            $sql .= ' AND a.client_id = :viewer_cid AND COALESCE(a.status, \'active\') = \'active\'';
             $params['viewer_cid'] = $viewerClientId;
         } elseif (!empty($filters['client_id']) && ctype_digit((string) $filters['client_id'])) {
             $sql .= ' AND a.client_id = :cid';
@@ -120,6 +120,7 @@ final class AssetService
         foreach ($all as $r) {
             if (!$internal) {
                 unset($r['notes'], $r['vault_count']);
+                $r['ip_address'] = null;
             }
             $exp = (string) ($r['expiry_date'] ?? '');
             $daysLeft = null;
@@ -233,9 +234,20 @@ final class AssetService
         if (!$internal && (int) ($user['client_id'] ?? 0) !== (int) ($row['client_id'] ?? 0)) {
             throw new HttpException(403, 'אין הרשאה לצפות בנכס זה');
         }
+        if (!$internal && ($row['status'] ?? 'active') !== 'active') {
+            throw new HttpException(404, 'הנכס לא נמצא');
+        }
         $data = is_string($row['data_json'] ?? null) ? json_decode($row['data_json'], true) : null;
         unset($row['data_json']);
         $row['inspection'] = is_array($data['inspection'] ?? null) ? $data['inspection'] : null;
+        if (!$internal) {
+            $row['ip_address'] = null;
+            $row['notes'] = null;
+            if (is_array($row['inspection'])) {
+                $row['inspection']['dns_a'] = [];
+                $row['inspection']['ip_address'] = null;
+            }
+        }
         $client = $row['client_id'] !== null ? $this->tenant->find('clients', (int) $row['client_id']) : null;
         $row['client_name'] = $client['name'] ?? null;
 

@@ -1085,17 +1085,21 @@ test('viewer: client-visible tasks and time totals only; cannot start timers or 
     eq(403, throws(fn () => (new TimeEntryService($w['ta'], $w['perms']))->create($v, ['client_id' => (string) $w['c'], 'description' => 'x', 'duration' => '1:00']), HttpException::class)->status);
     eq(0, $w['ta']->count('active_timers'));
 
+    (new TimeEntryService($w['ta'], $w['perms']))->create($w['ownerA'], ['client_id' => (string) $w['d'], 'description' => 'ZZ_OTHER_CLIENT_NOTE', 'duration' => '1:00']);
     $list = (new TimeEntryService($w['ta'], $w['perms']))->list($v, ['client_id' => (string) $w['d']]);
-    eq([], $list['rows'], 'no entry rows for viewer');
+    eq(1, count($list['rows']), 'viewer sees own client time entries only (never other client)');
+    eq(null, $list['rows'][0]['user_id'], 'internal user_id stripped for viewer');
+    eq(null, $list['rows'][0]['user_name'], 'internal user_name stripped for viewer');
     eq(7200, $list['total_seconds'], 'forced to own client totals');
     eq($w['c'], $list['filters']['client_id']);
 
     $card = (new Client360Service($w['ta'], $w['perms']))->build($v, $w['c']);
     eq([$visible], array_map('intval', array_column($card['tasks'], 'id')), 'card work tab: visible tasks only');
-    eq([], $card['time_entries']);
+    eq(1, count($card['time_entries']), 'viewer sees own client transparent time entries');
+    eq(null, $card['time_entries'][0]['user_id'], 'card strips internal user_id for viewer');
     eq(2.0, $card['metrics']['hours_total'], 'viewer still sees totals');
     $html = (new View(HUBOS_ROOT . '/views'))->render('clients/show', ['card' => $card, 'tab' => 'time', 'canEnrich' => false, 'suggestion' => null, 'registryError' => null]);
-    ok(!str_contains($html, 'ZZ_SECRET_INTERNAL_NOTE'), 'no internal description in viewer HTML');
+    ok(!str_contains($html, 'ZZ_OTHER_CLIENT_NOTE'), 'never leaks other client time entries');
     ok(!str_contains($html, 'client-timer-form'), 'no timer controls for viewer');
     $html = (new View(HUBOS_ROOT . '/views'))->render('clients/show', ['card' => $card, 'tab' => 'work', 'canEnrich' => false, 'suggestion' => null, 'registryError' => null]);
     ok(!str_contains($html, 'ZZ_internal') && str_contains($html, 'ZZ_visible'));
@@ -1454,6 +1458,86 @@ test('data provenance: D1Importer & SyncService record sync_runs, exact timestam
     eq('2026-10-19 15:00:00', $afterSync['fetched_at_il']);
     eq(2, $t->count('sync_runs'));
     eq(2, $t->count('events', ['action' => 'sync.completed']));
+});
+
+test('csp & portal polish: zero inline style/onclick/script in views, viewer get() strips assignee, fmt_rich_text BiDi & XSS', function (): void {
+    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(HUBOS_ROOT . '/views'));
+    $violations = [];
+    foreach ($it as $f) {
+        if (!$f->isFile() || $f->getExtension() !== 'php') {
+            continue;
+        }
+        $src = (string) file_get_contents($f->getPathname());
+        if (preg_match('/\bstyle\s*=|\bon(?:click|change|submit|input|keyup|keydown)\s*=|<script(?![^>]*\bsrc=)/i', $src) === 1) {
+            $violations[] = str_replace(HUBOS_ROOT . '/', '', $f->getPathname());
+        }
+    }
+    eq([], $violations, 'zero CSP-blocked inline style/event/script attributes across all views');
+
+    $w = workWorld();
+    $tasks = new TaskService($w['ta'], $w['perms']);
+    $tid = $tasks->create($w['ownerA'], [
+        'client_id' => (string) $w['c'],
+        'title' => 'ZZ_PortalTask',
+        'description' => 'שורה 1\n2. בדיקת https://av-re.co.il.',
+        'assignee_user_id' => (string) $w['ownerA']['id'],
+        'client_visible' => '1',
+    ]);
+    $forOwner = $tasks->get($w['ownerA'], $tid);
+    ok(isset($forOwner['assignee_name']), 'internal user sees assignee_name');
+    ok(!str_contains((string) $forOwner['description'], '\\n'), 'TaskService::validate normalizes literal \\n');
+
+    $forViewer = $tasks->get($w['viewer'], $tid);
+    ok(!array_key_exists('assignee_user_id', $forViewer) && !array_key_exists('assignee_name', $forViewer), 'client_viewer get() strips internal assignee metadata');
+
+    $rich = fmt_rich_text("1. בדיקת <script>alert(1)</script> מול https://av-re.co.il.\\n2. מייל kfir.raviv@mano.co.il");
+    ok(!str_contains($rich, '<script>'), 'XSS escaped in fmt_rich_text');
+    ok(str_contains($rich, 'href="https://av-re.co.il"'), 'URL linked cleanly without trailing dot');
+    ok(str_contains($rich, '<bdi dir="ltr" class="ltr-token">kfir.raviv@mano.co.il</bdi>'), 'email isolated in LTR bdi');
+    ok(str_contains($rich, 'class="rich-step"'), 'numbered step formatted cleanly');
+
+    // Kitchen vs Dining Room: TimeEntryService, AssetService, ProjectService & Client360Service strict hygiene
+    $timeSvc = new TimeEntryService($w['ta'], $w['perms']);
+    $timeSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'description' => 'ZZ_PortalWork', 'duration' => '1:30']);
+    $vTime = $timeSvc->list($w['viewer'], []);
+    eq([], $vTime['by_user'], 'client_viewer never sees employee hour breakdown');
+    eq([], $vTime['by_client'], 'client_viewer never sees cross-client breakdown');
+    eq(null, $vTime['rows'][0]['source'], 'client_viewer never sees internal entry source');
+
+    $projSvc = new ProjectService($w['ta'], $w['perms']);
+    $pid = $projSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'name' => 'ZZ_Proj', 'description' => 'שורה א\nשורה ב', 'client_visible' => '1']);
+    $tasks->create($w['ownerA'], ['client_id' => (string) $w['c'], 'project_id' => (string) $pid, 'title' => 'ZZ_HiddenTask', 'client_visible' => '0']);
+    $tasks->create($w['ownerA'], ['client_id' => (string) $w['c'], 'project_id' => (string) $pid, 'title' => 'ZZ_ShownTask', 'client_visible' => '1']);
+    $ownerProjs = array_values(array_filter($projSvc->list($w['ownerA'], ['client_id' => (string) $w['c']]), fn ($p) => (int) $p['id'] === $pid));
+    $viewerProjs = array_values(array_filter($projSvc->list($w['viewer'], []), fn ($p) => (int) $p['id'] === $pid));
+    eq(2, (int) $ownerProjs[0]['task_count'], 'owner sees all project tasks');
+    eq(1, (int) $viewerProjs[0]['task_count'], 'client_viewer task_count counts client_visible=1 only');
+    ok(!str_contains((string) $projSvc->get($w['ownerA'], $pid)['description'], '\\n'), 'ProjectService normalizes literal \\n');
+
+    $assetSvc = new AssetService($w['ta'], $w['perms']);
+    $activeAsset = $assetSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'kind' => 'domain', 'domain' => 'zz-live.co.il', 'ip_address' => '128.140.100.120', 'notes' => 'ZZ_InternalAssetNote', 'status' => 'active']);
+    $inactiveAsset = $assetSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'kind' => 'domain', 'domain' => 'zz-sister.co.il', 'status' => 'inactive']);
+    $archivedAsset = $assetSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'kind' => 'hosting', 'domain' => 'zz-staging.hostingersite.com', 'status' => 'archived']);
+
+    $ownerAssetIds = array_map('intval', array_column($assetSvc->list($w['ownerA'], ['client_id' => (string) $w['c']])['rows'], 'id'));
+    ok(in_array($activeAsset, $ownerAssetIds, true) && in_array($inactiveAsset, $ownerAssetIds, true) && !in_array($archivedAsset, $ownerAssetIds, true), 'owner sees active+inactive assets, excludes archived');
+
+    $viewerAssetList = $assetSvc->list($w['viewer'], [])['rows'];
+    eq([$activeAsset], array_map('intval', array_column($viewerAssetList, 'id')), 'client_viewer sees active assets only');
+    eq(null, $viewerAssetList[0]['ip_address'], 'AssetService::list strips ip_address for client_viewer');
+    $viewerAssetGet = $assetSvc->get($w['viewer'], $activeAsset);
+    eq(null, $viewerAssetGet['ip_address'], 'AssetService::get strips ip_address for client_viewer');
+    eq(null, $viewerAssetGet['notes'], 'AssetService::get strips notes for client_viewer');
+    eq(404, throws(fn () => $assetSvc->get($w['viewer'], $inactiveAsset), HttpException::class)->status, 'client_viewer blocked from inactive asset');
+    eq(404, throws(fn () => $assetSvc->get($w['viewer'], $archivedAsset), HttpException::class)->status, 'client_viewer blocked from archived asset');
+
+    $w['ta']->insert('client_contacts', ['client_id' => $w['c'], 'name' => 'ZZ_Contact', 'role' => 'VP IT', 'notes' => 'ZZ_SecretContactNote', 'is_primary' => 1]);
+    $w['ta']->insert('interactions', ['client_id' => $w['c'], 'kind' => 'note', 'summary' => 'ZZ_InternalCRMNote']);
+    $c360v = (new Client360Service($w['ta'], $w['perms']))->build($w['viewer'], $w['c']);
+    eq(null, $c360v['contacts'][0]['notes'], 'Client360 strips contact notes for client_viewer');
+    eq([], $c360v['interactions'], 'Client360 hides CRM interactions for client_viewer');
+    eq([$activeAsset], array_map('intval', array_column($c360v['assets'], 'id')), 'Client360 shows active assets only for client_viewer');
+    eq(null, $c360v['assets'][0]['ip_address'], 'Client360 strips asset IP for client_viewer');
 });
 
 // ---------------------------------------------------------------- Run

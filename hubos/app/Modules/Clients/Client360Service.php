@@ -101,7 +101,14 @@ final class Client360Service
 
         // ---------------------------------------------------------- rows
         $contacts = $this->label($this->rows('client_contacts', $ids, 'is_primary DESC, name ASC'), $names, $clientId);
-        $interactions = $this->label($this->rows('interactions', $ids, 'COALESCE(occurred_at, created_at) DESC'), $names, $clientId);
+        if (!$internal) {
+            $client['notes'] = null;
+            $contacts = array_map(static function (array $p): array {
+                $p['notes'] = null;
+                return $p;
+            }, $contacts);
+        }
+        $interactions = $internal ? $this->label($this->rows('interactions', $ids, 'COALESCE(occurred_at, created_at) DESC'), $names, $clientId) : [];
         $projects = $this->label($this->rows('projects', $ids, 'created_at DESC'), $names, $clientId);
         $tasks = $this->label($this->tasks($ids, array_map(static fn (array $p): int => (int) $p['id'], $projects)), $names, $clientId);
         // M4: archived work is hidden; viewers see only client-visible items.
@@ -112,9 +119,17 @@ final class Client360Service
         $banks = $this->label($this->rows('hours_banks', $ids, 'status ASC, id ASC'), $names, $clientId);
         $canFinance = ($user['role'] ?? '') === 'owner' && $this->perms->can($user, 'finance.view');
         $finance = $canFinance ? $this->label($this->rows('finance_documents', $ids, 'doc_date DESC, id DESC'), $names, $clientId) : [];
-        $leads = $this->label($this->rows('leads', $ids, 'created_at DESC'), $names, $clientId);
-        $quotes = $this->label($this->rows('quotes', $ids, 'created_at DESC'), $names, $clientId);
+        $leads = $internal ? $this->label($this->rows('leads', $ids, 'created_at DESC'), $names, $clientId) : [];
+        $quotes = $internal ? $this->label($this->rows('quotes', $ids, 'created_at DESC'), $names, $clientId) : [];
         $assets = $this->label($this->rows('assets', $ids, 'expiry_date IS NULL, expiry_date ASC, id ASC'), $names, $clientId);
+        $assets = array_values(array_filter($assets, static fn (array $a): bool => $internal ? ($a['status'] ?? 'active') !== 'archived' : ($a['status'] ?? 'active') === 'active'));
+        if (!$internal) {
+            $assets = array_map(static function (array $a): array {
+                $a['ip_address'] = null;
+                $a['notes'] = null;
+                return $a;
+            }, $assets);
+        }
         $vault = $internal ? $this->label($this->rows('vault_items', $ids, 'id ASC', self::VAULT_COLUMNS), $names, $clientId) : [];
         $events = $internal ? $this->label($this->events($ids), $names, $clientId) : [];
 
@@ -151,7 +166,13 @@ final class Client360Service
         }
         $timeEntryCount = count($timeEntries);
         if (!$internal) {
-            $timeEntries = []; // client_viewer: totals only, never internal descriptions
+            $timeEntries = array_map(static function (array $te): array {
+                $te['user_id'] = null;
+                $te['legacy_user_ref'] = null;
+                $te['source'] = null;
+                unset($te['data_json']);
+                return $te;
+            }, $timeEntries);
         }
 
         // ---------------------------------------------------------- money (accounting rule)

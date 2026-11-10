@@ -72,10 +72,10 @@ $metrics = $portal['metrics'] ?? [];
                 <tbody>
                 <?php foreach ($tasks as $t): $st = TaskService::statusKey((string) $t['status']); ?>
                     <tr>
-                        <td><strong><?= e($t['title']) ?></strong></td>
+                        <td><a class="client-link" href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a></td>
                         <td><?= e($t['project_name'] ?? '—') ?></td>
-                        <td><span class="pill"><?= e(TaskService::STATUSES[$st] ?? $t['status']) ?></span></td>
-                        <td dir="ltr"><?= e($t['due_at'] ? substr((string) $t['due_at'], 0, 10) : '—') ?></td>
+                        <td><span class="tstatus tstatus-<?= e($st) ?>"><?= e(TaskService::STATUSES[$st] ?? $t['status']) ?></span></td>
+                        <td dir="ltr"><?= e($t['due_at'] ? fmt_date((string) $t['due_at']) : '—') ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -84,7 +84,7 @@ $metrics = $portal['metrics'] ?? [];
     <?php endif; ?>
 </section>
 
-<section class="grid-2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem">
+<section class="grid-2-wide">
     <article class="card" aria-labelledby="portal-banks-title">
         <div class="card-head">
             <h2 id="portal-banks-title">בנקי שעות (<?= e(count($banks)) ?>)</h2>
@@ -104,7 +104,7 @@ $metrics = $portal['metrics'] ?? [];
                 <tbody>
                 <?php foreach ($banks as $b): ?>
                     <tr>
-                        <td><strong><?= e($b['name']) ?></strong></td>
+                        <td><strong><?= fmt_inline_bidi((string) $b['name']) ?></strong></td>
                         <td dir="ltr"><?= e(number_format((float) $b['allowance_hours'], 1)) ?>h</td>
                         <td dir="ltr"><?= e(number_format((float) $b['used_hours'], 1)) ?>h (<?= e((int) $b['pct']) ?>%)</td>
                         <td dir="ltr"><strong><?= e(number_format((float) $b['remaining_hours'], 1)) ?>h</strong></td>
@@ -136,8 +136,8 @@ $metrics = $portal['metrics'] ?? [];
                     <tr>
                         <td><?= e(AssetService::KINDS[$a['kind'] ?? 'other'] ?? $a['kind']) ?></td>
                         <td dir="ltr"><strong><?= e($a['domain'] ?? '—') ?></strong></td>
-                        <td><?= e($a['provider'] ?? '—') ?></td>
-                        <td dir="ltr"><?= e($a['expiry_date'] ?? '—') ?></td>
+                        <td><bdi><?= e($a['provider'] ?? '—') ?></bdi></td>
+                        <td dir="ltr"><?= e(fmt_date($a['expiry_date'] ?? null) ?: '—') ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

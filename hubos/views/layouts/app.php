@@ -11,9 +11,10 @@ use HubOS\Core\Str;
  * @var \HubOS\Core\Context $ctx
  */
 $active = $active ?? '';
+$isClientViewer = ($user['role'] ?? '') === 'client_viewer';
 $nav = [
     ['key' => 'dashboard', 'href' => '/dashboard',      'label' => 'לוח בקרה',        'icon' => '◆', 'perm' => 'dashboard.view'],
-    ['key' => 'clients',   'href' => '/clients',        'label' => 'לקוחות',          'icon' => '◎', 'perm' => 'clients.view'],
+    ['key' => 'clients',   'href' => ($isClientViewer && !empty($user['client_id'])) ? '/clients/' . (int) $user['client_id'] : '/clients', 'label' => $isClientViewer ? 'תיק לקוח' : 'לקוחות', 'icon' => '◎', 'perm' => 'clients.view'],
     ['key' => 'time',      'href' => '/time',           'label' => 'שעות',            'icon' => '◷', 'perm' => 'time.view'],
     ['key' => 'tasks',     'href' => '/tasks',          'label' => 'משימות',          'icon' => '☑', 'perm' => 'work.view'],
     ['key' => 'projects',  'href' => '/projects',       'label' => 'פרויקטים',        'icon' => '▣', 'perm' => 'work.view'],
@@ -40,8 +41,8 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&amp;display=swap">
-    <link rel="stylesheet" href="/assets/app.css?v=4">
-    <script src="/assets/timer.js?v=3" defer></script>
+    <link rel="stylesheet" href="/assets/app.css?v=8">
+    <script src="/assets/timer.js?v=5" defer></script>
 </head>
 <body class="app-body">
 <div class="app-shell">
@@ -62,7 +63,11 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
             <?php endforeach; ?>
         </nav>
         <div class="sidebar-foot">
-            <span class="phase-pill">M6 · הפעלה מלאה</span>
+            <?php if ($isClientViewer): ?>
+                <span class="portal-pill">🔒 פורטל לקוח מאובטח</span>
+            <?php else: ?>
+                <span class="phase-pill">OS HUB · סביבת ייצור</span>
+            <?php endif; ?>
         </div>
     </aside>
 
@@ -100,7 +105,7 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
                         </select>
                         <select name="task_id" id="timer-task-select" data-role="task-select" aria-label="משימה (רשות)">
                             <option value="">משימה (רשות)</option>
-                            <?php foreach ($timerBox['tasks'] as $tt): ?><option value="<?= e((int) $tt['id']) ?>" data-client="<?= e((int) $tt['client_id']) ?>"><?= e($tt['title']) ?></option><?php endforeach; ?>
+                            <?php foreach ($timerBox['tasks'] as $tt): ?><option value="<?= e((int) $tt['id']) ?>" data-client="<?= e((int) $tt['client_id']) ?>" data-client-name="<?= e($tt['client_name'] ?? '') ?>"><?= e($tt['title']) ?></option><?php endforeach; ?>
                         </select>
                         <button type="submit" class="btn btn-primary btn-sm" id="timer-start">▶ טיימר</button>
                     </form>

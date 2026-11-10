@@ -47,13 +47,13 @@ $err = static fn (string $k): string => isset($errors[$k]) ? '<small class="fiel
     <?php endif; ?>
     <?php if ($projects === []): ?><p class="empty">אין פרויקטים.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="projects-list">
-        <thead><tr><th scope="col">פרויקט</th><th scope="col">לקוח</th><th scope="col">סטטוס</th><th scope="col">משימות</th><?php if ($internal): ?><th scope="col">נראות</th><th scope="col"></th><?php endif; ?></tr></thead>
+        <thead><tr><th scope="col">פרויקט</th><?php if ($internal): ?><th scope="col">לקוח</th><?php endif; ?><th scope="col">סטטוס</th><th scope="col">משימות</th><?php if ($internal): ?><th scope="col">נראות</th><th scope="col"></th><?php endif; ?></tr></thead>
         <tbody>
         <?php foreach ($projects as $p): ?>
             <tr id="project-<?= e((int) $p['id']) ?>">
-                <td class="strong"><a href="/projects/<?= e((int) $p['id']) ?>"><?= e($p['name']) ?></a></td>
-                <td><?php if ($p['client_id'] !== null): ?><a class="client-link" href="/clients/<?= e((int) $p['client_id']) ?>?tab=work"><?= e($p['client_name'] ?? '') ?></a><?php else: ?><span class="level level-warn80">ממתין לשיוך</span><?php endif; ?></td>
-                <td><?= e(ProjectService::STATUSES[$p['status']] ?? $p['status']) ?></td>
+                <td class="strong"><a href="/projects/<?= e((int) $p['id']) ?>"><?= fmt_inline_bidi((string) $p['name']) ?></a></td>
+                <?php if ($internal): ?><td><?php if ($p['client_id'] !== null): ?><a class="client-link" href="/clients/<?= e((int) $p['client_id']) ?>?tab=work"><?= e($p['client_name'] ?? '') ?></a><?php else: ?><span class="level level-warn80">ממתין לשיוך</span><?php endif; ?></td><?php endif; ?>
+                <td><span class="pstatus pstatus-<?= e((string) $p['status']) ?>"><?= e(ProjectService::STATUSES[$p['status']] ?? $p['status']) ?></span></td>
                 <td><?= e((int) $p['task_count']) ?></td>
                 <?php if ($internal): ?>
                 <td><?= (int) $p['client_visible'] === 1 ? '<span class="visible-flag">גלוי ללקוח</span>' : '<span class="muted">פנימי</span>' ?></td>

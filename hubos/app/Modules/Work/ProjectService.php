@@ -30,7 +30,8 @@ final class ProjectService
         $this->perms->authorize($user, 'work.view');
         $where = ['p.tenant_id = :tenant_id'];
         $params = [];
-        if (($user['role'] ?? '') === 'client_viewer') {
+        $viewer = ($user['role'] ?? '') === 'client_viewer';
+        if ($viewer) {
             $where[] = 'p.client_id = :vcid AND p.client_visible = 1 AND p.archived_at IS NULL';
             $params['vcid'] = $user['client_id'] !== null ? (int) $user['client_id'] : -1;
         } else {
@@ -45,10 +46,11 @@ final class ProjectService
             $where[] = 'p.status = :st';
             $params['st'] = $status;
         }
+        $taskCond = $viewer ? ' AND t.client_visible = 1' : '';
         return $this->tenant->select(
             "SELECT p.id, p.client_id, p.name, p.description, p.status, p.client_visible, p.archived_at, p.created_at, p.updated_at,
                     c.name AS client_name,
-                    (SELECT COUNT(*) FROM tasks t WHERE t.tenant_id = p.tenant_id AND t.project_id = p.id AND t.archived_at IS NULL) AS task_count
+                    (SELECT COUNT(*) FROM tasks t WHERE t.tenant_id = p.tenant_id AND t.project_id = p.id AND t.archived_at IS NULL{$taskCond}) AS task_count
                FROM projects p
           LEFT JOIN clients c ON c.tenant_id = p.tenant_id AND c.id = p.client_id
               WHERE " . implode(' AND ', $where) . "
@@ -145,7 +147,7 @@ final class ProjectService
         if (!isset(self::STATUSES[$status])) {
             $errors['status'] = 'סטטוס לא תקין';
         }
-        $description = trim(is_string($input['description'] ?? null) ? $input['description'] : '');
+        $description = trim(str_replace(["\\r\\n", "\\n"], "\n", is_string($input['description'] ?? null) ? $input['description'] : ''));
         if (Str::len($description) > 5000) {
             $errors['description'] = 'תיאור ארוך מדי';
         }
