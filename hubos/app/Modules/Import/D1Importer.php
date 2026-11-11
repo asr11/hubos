@@ -1035,7 +1035,7 @@ final class D1Importer
                 'provider'    => self::s($d['serverProvider'] ?? null) ?? self::s($d['provider'] ?? null) ?? self::s($d['platform'] ?? null) ?? self::s($d['registrar'] ?? null),
                 'ip_address'  => $ip,
                 'expiry_date' => $expiry,
-                'status'      => self::s($d['status'] ?? null),
+                'status'      => self::s($d['status'] ?? null) ?? 'active',
                 'notes'       => self::s($d['notes'] ?? null),
                 'link_method' => $method,
                 'data_json'   => self::json($d + ($entry['merged'] !== [] ? ['merged' => $entry['merged']] : [])),

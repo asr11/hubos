@@ -264,10 +264,23 @@ $prov = $provenance ?? null;
                                         <span class="muted">—</span>
                                     <?php endif; ?>
                                 </td>
-                                <td dir="ltr"><?= e($a['expiry_date'] ?? '—') ?></td>
+                                <?php
+                                $isSslOnlyAlert = !in_array($a['expiry_state'], ['expired', '30d', '60d'], true)
+                                    && in_array($a['ssl_state'] ?? '', ['expired', '30d'], true);
+                                $alertDate = $isSslOnlyAlert
+                                    ? ($a['ssl_expiry_date'] ?? $a['expiry_date'] ?? '—')
+                                    : ($a['expiry_date'] ?? '—');
+                                $alertLabel = $isSslOnlyAlert
+                                    ? (($a['ssl_state'] ?? '') === 'expired' ? 'SSL פג תוקף' : 'SSL מתחדש בקרוב')
+                                    : $a['expiry_label'];
+                                $isDanger = $a['expiry_state'] === 'expired'
+                                    || ($a['expiry_level'] ?? '') === 'danger'
+                                    || ($a['ssl_state'] ?? '') === 'expired';
+                                ?>
+                                <td dir="ltr"><?= e($alertDate) ?></td>
                                 <td>
-                                    <span class="pill <?= $a['expiry_state'] === 'expired' ? 'pill-danger' : 'pill-warn' ?>">
-                                        <?= e($a['expiry_label']) ?>
+                                    <span class="pill <?= $isDanger ? 'pill-danger' : 'pill-warn' ?>">
+                                        <?= e($alertLabel) ?>
                                     </span>
                                 </td>
                             </tr>

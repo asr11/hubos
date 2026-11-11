@@ -709,4 +709,20 @@ select[data-role="task-select"] option {
     .task-main-title { font-size: 1.25rem; }
 }
 
-
+/* Assets 9-column table clean fit on standard 1440px desktop */
+#assets-list-table th,
+#assets-list-table td {
+    padding: 0.6rem 0.5rem;
+    font-size: 0.88rem;
+}
+#assets-list-table td:nth-child(4) {
+    max-width: 195px;
+    line-height: 1.35;
+}
+#assets-list-table td:last-child {
+    white-space: nowrap;
+}
+#assets-list-table td:last-child .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}

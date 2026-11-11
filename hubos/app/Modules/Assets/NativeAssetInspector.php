@@ -206,7 +206,8 @@ final class NativeAssetInspector implements AssetInspector
                 return [null, null];
             }
             stream_set_timeout($fp, $this->timeoutSeconds);
-            fwrite($fp, $host . "\r\n");
+            $query = $server === 'whois.verisign-grs.com' ? 'domain ' . $host : $host;
+            fwrite($fp, $query . "\r\n");
             $raw = '';
             while (!feof($fp) && strlen($raw) < 32768) {
                 $chunk = fread($fp, 2048);
