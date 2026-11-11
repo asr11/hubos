@@ -174,6 +174,43 @@ final class TaskService
     }
 
     /**
+     * Fast single-field status transition for 1-click table actions.
+     *
+     * @param array<string, mixed> $user
+     * @return array{id:int, status:string, status_label:string}
+     */
+    public function setStatus(array $user, int $id, string $status): array
+    {
+        $this->perms->authorize($user, 'work.update');
+        $before = $this->tenant->find('tasks', $id);
+        if ($before === null) {
+            throw new HttpException(404, 'המשימה לא נמצאה');
+        }
+        $norm = self::statusKey(trim($status));
+        if (!isset(self::STATUSES[$norm])) {
+            throw new ValidationException(['status' => 'סטטוס לא תקין']);
+        }
+        $prevNorm = self::statusKey((string) ($before['status'] ?? 'todo'));
+        if ($prevNorm !== $norm || (string) ($before['status'] ?? '') !== $norm) {
+            $now = gmdate('Y-m-d\TH:i:s\Z');
+            $this->tenant->transaction(function (Tenant $t) use ($user, $id, $before, $norm, $now): void {
+                $t->update('tasks', $id, ['status' => $norm, 'updated_at' => $now]);
+                Events::record(
+                    $t,
+                    (int) $user['id'],
+                    'task',
+                    $id,
+                    $before['client_id'] !== null ? (int) $before['client_id'] : null,
+                    'task.status_changed',
+                    ['status' => $before['status']],
+                    ['status' => $norm]
+                );
+            });
+        }
+        return ['id' => $id, 'status' => $norm, 'status_label' => self::STATUSES[$norm]];
+    }
+
+    /**
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */

@@ -64,9 +64,7 @@ $completedDate = ($sk === 'done' && empty($task['due_at']) && !empty($task['upda
             <div class="task-meta-item">
                 <span class="task-meta-label">סטטוס ביצוע</span>
                 <div class="task-meta-value">
-                    <span class="tstatus-lg tstatus-<?= e($sk) ?>">
-                        <?= $sk === 'done' ? '✓ ' : '' ?><?= e(TaskService::STATUSES[$sk] ?? $task['status']) ?>
-                    </span>
+                    <?php $taskId = $id; $rawStatus = (string) $task['status']; $canEditStatus = $internal && $canUpdate && $task['archived_at'] === null; $returnPath = '/tasks/' . $id; $largePill = true; include __DIR__ . '/_status_toggle.php'; ?>
                 </div>
             </div>
 

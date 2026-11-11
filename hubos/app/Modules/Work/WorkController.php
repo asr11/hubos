@@ -53,10 +53,33 @@ final class WorkController
         return Response::redirect('/tasks/' . $id);
     }
 
+    public function setTaskStatus(Context $ctx, array $params): Response
+    {
+        $id = (int) $params['id'];
+        try {
+            $res = (new TaskService($ctx->tenant(), $ctx->permissions()))->setStatus($ctx->requireUser(), $id, $ctx->input('status'));
+        } catch (ValidationException $e) {
+            if ($this->wantsJson()) {
+                return Response::json(['ok' => false, 'errors' => $e->errors], 422);
+            }
+            $ctx->flashError(implode(' · ', $e->errors));
+            return Response::redirect($this->back($ctx, '/tasks'));
+        }
+        if ($this->wantsJson()) {
+            return Response::json(['ok' => true] + $res);
+        }
+        $ctx->flash('סטטוס משימה #' . $res['id'] . ' עודכן ל' . $res['status_label']);
+        return Response::redirect($this->back($ctx, '/tasks'));
+    }
+
     public function archiveTask(Context $ctx, array $params): Response
     {
+        $id = (int) $params['id'];
         $archive = $ctx->input('archive') !== '0';
-        (new TaskService($ctx->tenant(), $ctx->permissions()))->setArchived($ctx->requireUser(), (int) $params['id'], $archive);
+        (new TaskService($ctx->tenant(), $ctx->permissions()))->setArchived($ctx->requireUser(), $id, $archive);
+        if ($this->wantsJson()) {
+            return Response::json(['ok' => true, 'type' => 'task', 'id' => $id, 'archived' => $archive]);
+        }
         $ctx->flash($archive ? 'המשימה הועברה לארכיון' : 'המשימה הוחזרה מהארכיון');
         return Response::redirect($this->back($ctx, '/tasks'));
     }
@@ -102,8 +125,12 @@ final class WorkController
 
     public function archiveProject(Context $ctx, array $params): Response
     {
+        $id = (int) $params['id'];
         $archive = $ctx->input('archive') !== '0';
-        (new ProjectService($ctx->tenant(), $ctx->permissions()))->setArchived($ctx->requireUser(), (int) $params['id'], $archive);
+        (new ProjectService($ctx->tenant(), $ctx->permissions()))->setArchived($ctx->requireUser(), $id, $archive);
+        if ($this->wantsJson()) {
+            return Response::json(['ok' => true, 'type' => 'project', 'id' => $id, 'archived' => $archive]);
+        }
         $ctx->flash($archive ? 'הפרויקט הועבר לארכיון' : 'הפרויקט הוחזר מהארכיון');
         return Response::redirect($this->back($ctx, '/projects'));
     }
@@ -113,22 +140,40 @@ final class WorkController
     public function linking(Context $ctx): Response
     {
         $queue = (new LinkingService($ctx->tenant(), $ctx->permissions()))->queue($ctx->requireUser());
+        $clients = $ctx->tenant()->select("SELECT id, name, domain FROM clients WHERE tenant_id = :tenant_id AND status <> 'archived' ORDER BY name LIMIT 1000");
+        $hubClient = null;
+        foreach ($clients as $c) {
+            if (str_starts_with((string) $c['name'], 'האב מערכות מתקדמות')) {
+                $hubClient = $c;
+                break;
+            }
+        }
         return $ctx->render('work/linking', [
-            'title'   => 'ממתין לשיוך ללקוח',
-            'active'  => 'linking',
-            'queue'   => $queue,
-            'clients' => $ctx->tenant()->select('SELECT id, name, domain FROM clients WHERE tenant_id = :tenant_id ORDER BY name LIMIT 1000'),
+            'title'      => 'ממתין לשיוך ללקוח',
+            'active'     => 'linking',
+            'queue'      => $queue,
+            'clients'    => $clients,
+            'hubClient'  => $hubClient,
+            'canArchive' => $ctx->can('work.archive'),
         ]);
     }
 
     public function link(Context $ctx, array $params): Response
     {
-        $clientId = WorkRefs::intOrNull($ctx->input('client_id'));
+        $svc = new LinkingService($ctx->tenant(), $ctx->permissions());
+        $rawRef = $ctx->input('client_id') !== '' ? $ctx->input('client_id') : $ctx->input('client_ref');
+        $clientId = $svc->resolveClientId($rawRef);
         if ($clientId === null) {
+            if ($this->wantsJson()) {
+                return Response::json(['ok' => false, 'error' => 'יש לבחור לקוח תקין לשיוך'], 422);
+            }
             $ctx->flashError('יש לבחור לקוח לשיוך');
             return Response::redirect('/work/linking');
         }
-        (new LinkingService($ctx->tenant(), $ctx->permissions()))->link($ctx->requireUser(), (string) $params['type'], (int) $params['id'], $clientId);
+        $svc->link($ctx->requireUser(), (string) $params['type'], (int) $params['id'], $clientId);
+        if ($this->wantsJson()) {
+            return Response::json(['ok' => true, 'type' => (string) $params['type'], 'id' => (int) $params['id'], 'client_id' => $clientId]);
+        }
         $ctx->flash(($params['type'] === 'task' ? 'המשימה' : 'הפרויקט') . ' #' . (int) $params['id'] . ' שויך ללקוח ונרשם ביומן האירועים');
         return Response::redirect('/work/linking');
     }
@@ -274,13 +319,19 @@ final class WorkController
             return ['clients' => [], 'projectsList' => [], 'users' => [], 'canCreate' => false, 'canUpdate' => false, 'canArchive' => false];
         }
         return [
-            'clients'      => $ctx->tenant()->select('SELECT id, name FROM clients WHERE tenant_id = :tenant_id ORDER BY name LIMIT 1000'),
+            'clients'      => $ctx->tenant()->select("SELECT id, name FROM clients WHERE tenant_id = :tenant_id AND status <> 'archived' ORDER BY name LIMIT 1000"),
             'projectsList' => $ctx->tenant()->select('SELECT id, name, client_id FROM projects WHERE tenant_id = :tenant_id AND archived_at IS NULL AND client_id IS NOT NULL ORDER BY name LIMIT 1000'),
             'users'        => $ctx->tenant()->select("SELECT id, name FROM users WHERE tenant_id = :tenant_id AND role <> 'client_viewer' AND status = 'active' ORDER BY name"),
             'canCreate'    => $ctx->can('work.create'),
             'canUpdate'    => $ctx->can('work.update'),
             'canArchive'   => $ctx->can('work.archive'),
         ];
+    }
+
+    private function wantsJson(): bool
+    {
+        $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+        return str_contains($accept, 'application/json') || ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
     }
 
     /**

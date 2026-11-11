@@ -1603,6 +1603,60 @@ test('daily care cli: shabbat guard, hot backup, mock asset refresh & dashboard 
     }
 });
 
+test('fast work UX: 1-click task status toggle, viewer read-only guard, and smart linking resolution', function (): void {
+    $r = new Router();
+    (require HUBOS_ROOT . '/app/routes.php')($r);
+    $m = $r->match('POST', '/tasks/42/status');
+    eq(200, $m['status'], 'POST /tasks/{id}/status route registered');
+    eq('work.update', $m['opts']['perm'] ?? null, 'POST /tasks/{id}/status requires work.update');
+
+    $w = workWorld();
+    $taskSvc = new TaskService($w['ta'], $w['perms']);
+    $tid = $taskSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'title' => 'ZZ_FastToggle', 'client_visible' => '1']);
+
+    $res1 = $taskSvc->setStatus($w['staff'], $tid, 'doing');
+    eq('doing', $res1['status'], 'staff transitions task to doing in 1 step');
+    eq('בתהליך', $res1['status_label']);
+    eq('doing', $taskSvc->get($w['ownerA'], $tid)['status']);
+    eq(1, $w['ta']->count('events', ['action' => 'task.status_changed', 'entity_id' => $tid]), 'task.status_changed event recorded');
+
+    // Idempotent repeat does not spam duplicate event
+    $taskSvc->setStatus($w['staff'], $tid, 'doing');
+    eq(1, $w['ta']->count('events', ['action' => 'task.status_changed', 'entity_id' => $tid]), 'idempotent status click avoids duplicate audit event');
+
+    // Legacy alias normalization + strict viewer block
+    $res2 = $taskSvc->setStatus($w['ownerA'], $tid, 'done');
+    eq('done', $res2['status']);
+    eq(403, throws(fn () => $taskSvc->setStatus($w['viewer'], $tid, 'todo'), HttpException::class)->status, 'client_viewer strictly blocked from setStatus');
+    throws(fn () => $taskSvc->setStatus($w['ownerA'], $tid, 'bogus'), ValidationException::class);
+
+    // Smart LinkingService: description scan + partial Hebrew keyword + resolveClientId formats
+    $yonaId = $w['ta']->insert('clients', ['name' => 'רחמים רם - מסעדת יונה', 'status' => 'active']);
+    $frediId = $w['ta']->insert('clients', ['name' => 'פרדי תעשיות רהיטים בע"מ', 'domain' => 'fredi-f.co.il', 'status' => 'active']);
+    $unlinkedTask = $w['ta']->insert('tasks', [
+        'client_id'   => null,
+        'title'       => 'להעביר את הדומיינים לספק חדש',
+        'description' => 'יש להעביר את הדומיינים של פרדי רהיטים לספק חדש',
+        'status'      => 'todo',
+    ]);
+    $unlinkedProj = $w['ta']->insert('projects', [
+        'client_id' => null,
+        'name'      => 'בניית אתר תדמית מסעדת יונה',
+        'status'    => 'active',
+    ]);
+
+    $linkSvc = new LinkingService($w['ta'], $w['perms']);
+    $q = $linkSvc->queue($w['ownerA']);
+    $tRow = array_values(array_filter($q['tasks'], fn ($x) => (int) $x['id'] === $unlinkedTask))[0] ?? null;
+    $pRow = array_values(array_filter($q['projects'], fn ($x) => (int) $x['id'] === $unlinkedProj))[0] ?? null;
+    ok($tRow !== null && ($tRow['suggestions'][0]['client_id'] ?? 0) === $frediId, 'LinkingService scans task description for partial client keyword');
+    ok($pRow !== null && ($pRow['suggestions'][0]['client_id'] ?? 0) === $yonaId, 'LinkingService matches partial distinctive client tokens on project');
+
+    eq($yonaId, $linkSvc->resolveClientId('#' . $yonaId . ' — רחמים רם - מסעדת יונה'), 'resolveClientId parses datalist #id — name format');
+    eq($frediId, $linkSvc->resolveClientId('פרדי תעשיות רהיטים בע"מ'), 'resolveClientId matches exact Hebrew client name');
+    eq(null, $linkSvc->resolveClientId('לא קיים בכלל'), 'resolveClientId rejects unknown string');
+});
+
 // ---------------------------------------------------------------- Run
 
 $pass = 0;

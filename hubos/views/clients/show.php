@@ -259,18 +259,19 @@ $origin = static function (array $row) use ($familyRolled): string {
     <?php endif; ?>
     <h3>משימות (<?= e(count($card['tasks'])) ?>)</h3>
     <?php if ($card['tasks'] === []): ?><p class="empty">אין משימות.</p><?php else: ?>
+    <?php $canEditClientTasks = !empty($canUpdateTask); ?>
     <div class="table-wrap"><table class="table" id="tasks-table">
         <thead><tr><th scope="col">משימה</th><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">עדיפות</th><?php if ($card['internal']): ?><th scope="col">נראות</th><?php endif; ?><th scope="col">יעד</th><?php if ($familyRolled): ?><th scope="col">לקוח</th><?php endif; ?><?php if ($canTrack): ?><th scope="col"></th><?php endif; ?></tr></thead>
         <tbody><?php foreach ($card['tasks'] as $t): $sk = \HubOS\Modules\Work\TaskService::statusKey((string) $t['status']); ?>
-            <tr class="work-task" id="work-task-<?= e((int) $t['id']) ?>"><td class="strong"><a href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a></td>
+            <tr class="work-task<?= $sk === 'done' ? ' is-task-done' : '' ?>" id="work-task-<?= e((int) $t['id']) ?>"><td class="strong"><a href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a></td>
                 <td><?php if (!empty($t['project_id'])): ?><a class="client-link" href="/projects/<?= e((int) $t['project_id']) ?>"><?= fmt_inline_bidi((string) ($t['project_name'] ?? '')) ?></a><?php else: ?><?= fmt_inline_bidi((string) ($t['project_name'] ?? '')) ?><?php endif; ?></td>
-                <td><span class="tstatus tstatus-<?= e($sk) ?>"><?= e($taskStatus[$t['status']] ?? $t['status']) ?></span></td>
+                <td class="status-cell"><?php $taskId = (int) $t['id']; $rawStatus = (string) $t['status']; $canEditStatus = $canEditClientTasks; $returnPath = '/clients/' . $id . '?tab=work'; $largePill = false; include dirname(__DIR__) . '/work/_status_toggle.php'; ?></td>
                 <td><?= e($priorityLabels[$t['priority'] ?? 'normal'] ?? '') ?></td>
                 <?php if ($card['internal']): ?><td><?= (int) ($t['client_visible'] ?? 0) === 1 ? '<span class="visible-flag">גלוי ללקוח</span>' : '<span class="muted">פנימי</span>' ?></td><?php endif; ?>
                 <td><?= e(fmt_date($t['due_at'] ?? null)) ?></td><?php if ($familyRolled): ?><td><?= $origin($t) ?></td><?php endif; ?>
                 <?php if ($canTrack): ?><td><?php if ($timer === null && $t['client_id'] !== null): ?><form method="post" action="/timer/start" class="inline-form"><?= Csrf::field() ?>
                     <input type="hidden" name="task_id" value="<?= e((int) $t['id']) ?>"><input type="hidden" name="_return" value="/clients/<?= e($id) ?>?tab=work">
-                    <button type="submit" class="btn btn-ghost btn-sm" title="טיימר על המשימה">▶</button></form><?php endif; ?></td><?php endif; ?></tr>
+                    <button type="submit" class="btn btn-ghost btn-sm" title="טיימר על המשימה" aria-label="הפעלת טיימר על משימה #<?= e((int) $t['id']) ?>">▶</button></form><?php endif; ?></td><?php endif; ?></tr>
         <?php endforeach; ?></tbody>
     </table></div>
     <?php endif; ?>

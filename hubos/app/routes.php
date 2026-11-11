@@ -51,6 +51,7 @@ return static function (Router $r): void {
     $r->post('/tasks', [WorkController::class, 'storeTask'], ['auth' => true, 'perm' => 'work.create']);
     $r->get('/tasks/{id:\d+}', [WorkController::class, 'showTask'], ['auth' => true, 'perm' => 'work.view']);
     $r->post('/tasks/{id:\d+}', [WorkController::class, 'updateTask'], ['auth' => true, 'perm' => 'work.update']);
+    $r->post('/tasks/{id:\d+}/status', [WorkController::class, 'setTaskStatus'], ['auth' => true, 'perm' => 'work.update']);
     $r->post('/tasks/{id:\d+}/archive', [WorkController::class, 'archiveTask'], ['auth' => true, 'perm' => 'work.archive']);
     $r->get('/projects', [WorkController::class, 'projects'], ['auth' => true, 'perm' => 'work.view']);
     $r->post('/projects', [WorkController::class, 'storeProject'], ['auth' => true, 'perm' => 'work.create']);

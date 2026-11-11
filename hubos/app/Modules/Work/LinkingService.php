@@ -19,7 +19,13 @@ use HubOS\Core\Tenant;
 final class LinkingService
 {
     /** Words that say nothing about which client it is. */
-    private const STOPWORDS = ['בעמ', 'בע', 'מ', 'ltd', 'inc', 'co', 'il', 'com', 'org', 'net', 'www', 'קבוצת', 'חברת', 'group', 'the', 'של', 'עם', 'את'];
+    private const STOPWORDS = [
+        'בעמ', 'בע', 'מ', 'ltd', 'inc', 'co', 'il', 'com', 'org', 'net', 'www',
+        'קבוצת', 'חברת', 'group', 'the', 'של', 'עם', 'את', 'על', 'כל', 'או',
+        'אתר', 'בניית', 'שדרוג', 'קידום', 'תדמית', 'מערכת', 'פגישה', 'בדיקה',
+        'טיפול', 'חדש', 'חדשה', 'פרויקט', 'פרוייקט', 'ניהול', 'לקוח', 'דומיין',
+        'דומיינים', 'חיפה', 'קריות', 'ישראל', 'פתרונות', 'שירותי', 'מתקדמות', 'תעשיות',
+    ];
 
     public function __construct(private Tenant $tenant, private Permissions $perms)
     {
@@ -39,17 +45,40 @@ final class LinkingService
               WHERE t.tenant_id = :tenant_id AND t.client_id IS NULL AND t.archived_at IS NULL ORDER BY t.id'
         );
         foreach ($tasks as &$t) {
-            $t['suggestions'] = self::suggest((string) $t['title'] . ' ' . (string) ($t['project_name'] ?? ''), $candidates);
+            $blob = (string) $t['title'] . ' ' . (string) ($t['description'] ?? '') . ' ' . (string) ($t['project_name'] ?? '');
+            $t['suggestions'] = self::suggest($blob, $candidates);
         }
         unset($t);
         $projects = $this->tenant->select(
-            'SELECT id, name, status, created_at FROM projects WHERE tenant_id = :tenant_id AND client_id IS NULL AND archived_at IS NULL ORDER BY id'
+            'SELECT id, name, description, status, created_at FROM projects WHERE tenant_id = :tenant_id AND client_id IS NULL AND archived_at IS NULL ORDER BY id'
         );
         foreach ($projects as &$p) {
-            $p['suggestions'] = self::suggest((string) $p['name'], $candidates);
+            $p['suggestions'] = self::suggest((string) $p['name'] . ' ' . (string) ($p['description'] ?? ''), $candidates);
         }
         unset($p);
         return ['tasks' => $tasks, 'projects' => $projects];
+    }
+
+    /**
+     * Resolve a raw client input ("213", "#213 — שם לקוח", or exact client name) into a valid client_id.
+     */
+    public function resolveClientId(string $raw): ?int
+    {
+        $clean = trim($raw);
+        if ($clean === '') {
+            return null;
+        }
+        if (ctype_digit($clean)) {
+            return (int) $clean > 0 ? (int) $clean : null;
+        }
+        if (preg_match('/^#?(\d+)\s*[—\-·:]/u', $clean, $m) === 1 || preg_match('/\(#?(\d+)\)\s*$/u', $clean, $m) === 1) {
+            return (int) $m[1] > 0 ? (int) $m[1] : null;
+        }
+        $rows = $this->tenant->select(
+            "SELECT id FROM clients WHERE tenant_id = :tenant_id AND status <> 'archived' AND name = :n LIMIT 2",
+            ['n' => $clean]
+        );
+        return count($rows) === 1 ? (int) $rows[0]['id'] : null;
     }
 
     /**
@@ -78,7 +107,7 @@ final class LinkingService
                 throw new HttpException(422, 'הלקוח לא נמצא');
             }
             $suggested = array_map(static fn (array $s): int => $s['client_id'],
-                self::suggest((string) ($row['title'] ?? $row['name'] ?? ''), $this->candidates()));
+                self::suggest((string) ($row['title'] ?? $row['name'] ?? '') . ' ' . (string) ($row['description'] ?? ''), $this->candidates()));
             $t->update($table, $id, ['client_id' => $clientId, 'updated_at' => gmdate('Y-m-d\TH:i:s\Z')]);
             Events::record($t, (int) $user['id'], $type, $id, $clientId, $type . '.linked',
                 ['client_id' => null],
@@ -125,22 +154,27 @@ final class LinkingService
                 } elseif (strlen($label) >= 3 && in_array($label, $labels, true)) {
                     [$best, $reason] = $best < 80 ? [80, 'שם דומיין דומה: ' . $cd] : [$best, $reason];
                 } elseif (strlen($label) >= 3 && in_array($label, $bare, true)) {
-                    [$best, $reason] = $best < 70 ? [70, 'שם הדומיין מופיע בכותרת: ' . $label] : [$best, $reason];
+                    [$best, $reason] = $best < 70 ? [70, 'שם הדומיין מופיע: ' . $label] : [$best, $reason];
                 }
             }
             $nameTokens = array_values(array_filter(HebrewText::tokens($c['name']),
-                static fn (string $t): bool => !in_array($t, self::STOPWORDS, true) && strlen($t) >= 2));
-            if ($best < 50 && $nameTokens !== [] && strlen(implode('', $nameTokens)) >= 3) {
-                $all = true;
+                static fn (string $t): bool => !in_array($t, self::STOPWORDS, true) && mb_strlen($t, 'UTF-8') >= 2));
+            if ($best < 50 && $nameTokens !== [] && mb_strlen(implode('', $nameTokens), 'UTF-8') >= 3) {
+                $matched = [];
                 foreach ($nameTokens as $nt) {
-                    if (!isset($wordSet[$nt])) {
-                        $all = false;
-                        break;
+                    if (isset($wordSet[$nt])) {
+                        $matched[] = $nt;
                     }
                 }
-                if ($all) {
+                if (count($matched) === count($nameTokens)) {
                     $best = 50 + min(count($nameTokens) * 5, 20);
                     $reason = 'שם הלקוח מופיע בכותרת';
+                } elseif ($matched !== []) {
+                    $strong = array_values(array_filter($matched, static fn (string $t): bool => mb_strlen($t, 'UTF-8') >= 3));
+                    if ($strong !== []) {
+                        $best = 35 + min(count($strong) * 8, 14);
+                        $reason = 'התאמת מילת מפתח: ' . implode(', ', $strong);
+                    }
                 }
             }
             if ($best > 0) {
@@ -155,10 +189,10 @@ final class LinkingService
     public function candidates(): array
     {
         $rows = [];
-        foreach ($this->tenant->select('SELECT id, name, domain FROM clients WHERE tenant_id = :tenant_id ORDER BY id') as $c) {
+        foreach ($this->tenant->select("SELECT id, name, domain FROM clients WHERE tenant_id = :tenant_id AND status <> 'archived' ORDER BY id") as $c) {
             $rows[(int) $c['id']] = ['id' => (int) $c['id'], 'name' => (string) $c['name'], 'domains' => self::normDomains([(string) ($c['domain'] ?? '')])];
         }
-        foreach ($this->tenant->select("SELECT client_id, domain FROM assets WHERE tenant_id = :tenant_id AND client_id IS NOT NULL AND domain IS NOT NULL AND domain <> ''") as $a) {
+        foreach ($this->tenant->select("SELECT client_id, domain FROM assets WHERE tenant_id = :tenant_id AND status <> 'archived' AND client_id IS NOT NULL AND domain IS NOT NULL AND domain <> ''") as $a) {
             $cid = (int) $a['client_id'];
             if (isset($rows[$cid])) {
                 $rows[$cid]['domains'] = array_values(array_unique([...$rows[$cid]['domains'], ...self::normDomains([(string) $a['domain']])]));

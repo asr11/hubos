@@ -39,13 +39,18 @@ $actionLabels = [
     'hours_bank.settings_updated'   => 'הגדרות בנק שעות עודכנו',
     'task.created'                  => 'משימה נוצרה',
     'task.updated'                  => 'משימה עודכנה',
+    'task.status_changed'           => 'סטטוס משימה עודכן',
     'task.archived'                 => 'משימה הועברה לארכיון',
     'task.restored'                 => 'משימה שוחזרה מארכיון',
+    'task.unarchived'               => 'משימה שוחזרה מארכיון',
     'task.client_linked'            => 'משימה שויכה ללקוח',
+    'task.linked'                   => 'משימה שויכה ללקוח',
     'project.created'               => 'פרויקט נוצר',
     'project.updated'               => 'פרויקט עודכן',
     'project.archived'              => 'פרויקט הועבר לארכיון',
+    'project.unarchived'            => 'פרויקט שוחזר מארכיון',
     'project.client_linked'         => 'פרויקט שויך ללקוח',
+    'project.linked'                => 'פרויקט שויך ללקוח',
     'recurring_template.created'    => 'תבנית תחזוקה נוצרה',
     'recurring.generated'           => 'משימת תחזוקה חודשית נוצרה',
     'asset.created'                 => 'נכס נוצר',
@@ -60,6 +65,7 @@ $actionLabels = [
     'system.daily_care_completed'   => 'תחזוקה יומית אוטומטית (גיבוי + SSL/WHOIS)',
     'system.hygiene_completed'      => 'ניקוי והשבחת נתוני מערכת',
     'system.assets_bulk_inspected'  => 'סריקת דומיינים ו-SSL רוחבית',
+    'system.work_linking_completed' => 'שיוך מרוכז של משימות ופרויקטים',
 ];
 $moduleLabels = Permissions::SWITCHABLE_MODULES;
 $overdueCount = count($urgent['overdue_tasks'] ?? []);
@@ -151,20 +157,22 @@ $care = $dailyCare ?? null;
             <?php if ($urgentTasks === []): ?>
                 <p class="empty">אין משימות באיחור או בעדיפות דחופה.</p>
             <?php else: ?>
+                <?php $canEditUrgent = $ctx->can('work.update'); ?>
                 <div class="table-wrap">
                     <table class="table" id="urgent-tasks-table">
                         <thead>
                             <tr>
                                 <th scope="col">משימה</th>
                                 <th scope="col">לקוח</th>
+                                <th scope="col">סטטוס</th>
                                 <th scope="col">עדיפות</th>
                                 <th scope="col">יעד</th>
                             </tr>
                         </thead>
                         <tbody>
                         <?php foreach ($urgentTasks as $t): ?>
-                            <tr>
-                                <td><a href="/tasks/<?= e((int) $t['id']) ?>"><strong><?= e($t['title']) ?></strong></a></td>
+                            <tr class="task-row">
+                                <td><a href="/tasks/<?= e((int) $t['id']) ?>"><strong><?= fmt_inline_bidi((string) $t['title']) ?></strong></a></td>
                                 <td>
                                     <?php if (!empty($t['client_id'])): ?>
                                         <a href="/clients/<?= e((int) $t['client_id']) ?>"><?= e($t['client_name'] ?? ('#' . (int) $t['client_id'])) ?></a>
@@ -172,6 +180,7 @@ $care = $dailyCare ?? null;
                                         <a href="/work/linking" class="pill pill-warn">ללא שיוך</a>
                                     <?php endif; ?>
                                 </td>
+                                <td class="status-cell"><?php $taskId = (int) $t['id']; $rawStatus = (string) ($t['status'] ?? 'todo'); $canEditStatus = $canEditUrgent; $returnPath = '/dashboard'; $largePill = false; include dirname(__DIR__) . '/work/_status_toggle.php'; ?></td>
                                 <td>
                                     <span class="pill <?= ($t['priority'] ?? '') === 'urgent' ? 'pill-danger' : 'pill-warn' ?>">
                                         <?= e(TaskService::PRIORITIES[$t['priority'] ?? 'normal'] ?? $t['priority']) ?>

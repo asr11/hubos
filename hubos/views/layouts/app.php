@@ -42,8 +42,8 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&amp;display=swap">
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-    <link rel="stylesheet" href="/assets/app.css?v=9">
-    <script src="/assets/timer.js?v=5" defer></script>
+    <link rel="stylesheet" href="/assets/app.css?v=10">
+    <script src="/assets/timer.js?v=6" defer></script>
 </head>
 <body class="app-body">
 <div class="app-shell">
@@ -137,5 +137,6 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
         </main>
     </div>
 </div>
+<div id="live-status-region" class="live-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>

@@ -77,6 +77,7 @@ final class ClientsController
             // M3/M4: live timer + work actions on the card (never for client_viewer)
             'canTrack'      => $card['internal'] && $ctx->can('time.track'),
             'canWork'       => $card['internal'] && $ctx->can('work.create'),
+            'canUpdateTask' => $card['internal'] && $ctx->can('work.update'),
             'timer'         => $card['internal'] && $ctx->can('time.track')
                 ? (new TimerService($ctx->tenant(), $ctx->permissions()))->current($user) : null,
         ]);

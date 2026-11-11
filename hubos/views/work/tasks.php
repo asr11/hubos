@@ -38,8 +38,9 @@ $archivedView = ($filters['archived'] ?? '') === '1';
         <span class="badge" id="tasks-count"><?= e(count($tasks)) ?></span>
     </div>
     <?php if ($internal): ?>
+    <search aria-label="סינון משימות">
     <form method="get" action="/tasks" class="form form-inline search-form" id="task-filter-form">
-        <label class="field"><span>חיפוש</span><input type="search" name="q" value="<?= e($filters['q'] ?? '') ?>" maxlength="100"></label>
+        <label class="field"><span>חיפוש</span><input type="search" name="q" value="<?= e($filters['q'] ?? '') ?>" maxlength="100" autocorrect="off" autocapitalize="none" spellcheck="false"></label>
         <label class="field"><span>סטטוס</span>
             <select name="status"><option value="">הכל</option>
                 <?php foreach (TaskService::STATUSES as $k => $label): ?><option value="<?= e($k) ?>" <?= ($filters['status'] ?? '') === $k ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
@@ -52,18 +53,24 @@ $archivedView = ($filters['archived'] ?? '') === '1';
             <select name="archived"><option value="">פעילות</option><option value="1" <?= $archivedView ? 'selected' : '' ?>>ארכיון</option></select></label>
         <button type="submit" class="btn btn-ghost">סינון</button>
     </form>
+    </search>
     <?php endif; ?>
     <?php if ($tasks === []): ?><p class="empty">אין משימות.</p><?php else: ?>
+    <?php
+    $returnQs = http_build_query(array_filter($filters, static fn ($v): bool => is_string($v) && $v !== ''));
+    $tasksReturnPath = '/tasks' . ($returnQs !== '' ? '?' . $returnQs : '');
+    $canEditTaskRows = $internal && !empty($canUpdate) && !$archivedView;
+    ?>
     <div class="table-wrap"><table class="table" id="tasks-list">
         <thead><tr><th scope="col">משימה</th><?php if ($internal): ?><th scope="col">לקוח</th><?php endif; ?><th scope="col">פרויקט</th><th scope="col">סטטוס</th><th scope="col">עדיפות</th><th scope="col">יעד</th>
             <?php if ($internal): ?><th scope="col">אחראי</th><th scope="col">נראות</th><th scope="col"></th><?php endif; ?></tr></thead>
         <tbody>
         <?php foreach ($tasks as $t): $sk = TaskService::statusKey((string) $t['status']); ?>
-            <tr class="task-row" id="task-<?= e((int) $t['id']) ?>">
+            <tr class="task-row<?= $sk === 'done' ? ' is-task-done' : '' ?>" id="task-<?= e((int) $t['id']) ?>">
                 <td class="strong"><a href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a></td>
                 <?php if ($internal): ?><td><?php if ($t['client_id'] !== null): ?><a class="client-link" href="/clients/<?= e((int) $t['client_id']) ?>?tab=work"><?= e($t['client_name'] ?? '') ?></a><?php else: ?><span class="level level-warn80">ממתין לשיוך</span><?php endif; ?></td><?php endif; ?>
                 <td><?php if (!empty($t['project_id'])): ?><a class="client-link" href="/projects/<?= e((int) $t['project_id']) ?>"><?= fmt_inline_bidi((string) ($t['project_name'] ?? '')) ?></a><?php else: ?><?= fmt_inline_bidi((string) ($t['project_name'] ?? '')) ?><?php endif; ?></td>
-                <td><span class="tstatus tstatus-<?= e($sk) ?>"><?= e(TaskService::STATUSES[$sk] ?? $t['status']) ?></span></td>
+                <td class="status-cell"><?php $taskId = (int) $t['id']; $rawStatus = (string) $t['status']; $canEditStatus = $canEditTaskRows; $returnPath = $tasksReturnPath; $largePill = false; include __DIR__ . '/_status_toggle.php'; ?></td>
                 <td><?= e(TaskService::PRIORITIES[$t['priority']] ?? $t['priority']) ?></td>
                 <td><?= e(fmt_date($t['due_at'] ?? null)) ?></td>
                 <?php if ($internal): ?>
@@ -72,12 +79,12 @@ $archivedView = ($filters['archived'] ?? '') === '1';
                 <td class="row-actions">
                     <?php if ($t['client_id'] !== null && $ctx->can('time.track')): ?>
                     <form method="post" action="/timer/start" class="inline-form"><?= Csrf::field() ?>
-                        <input type="hidden" name="task_id" value="<?= e((int) $t['id']) ?>"><input type="hidden" name="_return" value="/tasks">
-                        <button type="submit" class="btn btn-ghost btn-sm" title="הפעלת טיימר על המשימה">▶</button></form>
+                        <input type="hidden" name="task_id" value="<?= e((int) $t['id']) ?>"><input type="hidden" name="_return" value="<?= e($tasksReturnPath) ?>">
+                        <button type="submit" class="btn btn-ghost btn-sm" title="הפעלת טיימר על המשימה" aria-label="הפעלת טיימר על משימה #<?= e((int) $t['id']) ?>">▶</button></form>
                     <?php endif; ?>
                     <?php if ($canArchive): ?>
                     <form method="post" action="/tasks/<?= e((int) $t['id']) ?>/archive" class="inline-form"><?= Csrf::field() ?>
-                        <input type="hidden" name="archive" value="<?= $archivedView ? '0' : '1' ?>"><input type="hidden" name="_return" value="/tasks">
+                        <input type="hidden" name="archive" value="<?= $archivedView ? '0' : '1' ?>"><input type="hidden" name="_return" value="<?= e($tasksReturnPath) ?>">
                         <button type="submit" class="btn btn-ghost btn-sm"><?= $archivedView ? 'שחזור' : 'ארכיון' ?></button></form>
                     <?php endif; ?>
                 </td>

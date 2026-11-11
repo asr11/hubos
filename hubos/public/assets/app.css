@@ -726,3 +726,163 @@ select[data-role="task-select"] option {
     padding: 0.25rem 0.5rem;
     font-size: 0.8rem;
 }
+
+/* Canonical visually-hidden utility (WCAG / modern-web-guidance) */
+.visually-hidden {
+    position: absolute;
+    clip-path: inset(50%);
+    overflow: hidden;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    white-space: nowrap;
+}
+
+/* 1-Click Segmented Task Status Control */
+.inline-status-form {
+    display: inline-flex;
+    margin: 0;
+}
+.status-cell {
+    white-space: nowrap;
+}
+.status-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+}
+.status-seg-btn {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #64748b;
+    font-family: inherit;
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.2;
+    min-block-size: 25px;
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.status-seg-lg .status-seg-btn {
+    font-size: 0.84rem;
+    min-block-size: 30px;
+    padding: 0.24rem 0.72rem;
+}
+.status-seg-btn:hover:not(:disabled):not(.is-current) {
+    background: #ffffff;
+    color: #0f172a;
+}
+.status-seg-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+.status-seg-btn:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+.status-seg-btn.is-todo.is-current {
+    background: #ffffff;
+    color: #1e293b;
+    border-color: #cbd5e1;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.status-seg-btn.is-doing.is-current {
+    background: #ffedd5;
+    color: #9a3412;
+    border-color: #fdba74;
+    font-weight: 700;
+}
+.status-seg-btn.is-done.is-current {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+    font-weight: 700;
+}
+tr.is-task-done td.strong a {
+    color: #64748b;
+    text-decoration: line-through;
+    text-decoration-color: #cbd5e1;
+}
+
+/* Needs-Linking Queue Fast Actions */
+.link-id-cell {
+    white-space: nowrap;
+    width: 5.5rem;
+}
+.link-desc-snippet {
+    margin: 0.25rem 0 0;
+    line-height: 1.4;
+    max-width: 52ch;
+}
+.link-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+.btn-hub-internal {
+    border-color: #cbd5e1;
+    color: #334155;
+    background: #f8fafc;
+}
+.btn-hub-internal:hover {
+    border-color: var(--primary);
+    color: var(--primary-hover);
+    background: #fff7ed;
+}
+.link-manual-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+.link-client-input {
+    min-inline-size: 13.5rem;
+}
+.link-client-input[aria-invalid="true"] {
+    border-color: var(--danger, #dc2626);
+    background: #fef2f2;
+}
+
+/* Centralized Polite Live Toast */
+.live-toast {
+    position: fixed;
+    inset-block-end: 1.25rem;
+    inset-inline-start: 1.25rem;
+    z-index: 900;
+    padding: 0.55rem 1rem;
+    border-radius: 999px;
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid #334155;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.25);
+    font-size: 0.86rem;
+    font-weight: 700;
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.live-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.live-toast.is-error {
+    background: #991b1b;
+    border-color: #fca5a5;
+}
+@media (prefers-reduced-motion: reduce) {
+    .status-seg-btn, .live-toast { transition: none; }
+}
+

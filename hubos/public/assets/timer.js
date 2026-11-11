@@ -188,5 +188,144 @@
             if (tInput) { tInput.focus(); }
         }
     });
+
+    // Centralized polite status announcer & toast
+    var toastTimer = null;
+    function announceStatus(msg, isError) {
+        var region = document.getElementById('live-status-region');
+        if (!region) { return; }
+        region.textContent = msg;
+        region.classList.toggle('is-error', !!isError);
+        region.classList.add('is-visible');
+        if (toastTimer) { clearTimeout(toastTimer); }
+        toastTimer = setTimeout(function () {
+            region.classList.remove('is-visible');
+        }, 2400);
+    }
+
+    function refreshProjectProgress() {
+        var progText = document.getElementById('project-progress-text');
+        var progFill = document.getElementById('project-progress-fill');
+        var tbl = document.getElementById('project-tasks-table');
+        if (!progText || !progFill || !tbl) { return; }
+        var rows = tbl.querySelectorAll('tbody tr.task-row');
+        var total = rows.length;
+        if (!total) { return; }
+        var done = tbl.querySelectorAll('tbody tr.task-row.is-task-done').length;
+        var pct = Math.round((done / total) * 100);
+        progText.textContent = done + ' מתוך ' + total + ' הושלמו (' + pct + '%)';
+        var bucket = pct >= 95 ? 'w-100' : (pct >= 70 ? 'w-75' : (pct >= 60 ? 'w-67' : (pct >= 45 ? 'w-50' : (pct >= 30 ? 'w-33' : (pct > 0 ? 'w-25' : 'w-0')))));
+        progFill.className = 'project-progress-fill ' + bucket;
+    }
+
+    // Progressive enhancement: 1-click task status & 1-click linking queue
+    document.addEventListener('submit', function (ev) {
+        var form = ev.target;
+        if (!form || form.tagName !== 'FORM') { return; }
+
+        if (form.getAttribute('data-ajax-status') === '1') {
+            var submitter = ev.submitter;
+            if (!submitter || !submitter.name) { return; }
+            ev.preventDefault();
+            var fd = new FormData(form);
+            fd.set(submitter.name, submitter.value);
+
+            var btns = form.querySelectorAll('button[type="submit"]');
+            Array.prototype.forEach.call(btns, function (b) { b.disabled = true; });
+
+            fetch(form.action, {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
+            })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                Array.prototype.forEach.call(btns, function (b) { b.disabled = false; });
+                if (!res.ok || !res.body || !res.body.ok) {
+                    announceStatus('לא ניתן לעדכן סטטוס משימה', true);
+                    return;
+                }
+                var newSt = res.body.status;
+                Array.prototype.forEach.call(btns, function (b) {
+                    var active = b.value === newSt;
+                    b.classList.toggle('is-current', active);
+                    b.setAttribute('aria-pressed', active ? 'true' : 'false');
+                });
+                var tr = form.closest('tr');
+                if (tr) {
+                    tr.classList.toggle('is-task-done', newSt === 'done');
+                }
+                refreshProjectProgress();
+                announceStatus('✓ משימה #' + res.body.id + ' עודכנה ל' + res.body.status_label, false);
+            })
+            .catch(function () {
+                Array.prototype.forEach.call(btns, function (b) { b.disabled = false; });
+                HTMLFormElement.prototype.submit.call(form);
+            });
+            return;
+        }
+
+        if (form.getAttribute('data-ajax-link') === '1') {
+            ev.preventDefault();
+            var linkSub = ev.submitter;
+            var fdLink = new FormData(form);
+            if (linkSub && linkSub.name) {
+                fdLink.set(linkSub.name, linkSub.value);
+            }
+            var row = form.closest('tr.link-row');
+            var rowBtns = row ? row.querySelectorAll('button[type="submit"]') : form.querySelectorAll('button[type="submit"]');
+            Array.prototype.forEach.call(rowBtns, function (b) { b.disabled = true; });
+
+            fetch(form.action, {
+                method: 'POST',
+                body: fdLink,
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' }
+            })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (res) {
+                if (!res.ok || !res.body || !res.body.ok) {
+                    Array.prototype.forEach.call(rowBtns, function (b) { b.disabled = false; });
+                    announceStatus((res.body && res.body.error) ? res.body.error : 'יש לבחור לקוח תקין מהרשימה', true);
+                    var inp = form.querySelector('input[name="client_id"]');
+                    if (inp) { inp.setAttribute('aria-invalid', 'true'); inp.focus(); }
+                    return;
+                }
+                if (row) {
+                    var kind = row.getAttribute('data-link-kind') || 'task';
+                    var tbody = row.parentElement;
+                    row.parentElement.removeChild(row);
+                    var badge = document.getElementById(kind === 'project' ? 'link-projects-count' : 'link-tasks-count');
+                    if (badge) {
+                        var nextCount = Math.max(0, (parseInt(badge.textContent || '0', 10) || 0) - 1);
+                        badge.textContent = String(nextCount);
+                    }
+                    if (tbody && tbody.querySelectorAll('tr').length === 0) {
+                        var wrap = tbody.closest('.table-wrap');
+                        if (wrap) {
+                            var emptyP = document.createElement('p');
+                            emptyP.className = 'empty';
+                            emptyP.textContent = kind === 'project' ? 'כל הפרויקטים משויכים ✓' : 'כל המשימות משויכות ✓';
+                            wrap.parentElement.replaceChild(emptyP, wrap);
+                        }
+                    }
+                }
+                announceStatus(res.body.archived ? '✓ הפריט הועבר לארכיון' : '✓ הפריט שויך ללקוח ונרשם ביומן', false);
+            })
+            .catch(function () {
+                Array.prototype.forEach.call(rowBtns, function (b) { b.disabled = false; });
+                HTMLFormElement.prototype.submit.call(form);
+            });
+        }
+    });
+
+    // Clear aria-invalid on input per modern-web-guidance forms timing matrix
+    document.addEventListener('input', function (ev) {
+        if (ev.target && ev.target.hasAttribute && ev.target.hasAttribute('aria-invalid')) {
+            ev.target.removeAttribute('aria-invalid');
+        }
+    });
 }());
+
 

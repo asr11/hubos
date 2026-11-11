@@ -75,8 +75,8 @@ $widthBucket = match (true) {
         <div class="task-meta-item">
             <span class="task-meta-label">התקדמות ביצוע</span>
             <div class="project-progress-wrap">
-                <span class="task-meta-value"><?= e($doneTasks) ?> מתוך <?= e($totalTasks) ?> הושלמו (<?= e($pctDone) ?>%)</span>
-                <span class="project-progress-track" aria-hidden="true"><span class="project-progress-fill <?= e($widthBucket) ?>"></span></span>
+                <span class="task-meta-value" id="project-progress-text" data-total="<?= e($totalTasks) ?>"><?= e($doneTasks) ?> מתוך <?= e($totalTasks) ?> הושלמו (<?= e($pctDone) ?>%)</span>
+                <span class="project-progress-track" aria-hidden="true"><span class="project-progress-fill <?= e($widthBucket) ?>" id="project-progress-fill"></span></span>
             </div>
         </div>
     </div>
@@ -93,6 +93,7 @@ $widthBucket = match (true) {
         <?php if ($tasks === []): ?>
             <p class="task-desc-empty">אין משימות משויכות לפרויקט זה.</p>
         <?php else: ?>
+            <?php $canEditProjectTasks = $internal && $canUpdate && $project['archived_at'] === null; ?>
             <div class="table-wrap">
                 <table class="table" id="project-tasks-table">
                     <thead>
@@ -105,9 +106,9 @@ $widthBucket = match (true) {
                     </thead>
                     <tbody>
                     <?php foreach ($tasks as $t): $sk = TaskService::statusKey((string) $t['status']); ?>
-                        <tr>
+                        <tr class="task-row<?= $sk === 'done' ? ' is-task-done' : '' ?>" id="proj-task-<?= e((int) $t['id']) ?>">
                             <td class="strong"><a href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a></td>
-                            <td><span class="tstatus tstatus-<?= e($sk) ?>"><?= e(TaskService::STATUSES[$sk] ?? $t['status']) ?></span></td>
+                            <td class="status-cell"><?php $taskId = (int) $t['id']; $rawStatus = (string) $t['status']; $canEditStatus = $canEditProjectTasks; $returnPath = '/projects/' . $id; $largePill = false; include __DIR__ . '/_status_toggle.php'; ?></td>
                             <td><?= e(TaskService::PRIORITIES[$t['priority'] ?? 'normal'] ?? ($t['priority'] ?? '')) ?></td>
                             <td><?= e(fmt_date($t['due_at'] ?? null)) ?></td>
                         </tr>
