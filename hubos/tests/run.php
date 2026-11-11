@@ -1657,6 +1657,81 @@ test('fast work UX: 1-click task status toggle, viewer read-only guard, and smar
     eq(null, $linkSvc->resolveClientId('לא קיים בכלל'), 'resolveClientId rejects unknown string');
 });
 
+test('client status & hours print/PDF report: dining-room isolation, period filter, and RTL HTML', function (): void {
+    $r = new Router();
+    (require HUBOS_ROOT . '/app/routes.php')($r);
+    $m = $r->match('GET', '/clients/286/report');
+    eq(200, $m['status'], 'GET /clients/{id}/report route registered');
+    eq('clients.view', $m['opts']['perm'] ?? null, 'GET /clients/{id}/report requires clients.view');
+
+    $w = workWorld();
+    $taskSvc = new TaskService($w['ta'], $w['perms']);
+    $projSvc = new ProjectService($w['ta'], $w['perms']);
+    $timeSvc = new TimeEntryService($w['ta'], $w['perms']);
+    $assetSvc = new AssetService($w['ta'], $w['perms']);
+
+    $pid = $projSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'name' => 'ZZ_ReportProject', 'client_visible' => '1']);
+    $tVis = $taskSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'project_id' => (string) $pid, 'title' => 'ZZ_ClientVisibleTask', 'status' => 'done', 'client_visible' => '1', 'assignee_user_id' => (string) $w['ownerA']['id']]);
+    $taskSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'project_id' => (string) $pid, 'title' => 'ZZ_InternalSecretTask', 'status' => 'todo', 'client_visible' => '0']);
+
+    $w['ta']->update('hours_banks', $w['bank'], [
+        'rate'  => 350.0,
+        'notes' => 'ZZ_SecretBankRateNote',
+    ]);
+
+    $timeSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'task_id' => (string) $tVis, 'entry_date' => '2026-10-15', 'duration' => '2:00', 'description' => 'פיתוח אוקטובר']);
+    $timeSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'task_id' => (string) $tVis, 'entry_date' => '2026-11-05', 'duration' => '1:30', 'description' => 'ליטוש נובמבר']);
+    $assetSvc->create($w['ownerA'], ['client_id' => (string) $w['c'], 'kind' => 'domain', 'domain' => 'zz-report.co.il', 'ip_address' => '128.140.100.120', 'ssl_status' => 'valid', 'notes' => 'ZZ_InternalServerNote']);
+
+    $svc = new Client360Service($w['ta'], $w['perms']);
+    $now = new DateTimeImmutable('2026-11-11T12:00:00+02:00');
+
+    // 1. Foreign client strictly blocked for client_viewer (403)
+    eq(403, throws(fn () => $svc->buildReport($w['viewer'], $w['d'], 'all', 'client', $now), HttpException::class)->status, 'viewer blocked from foreign client report');
+
+    // 2. client_viewer attempting ?scope=internal is strictly forced into 'client' scope
+    $vRep = $svc->buildReport($w['viewer'], $w['c'], 'all', 'internal', $now);
+    eq('client', $vRep['scope'], 'client_viewer forced to client scope even if internal requested');
+    eq(false, $vRep['is_internal_actor']);
+    eq(0, $vRep['hidden_internal_tasks'], 'hidden_internal_tasks not leaked to client_viewer');
+    eq(1, count($vRep['tasks']), 'viewer report includes client_visible=1 tasks only');
+    eq('ZZ_ClientVisibleTask', $vRep['tasks'][0]['title']);
+    eq(null, $vRep['hours_banks'][0]['rate'], 'bank hourly rate stripped in client report');
+    eq(null, $vRep['assets'][0]['ip_address'], 'asset IP stripped in client report');
+    eq(null, $vRep['time_entries'][0]['user_id'], 'employee user_id stripped in client report');
+    eq(3.5, $vRep['time_summary']['period_hours'], 'all-period total equals 3.5h');
+
+    // 3. Period filter (?period=2026-10) filters entries accurately
+    $octRep = $svc->buildReport($w['viewer'], $w['c'], '2026-10', 'client', $now);
+    eq('2026-10', $octRep['selected_period']);
+    eq('אוקטובר 2026', $octRep['period_label']);
+    eq(1, count($octRep['time_entries']), 'October filter returns October entry only');
+    eq(2.0, $octRep['time_summary']['period_hours'], 'October period hours equals 2.0h');
+
+    // 4. Owner default scope is Dining-Room clean ('client') + exposes hidden_internal_tasks for toolbar; 'internal' includes internal tasks
+    $ownerClientRep = $svc->buildReport($w['ownerA'], $w['c'], 'all', 'client', $now);
+    eq('client', $ownerClientRep['scope']);
+    eq(1, $ownerClientRep['hidden_internal_tasks'], 'owner sees count of hidden internal tasks in toolbar metadata');
+    eq(1, count($ownerClientRep['tasks']), 'owner default client-scope report excludes internal tasks');
+
+    $ownerInternalRep = $svc->buildReport($w['ownerA'], $w['c'], 'all', 'internal', $now);
+    eq('internal', $ownerInternalRep['scope']);
+    eq(2, count($ownerInternalRep['tasks']), 'owner internal-scope report includes internal tasks');
+
+    // 5. Render full HTML with layouts/report and verify zero internal leaks
+    $html = (new View(HUBOS_ROOT . '/views'))->render('clients/report', [
+        'title'  => 'דוח סטטוס ושעות',
+        'appName'=> 'OS HUB',
+        'report' => $vRep,
+    ], 'layouts/report');
+    ok(str_contains($html, 'דוח סטטוס עבודה, שעות ונכסים דיגיטליים'), 'report heading rendered in Hebrew');
+    ok(str_contains($html, 'ZZ_ClientVisibleTask'), 'visible task rendered');
+    ok(!str_contains($html, 'ZZ_InternalSecretTask'), 'internal task never rendered in client report');
+    ok(!str_contains($html, '128.140.100.120'), 'server IP never rendered in client report');
+    ok(!str_contains($html, '350'), 'hourly bank rate never rendered in client report');
+    ok(!str_contains($html, 'id="report-scope"'), 'scope switcher hidden from client_viewer');
+});
+
 // ---------------------------------------------------------------- Run
 
 $pass = 0;

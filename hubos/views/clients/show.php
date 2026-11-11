@@ -75,6 +75,11 @@ $origin = static function (array $row) use ($familyRolled): string {
                     <button type="submit" class="btn btn-sm btn-ghost btn-xs">סנכרון ↻</button>
                 </form>
                 <?php endif; ?>
+                <a class="btn btn-sm btn-ghost btn-xs" id="client-report-link" href="/clients/<?= e($id) ?>/report">📄 דוח סטטוס ושעות (PDF)</a>
+            </div>
+        <?php else: ?>
+            <div class="cluster small client-prov-banner">
+                <a class="btn btn-sm btn-ghost" id="client-report-link" href="/clients/<?= e($id) ?>/report">📄 הפקת דוח סטטוס ושעות (PDF / הדפסה)</a>
             </div>
         <?php endif; ?>
     </div>

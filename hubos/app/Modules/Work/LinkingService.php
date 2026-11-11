@@ -8,6 +8,7 @@ use HubOS\Core\Events;
 use HubOS\Core\HebrewText;
 use HubOS\Core\HttpException;
 use HubOS\Core\Permissions;
+use HubOS\Core\Str;
 use HubOS\Core\Tenant;
 
 /**
@@ -158,8 +159,8 @@ final class LinkingService
                 }
             }
             $nameTokens = array_values(array_filter(HebrewText::tokens($c['name']),
-                static fn (string $t): bool => !in_array($t, self::STOPWORDS, true) && mb_strlen($t, 'UTF-8') >= 2));
-            if ($best < 50 && $nameTokens !== [] && mb_strlen(implode('', $nameTokens), 'UTF-8') >= 3) {
+                static fn (string $t): bool => !in_array($t, self::STOPWORDS, true) && Str::len($t) >= 2));
+            if ($best < 50 && $nameTokens !== [] && Str::len(implode('', $nameTokens)) >= 3) {
                 $matched = [];
                 foreach ($nameTokens as $nt) {
                     if (isset($wordSet[$nt])) {
@@ -170,7 +171,7 @@ final class LinkingService
                     $best = 50 + min(count($nameTokens) * 5, 20);
                     $reason = 'שם הלקוח מופיע בכותרת';
                 } elseif ($matched !== []) {
-                    $strong = array_values(array_filter($matched, static fn (string $t): bool => mb_strlen($t, 'UTF-8') >= 3));
+                    $strong = array_values(array_filter($matched, static fn (string $t): bool => Str::len($t) >= 3));
                     if ($strong !== []) {
                         $best = 35 + min(count($strong) * 8, 14);
                         $reason = 'התאמת מילת מפתח: ' . implode(', ', $strong);

@@ -42,8 +42,8 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&amp;display=swap">
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-    <link rel="stylesheet" href="/assets/app.css?v=10">
-    <script src="/assets/timer.js?v=6" defer></script>
+    <link rel="stylesheet" href="/assets/app.css?v=12">
+    <script src="/assets/timer.js?v=7" defer></script>
 </head>
 <body class="app-body">
 <div class="app-shell">

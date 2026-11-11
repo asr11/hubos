@@ -347,6 +347,190 @@ final class Client360Service
     }
 
     /**
+     * Build a print/PDF-ready Client Status & Hours Report.
+     * By default ($scope = 'client'), even internal actors receive a strictly
+     * Dining-Room-safe report ready to hand to the client (client_visible=1 work,
+     * no internal staff names/sources, no bank hourly rates, no server IPs/notes).
+     * A client_viewer is ALWAYS forced into 'client' scope regardless of $scope.
+     *
+     * @param array<string, mixed> $user
+     * @return array<string, mixed>
+     */
+    public function buildReport(
+        array $user,
+        int $clientId,
+        ?string $period = null,
+        string $scope = 'client',
+        ?DateTimeImmutable $now = null,
+    ): array {
+        $this->authorizeClient($user, $clientId);
+        $now ??= new DateTimeImmutable('now', new DateTimeZone('Asia/Jerusalem'));
+        $ilNow = $now->setTimezone(new DateTimeZone('Asia/Jerusalem'));
+        $currentMonth = $ilNow->format('Y-m');
+
+        $isInternalActor = self::isInternal($user);
+        $effectiveScope = ($isInternalActor && $scope === 'internal') ? 'internal' : 'client';
+
+        $card = $this->build($user, $clientId, $now);
+
+        $projects = $card['projects'];
+        $tasks = $card['tasks'];
+        $timeEntries = $card['time_entries'];
+        $banks = $card['hours_banks'];
+        $assets = $card['assets'];
+        $hiddenInternalTasks = 0;
+
+        if ($effectiveScope === 'client') {
+            $ownProjects = array_values(array_filter($projects, static fn (array $p): bool => !empty($p['is_own'])));
+            $ownTasks = array_values(array_filter($tasks, static fn (array $t): bool => !empty($t['is_own'])));
+            $visibleTasks = array_values(array_filter($ownTasks, static fn (array $t): bool => (int) ($t['client_visible'] ?? 0) === 1));
+            $hiddenInternalTasks = count($ownTasks) - count($visibleTasks);
+
+            $projects = array_values(array_filter($ownProjects, static fn (array $p): bool => (int) ($p['client_visible'] ?? 0) === 1));
+            $tasks = array_map(static function (array $t): array {
+                unset($t['assignee_user_id'], $t['assignee'], $t['assignee_name']);
+                return $t;
+            }, $visibleTasks);
+
+            $timeEntries = array_map(static function (array $te): array {
+                $te['user_id'] = null;
+                $te['legacy_user_ref'] = null;
+                $te['source'] = null;
+                unset($te['data_json'], $te['user_name']);
+                return $te;
+            }, array_values(array_filter($timeEntries, static fn (array $te): bool => !empty($te['is_own']))));
+
+            $banks = array_map(static function (array $b): array {
+                $b['rate'] = null;
+                $b['notes'] = null;
+                return $b;
+            }, array_values(array_filter($banks, static fn (array $b): bool => !empty($b['is_own']))));
+
+            $assets = array_map(static function (array $a): array {
+                $a['ip_address'] = null;
+                $a['notes'] = null;
+                return $a;
+            }, array_values(array_filter($assets, static fn (array $a): bool => !empty($a['is_own']) && ($a['status'] ?? 'active') === 'active')));
+        }
+
+        // Collect available YYYY-MM months from time entries + current month
+        $monthMap = [$currentMonth => true];
+        $hoursThisMonth = 0.0;
+        $hoursTotal = 0.0;
+        foreach ($timeEntries as $te) {
+            $sec = (int) ($te['duration_seconds'] ?? 0);
+            $hoursTotal += $sec / 3600.0;
+            $d = (string) ($te['entry_date'] ?? substr((string) ($te['started_at'] ?? ''), 0, 10));
+            if (preg_match('/^(\d{4}-(0[1-9]|1[0-2]))/', $d, $m) === 1) {
+                $monthMap[$m[1]] = true;
+                if ($m[1] === $currentMonth) {
+                    $hoursThisMonth += $sec / 3600.0;
+                }
+            }
+        }
+        $availableMonths = array_keys($monthMap);
+        rsort($availableMonths);
+
+        $selectedPeriod = ($period !== null && preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $period) === 1)
+            ? $period
+            : 'all';
+
+        $filteredEntries = $selectedPeriod === 'all'
+            ? $timeEntries
+            : array_values(array_filter($timeEntries, static function (array $te) use ($selectedPeriod): bool {
+                $d = (string) ($te['entry_date'] ?? substr((string) ($te['started_at'] ?? ''), 0, 10));
+                return str_starts_with($d, $selectedPeriod);
+            }));
+
+        $periodSeconds = array_sum(array_map(static fn (array $te): int => (int) ($te['duration_seconds'] ?? 0), $filteredEntries));
+        $periodHours = (float) ($periodSeconds / 3600.0);
+
+        $activeBanks = array_values(array_filter($banks, static fn (array $b): bool => ($b['status'] ?? '') === 'active'));
+        $bankRemaining = $activeBanks === []
+            ? null
+            : array_sum(array_map(static fn (array $b): float => (float) ($b['remaining_hours'] ?? 0), $activeBanks));
+
+        $projNames = [];
+        foreach ($card['projects'] as $p) {
+            $projNames[(int) $p['id']] = (string) $p['name'];
+        }
+        $doneCount = 0;
+        $doingCount = 0;
+        $todoCount = 0;
+        foreach ($tasks as &$t) {
+            $pid = $t['project_id'] !== null ? (int) $t['project_id'] : null;
+            if (empty($t['project_name']) && $pid !== null && isset($projNames[$pid])) {
+                $t['project_name'] = $projNames[$pid];
+            }
+            $sk = \HubOS\Modules\Work\TaskService::statusKey((string) ($t['status'] ?? 'todo'));
+            $t['status_key'] = $sk;
+            if ($sk === 'done') {
+                $doneCount++;
+            } elseif ($sk === 'doing') {
+                $doingCount++;
+            } else {
+                $todoCount++;
+            }
+        }
+        unset($t);
+
+        $totalTasks = count($tasks);
+        $completionPct = $totalTasks > 0 ? (int) round(($doneCount / $totalTasks) * 100) : 0;
+
+        $clientClean = $card['client'];
+        if ($effectiveScope === 'client') {
+            $clientClean['notes'] = null;
+        }
+
+        return [
+            'client'                => $clientClean,
+            'is_internal_actor'     => $isInternalActor,
+            'scope'                 => $effectiveScope,
+            'family_rolled'         => $effectiveScope === 'internal' && count($card['family']) > 1,
+            'family'                => $effectiveScope === 'internal' ? $card['family'] : [$clientId => (string) $clientClean['name']],
+            'selected_period'       => $selectedPeriod,
+            'period_label'          => $selectedPeriod === 'all' ? 'כל התקופות (מצטבר)' : self::hebrewMonthLabel($selectedPeriod),
+            'current_month'         => $currentMonth,
+            'available_months'      => $availableMonths,
+            'generated_at_il'       => $ilNow->format('d/m/Y H:i'),
+            'projects'              => $projects,
+            'tasks'                 => $tasks,
+            'hidden_internal_tasks' => $isInternalActor ? $hiddenInternalTasks : 0,
+            'task_summary'          => [
+                'total'          => $totalTasks,
+                'done'           => $doneCount,
+                'doing'          => $doingCount,
+                'todo'           => $todoCount,
+                'completion_pct' => $completionPct,
+            ],
+            'hours_banks'           => $banks,
+            'time_entries'          => $filteredEntries,
+            'time_summary'          => [
+                'period_seconds'   => $periodSeconds,
+                'period_hours'     => $periodHours,
+                'hours_this_month' => $hoursThisMonth,
+                'hours_total'      => $hoursTotal,
+                'bank_remaining'   => $bankRemaining,
+                'entries_count'    => count($filteredEntries),
+            ],
+            'assets'                => $assets,
+        ];
+    }
+
+    public static function hebrewMonthLabel(string $ym): string
+    {
+        if (preg_match('/^(\d{4})-(0[1-9]|1[0-2])$/', $ym, $m) !== 1) {
+            return $ym;
+        }
+        $names = [
+            '01' => 'ינואר', '02' => 'פברואר', '03' => 'מרץ', '04' => 'אפריל',
+            '05' => 'מאי', '06' => 'יוני', '07' => 'יולי', '08' => 'אוגוסט',
+            '09' => 'ספטמבר', '10' => 'אוקטובר', '11' => 'נובמבר', '12' => 'דצמבר',
+        ];
+        return ($names[$m[2]] ?? $m[2]) . ' ' . $m[1];
+    }
+
+    /**
      * Log that vault METADATA was shown (no secrets are ever shown).
      *
      * @param array<string, mixed> $user

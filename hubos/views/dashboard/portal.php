@@ -19,6 +19,10 @@ $metrics = $portal['metrics'] ?? [];
         <h2 id="hero-title">שלום, <?= e($user['name']) ?></h2>
         <?php if ($client !== null): ?>
             <p class="muted" id="portal-client-name">תיק לקוח: <strong><?= e($client['name']) ?></strong> · צפייה שקופה במשימות פתוחות, יתרת בנק שעות ונכסים דיגיטליים.</p>
+            <div class="portal-hero-actions">
+                <a class="btn btn-primary btn-sm" id="portal-report-link" href="/clients/<?= e((int) $client['id']) ?>/report">📄 הפקת דוח סטטוס ושעות (PDF / הדפסה)</a>
+                <a class="btn btn-ghost btn-sm" href="/clients/<?= e((int) $client['id']) ?>">פתיחת תיק לקוח מלא ←</a>
+            </div>
         <?php else: ?>
             <p class="muted">המשתמש אינו משויך ללקוח פעיל.</p>
         <?php endif; ?>

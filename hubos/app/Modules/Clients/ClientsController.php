@@ -83,6 +83,22 @@ final class ClientsController
         ]);
     }
 
+    /** GET /clients/{id}/report — Print & PDF-ready RTL Hebrew status and hours report. */
+    public function report(Context $ctx, array $params): Response
+    {
+        $user = $ctx->requireUser();
+        $id = (int) ($params['id'] ?? 0);
+        $period = is_string($_GET['period'] ?? null) ? trim($_GET['period']) : 'all';
+        $scope = is_string($_GET['scope'] ?? null) ? trim($_GET['scope']) : 'client';
+        $report = (new Client360Service($ctx->tenant(), $ctx->permissions()))->buildReport($user, $id, $period, $scope);
+
+        return $ctx->render('clients/report', [
+            'title'      => 'דוח סטטוס ושעות · ' . (string) $report['client']['name'],
+            'report'     => $report,
+            'viewerUser' => $user,
+        ], 200, 'layouts/report');
+    }
+
     /** POST /clients/{id}/enrich — fetch registry SUGGESTIONS (nothing is stored on the client). */
     public function enrich(Context $ctx, array $params): Response
     {

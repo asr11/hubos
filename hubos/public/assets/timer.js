@@ -186,6 +186,13 @@
                 pSelect.value = presetBtn.getAttribute('data-preset-priority');
             }
             if (tInput) { tInput.focus(); }
+            return;
+        }
+
+        var printBtn = ev.target.closest('[data-print-report]');
+        if (printBtn) {
+            ev.preventDefault();
+            window.print();
         }
     });
 
