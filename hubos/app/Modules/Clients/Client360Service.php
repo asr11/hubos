@@ -46,6 +46,51 @@ final class Client360Service
     /** Morning statuses that mean "not fully paid" on the document itself. */
     public const OPEN_STATUSES = ['unpaid', 'pending', 'partial'];
 
+    /** Human-readable Hebrew labels for audit events shown in Client 360 timeline. */
+    public const EVENT_LABELS = [
+        'client.created'                => 'תיק לקוח הוקם',
+        'client.updated'                => 'פרטי לקוח עודכנו',
+        'client.registry_applied'       => 'פרטי רשם החברות הוחלו',
+        'hours_bank.created'            => 'בנק שעות הוקם',
+        'hours_bank.threshold_crossed'  => 'חציית סף בבנק שעות',
+        'hours_bank.settings_updated'   => 'הגדרות בנק שעות עודכנו',
+        'time_entry.created'            => 'שעות עבודה דווחו',
+        'time_entry.updated'            => 'דיווח שעות עודכן',
+        'time_entry.deleted'            => 'דיווח שעות נמחק',
+        'timer.started'                 => 'טיימר הופעל',
+        'timer.paused'                  => 'טיימר הושהה',
+        'timer.resumed'                 => 'טיימר חודש',
+        'timer.stopped'                 => 'טיימר נעצר ונרשם',
+        'timer.discarded'               => 'טיימר בוטל',
+        'task.created'                  => 'משימה נוצרה',
+        'task.updated'                  => 'משימה עודכנה',
+        'task.status_changed'           => 'סטטוס משימה עודכן',
+        'task.archived'                 => 'משימה הועברה לארכיון',
+        'task.restored'                 => 'משימה שוחזרה מארכיון',
+        'task.unarchived'               => 'משימה שוחזרה מארכיון',
+        'task.client_linked'            => 'משימה שויכה ללקוח',
+        'task.linked'                   => 'משימה שויכה ללקוח',
+        'project.created'               => 'פרויקט נוצר',
+        'project.updated'               => 'פרויקט עודכן',
+        'project.archived'              => 'פרויקט הועבר לארכיון',
+        'project.unarchived'            => 'פרויקט שוחזר מארכיון',
+        'project.client_linked'         => 'פרויקט שויך ללקוח',
+        'project.linked'                => 'פרויקט שויך ללקוח',
+        'recurring_template.created'    => 'תבנית תחזוקה חודשית נוצרה',
+        'recurring.generated'           => 'משימת תחזוקה חודשית נוצרה',
+        'asset.created'                 => 'נכס דיגיטלי נוצר',
+        'asset.updated'                 => 'נכס דיגיטלי עודכן',
+        'asset.inspected'               => 'בדיקת DNS/SSL/WHOIS בוצעה',
+        'vault.item_created'            => 'רשומת כספת נוצרה',
+        'vault.item_updated'            => 'רשומת כספת עודכנה',
+        'vault.secret_revealed'         => 'סוד נחשף בכספת',
+        'vault.metadata_viewed'         => 'צפייה ברשימת גישות בכספת',
+        'user.created'                  => 'משתמש פורטל נוצר',
+        'user.updated'                  => 'משתמש פורטל עודכן',
+        'auth.login'                    => 'כניסה לפורטל',
+        'auth.logout'                   => 'יציאה מהפורטל',
+    ];
+
     private const MAX_DEPTH = 6;
 
     public function __construct(private Tenant $tenant, private Permissions $perms)
@@ -515,7 +560,8 @@ final class Client360Service
             }
         };
         foreach ($events as $e) {
-            $add($e['created_at'], 'אירוע', $e['action'] . ($e['actor_name'] ? ' · ' . $e['actor_name'] : ''), $e['origin_name']);
+            $label = self::EVENT_LABELS[(string) ($e['action'] ?? '')] ?? (string) ($e['action'] ?? '');
+            $add($e['created_at'], 'אירוע', $label . ($e['actor_name'] ? ' · ' . $e['actor_name'] : ''), $e['origin_name']);
         }
         foreach ($interactions as $i) {
             $add($i['occurred_at'] ?? $i['created_at'], 'תקשורת', (string) ($i['title'] ?? $i['kind']), $i['origin_name']);
