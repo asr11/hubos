@@ -313,6 +313,7 @@ final class DashboardService
 
         return [
             'provenance'         => (new \HubOS\Modules\Import\SyncService($this->tenant, $this->perms))->latestProvenance($now),
+            'dailyCare'          => $this->latestDailyCare($now),
             'clientsCount'       => $canClients ? (new ClientService($this->tenant, $this->perms))->count($user) : null,
             'clientsActiveCount' => $canClients ? count((new ClientService($this->tenant, $this->perms))->list($user, 1000, 'active')) : null,
             'canFinance'         => $canFinance,
@@ -334,6 +335,41 @@ final class DashboardService
             ],
             'money'        => $money,
             'team'         => $team,
+        ];
+    }
+
+    /**
+     * Latest automated daily backup & SSL/WHOIS inspection status.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function latestDailyCare(DateTimeImmutable $now): ?array
+    {
+        $row = $this->tenant->selectOne(
+            "SELECT after_json, created_at FROM events WHERE tenant_id = :tenant_id AND action = 'system.daily_care_completed' ORDER BY id DESC LIMIT 1"
+        );
+        if ($row === null) {
+            return null;
+        }
+        $decoded = is_string($row['after_json'] ?? null) ? json_decode($row['after_json'], true) : null;
+        if (!is_array($decoded)) {
+            return null;
+        }
+        $ilTz = new DateTimeZone('Asia/Jerusalem');
+        $rawUtc = (string) ($decoded['ran_at_utc'] ?? $row['created_at'] ?? '');
+        try {
+            $dt = new DateTimeImmutable($rawUtc);
+        } catch (\Throwable) {
+            $dt = $now;
+        }
+        return [
+            'status'         => (string) ($decoded['status'] ?? 'ok'),
+            'integrity'      => (string) ($decoded['integrity'] ?? 'ok'),
+            'ran_at_il'      => $dt->setTimezone($ilTz)->format('Y-m-d H:i:s'),
+            'relative_age'   => \HubOS\Modules\Import\SyncService::relativeAge($dt, $now),
+            'backup_file'    => (string) ($decoded['backup_file'] ?? ''),
+            'backup_kb'      => (int) round(((int) ($decoded['backup_bytes'] ?? 0)) / 1024),
+            'assets_checked' => (int) ($decoded['assets_checked'] ?? 0),
         ];
     }
 

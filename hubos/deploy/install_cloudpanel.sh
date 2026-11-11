@@ -65,5 +65,8 @@ fi
 php "$ROOT/bin/recurring.php" >/dev/null
 EOF
 chmod 750 "$APP_DIR/bin/nightly_maintenance.sh"
+if [[ -f "$APP_DIR/bin/daily_care.php" ]]; then
+    chmod 750 "$APP_DIR/bin/daily_care.php"
+fi
 
 echo "[hubos-deploy] Setup complete."

@@ -1540,6 +1540,69 @@ test('csp & portal polish: zero inline style/onclick/script in views, viewer get
     eq(null, $c360v['assets'][0]['ip_address'], 'Client360 strips asset IP for client_viewer');
 });
 
+test('daily care cli: shabbat guard, hot backup, mock asset refresh & dashboard status', function (): void {
+    $tmpDir = sys_get_temp_dir() . '/hubos_care_' . bin2hex(random_bytes(6));
+    mkdir($tmpDir, 0700, true);
+    $dbFile = $tmpDir . '/hubos.sqlite';
+    $logDir = $tmpDir . '/logs';
+    $sessDir = $tmpDir . '/sessions';
+    mkdir($logDir, 0700, true);
+    mkdir($sessDir, 0700, true);
+
+    $pdo = DB::connect($dbFile);
+    (new Migrator($pdo, HUBOS_ROOT . '/database/migrations'))->run();
+    $tid = Provisioning::ensureTenant($pdo, 'hub-care', 'HUB Care');
+    $uid = Provisioning::createUser($pdo, $tid, 'owner@care.test', 'אשר', 'owner', 'StrongPass1234!');
+    $ta = new Tenant($pdo, $tid);
+    $perms = new Permissions($ta);
+    $owner = userRow($pdo, $uid);
+    $cid = $ta->insert('clients', ['name' => 'לקוח בדיקה', 'status' => 'active']);
+    (new AssetService($ta, $perms))->create($owner, ['client_id' => (string) $cid, 'kind' => 'domain', 'domain' => 'example.co.il']);
+    unset($pdo);
+
+    $script = escapeshellarg(HUBOS_ROOT . '/bin/daily_care.php');
+    $envPrefix = 'HUBOS_DB_PATH=' . escapeshellarg($dbFile)
+        . ' HUBOS_LOG_PATH=' . escapeshellarg($logDir)
+        . ' HUBOS_SESSION_PATH=' . escapeshellarg($sessDir);
+
+    // 1. Saturday guard
+    $satOut = shell_exec($envPrefix . ' ' . escapeshellarg(PHP_BINARY) . " {$script} --assets=mock --simulate-iso=" . escapeshellarg('2026-11-14 11:00:00'));
+    $satJson = json_decode((string) $satOut, true);
+    eq('shabbat_guard', $satJson['skipped'] ?? null, 'daily_care skips execution on Shabbat (Saturday)');
+
+    // 2. Friday >= 15:00 guard
+    $friOut = shell_exec($envPrefix . ' ' . escapeshellarg(PHP_BINARY) . " {$script} --assets=mock --simulate-iso=" . escapeshellarg('2026-11-13 15:30:00'));
+    $friJson = json_decode((string) $friOut, true);
+    eq('shabbat_guard', $friJson['skipped'] ?? null, 'daily_care skips execution on Friday afternoon (>=15:00)');
+
+    // 3. Weekday 05:30 run creates verified hot backup + updates asset + records event
+    $wedOut = shell_exec($envPrefix . ' ' . escapeshellarg(PHP_BINARY) . " {$script} --assets=mock --simulate-iso=" . escapeshellarg('2026-11-11 05:30:00'));
+    $wedJson = json_decode((string) $wedOut, true);
+    eq(true, $wedJson['ok'] ?? false, 'daily_care weekday run succeeds');
+    eq('ok', $wedJson['integrity'] ?? '', 'daily_care verifies SQLite integrity');
+    eq(1, $wedJson['assets_checked'] ?? 0, 'daily_care inspects active domain');
+    ok(is_file($tmpDir . '/backups/' . ($wedJson['backup_file'] ?? 'missing')), 'daily_care creates hot SQLite backup file');
+
+    $pdo2 = DB::connect($dbFile);
+    $ta2 = new Tenant($pdo2, $tid);
+    $ceo = (new DashboardService($ta2, new Permissions($ta2)))->ceo($owner);
+    eq('ok', $ceo['dailyCare']['status'] ?? null, 'DashboardService::ceo exposes dailyCare status');
+    ok(($ceo['dailyCare']['backup_kb'] ?? 0) > 0, 'DashboardService::ceo exposes backup size');
+    unset($pdo2);
+
+    // Cleanup temp directory without shell rm
+    foreach ([$tmpDir . '/backups', $logDir, $sessDir, $tmpDir] as $d) {
+        foreach (glob($d . '/*') ?: [] as $f) {
+            if (is_file($f)) {
+                @unlink($f);
+            }
+        }
+        if (is_dir($d)) {
+            @rmdir($d);
+        }
+    }
+});
+
 // ---------------------------------------------------------------- Run
 
 $pass = 0;

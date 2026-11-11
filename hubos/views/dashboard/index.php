@@ -57,6 +57,9 @@ $actionLabels = [
     'vault.metadata_viewed'         => 'צפייה ברשימת כספת',
     'sync.completed'                => 'סנכרון ואימות נתונים הושלם',
     'import.completed'              => 'ייבוא נתונים הושלם',
+    'system.daily_care_completed'   => 'תחזוקה יומית אוטומטית (גיבוי + SSL/WHOIS)',
+    'system.hygiene_completed'      => 'ניקוי והשבחת נתוני מערכת',
+    'system.assets_bulk_inspected'  => 'סריקת דומיינים ו-SSL רוחבית',
 ];
 $moduleLabels = Permissions::SWITCHABLE_MODULES;
 $overdueCount = count($urgent['overdue_tasks'] ?? []);
@@ -68,6 +71,7 @@ $breakingAssets = $breaking['assets'] ?? [];
 $alertBanks = $breaking['banks'] ?? [];
 $sep = $money['separation'] ?? [];
 $prov = $provenance ?? null;
+$care = $dailyCare ?? null;
 ?>
 <section class="hero card" aria-labelledby="hero-title">
     <div>
@@ -83,6 +87,10 @@ $prov = $provenance ?? null;
     <div class="provenance-cluster">
         <span class="pill pill-ok pill-sm">✔ נתונים מאומתים (Morning SSOT)</span>
         <span class="muted small">סנכרון אחרון: <bdi dir="ltr"><?= e((string) ($prov['fetched_at_il'] ?? '')) ?></bdi> <span class="muted">(<?= e((string) ($prov['relative_age'] ?? '')) ?>)</span></span>
+        <?php if (is_array($care)): ?>
+            <span class="pill pill-ok pill-sm" id="daily-care-pill">✔ גיבוי וניטור יומי פעיל</span>
+            <span class="muted small">בדיקה אחרונה: <bdi dir="ltr"><?= e((string) ($care['ran_at_il'] ?? '')) ?></bdi> <span class="muted">(<?= e((string) ($care['relative_age'] ?? '')) ?>)</span></span>
+        <?php endif; ?>
     </div>
     <form method="post" action="/settings/sync-d1" class="m-0">
         <?= \HubOS\Core\Csrf::field() ?>
