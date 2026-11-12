@@ -4,6 +4,9 @@
 # The simulation runs on a private throwaway DB copy on 127.0.0.1 only. The production DB is never written.
 set -u
 APP="$(cd "$(dirname "$0")/.." && pwd)"
+# Pre-deploy: verify a staging code tree against a copy of the live DB (never written).
+SRC_DB="${HUBOS_SOURCE_DB:-$APP/storage/hubos.sqlite}"
+BACKUP_DIR="${HUBOS_BACKUP_DIR:-$APP/storage/backups}"
 APP_USER=hub-os
 PHP=/usr/bin/php
 SITE=https://os.hub.co.il
@@ -38,7 +41,7 @@ unit_tests() {
 
 simulation() {
     mkdir -m 700 "$D" "$D/sessions" "$D/logs" && chown -R "$APP_USER:$APP_USER" "$D"
-    su -s /bin/bash "$APP_USER" -c "sqlite3 '$APP/storage/hubos.sqlite' \".backup '$D/hubos.sqlite'\"" || return 2
+    su -s /bin/bash "$APP_USER" -c "sqlite3 '$SRC_DB' \".backup '$D/hubos.sqlite'\"" || return 2
     local envs="HUBOS_DB_PATH=$D/hubos.sqlite HUBOS_SESSION_PATH=$D/sessions HUBOS_LOG_PATH=$D/logs HUBOS_COOKIE_SECURE=0 HUBOS_AGENT_TOKEN=$TOKEN"
     su -s /bin/bash "$APP_USER" -c "env $envs $PHP '$APP/tests/sim/setup.php'" > "$D/setup.json" || return 3
     su -s /bin/bash "$APP_USER" -c "cd '$APP' && env $envs PHP_CLI_SERVER_WORKERS=4 setsid nohup $PHP -S 127.0.0.1:$PORT -t public public/index.php > '$D/server.log' 2>&1 < /dev/null &"
@@ -63,17 +66,17 @@ health() {
     echo "ssl_days_left=$days"; [ "$days" -ge 14 ] || bad=1
     local disk; disk=$(df --output=pcent / | tail -1 | tr -dc '0-9')
     echo "disk_used=${disk}%"; [ "$disk" -lt 85 ] || bad=1
-    local newest; newest=$(ls -t "$APP/storage/backups"/*.sqlite 2>/dev/null | head -1)
+    local newest; newest=$(ls -t "$BACKUP_DIR"/*.sqlite 2>/dev/null | head -1)
     local age=999
     [ -n "$newest" ] && age=$(( ( $(date +%s) - $(stat -c %Y "$newest") ) / 3600 ))
     echo "newest_backup_age_h=$age"; [ "$age" -le 30 ] || bad=1
-    local prod_integ; prod_integ=$(su -s /bin/bash "$APP_USER" -c "sqlite3 -readonly '$APP/storage/hubos.sqlite' 'PRAGMA quick_check;'")
+    local prod_integ; prod_integ=$(su -s /bin/bash "$APP_USER" -c "sqlite3 -readonly '$SRC_DB' 'PRAGMA quick_check;'")
     echo "prod_quick_check=$prod_integ"; [ "$prod_integ" = "ok" ] || bad=1
     return $bad
 }
 
 export -f unit_tests simulation health
-export APP APP_USER PHP SITE D PORT TOKEN
+export APP SRC_DB BACKUP_DIR APP_USER PHP SITE D PORT TOKEN
 T0=$(date +%s)
 echo "== 1/3 unit tests ==";   step "unit_tests"  unit_tests
 echo "== 2/3 simulation ==";   step "simulation"  simulation
