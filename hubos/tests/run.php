@@ -1732,6 +1732,30 @@ test('client status & hours print/PDF report: dining-room isolation, period filt
     ok(!str_contains($html, 'id="report-scope"'), 'scope switcher hidden from client_viewer');
 });
 
+test('sqlite concurrency: Tenant::transaction takes the write lock up-front (BEGIN IMMEDIATE)', function (): void {
+    $a = freshDb();
+    $path = T::$tmp[array_key_last(T::$tmp)];
+    $tid = Provisioning::ensureTenant($a, 'zz-lock', 'ZZ Lock');
+    $b = DB::connect($path);
+    $b->exec('PRAGMA busy_timeout = 0');
+    $blocked = false;
+    (new Tenant($a, $tid))->transaction(function (Tenant $t) use ($b, &$blocked): void {
+        $t->count('clients'); // read only so far — a deferred BEGIN would not hold the write lock yet
+        try {
+            $b->exec('BEGIN IMMEDIATE');
+            $b->exec('ROLLBACK');
+        } catch (PDOException $e) {
+            $blocked = stripos($e->getMessage(), 'locked') !== false;
+        }
+    });
+    ok($blocked, 'a second writer is blocked while the first transaction is open, even before its first write');
+    $nested = (new Tenant($a, $tid))->transaction(static fn (Tenant $t): string => (new Tenant($a, $tid))->transaction(static fn (Tenant $u): string => 'nested-ok'));
+    eq('nested-ok', $nested, 'nested transaction on the same PDO reuses the outer one');
+    $b->exec('BEGIN IMMEDIATE');
+    $b->exec('ROLLBACK');
+    ok(!$a->inTransaction() && !$b->inTransaction(), 'write lock released after commit');
+});
+
 // ---------------------------------------------------------------- Run
 
 $pass = 0;

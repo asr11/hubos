@@ -222,21 +222,44 @@ final class Tenant
      */
     public function transaction(callable $fn): mixed
     {
-        if ($this->pdo->inTransaction()) {
+        // PDO SQLite does not see a raw "BEGIN IMMEDIATE" in inTransaction(), so track it per connection.
+        $key = spl_object_id($this->pdo);
+        if (!empty(self::$openTx[$key]) || $this->pdo->inTransaction()) {
             return $fn($this);
         }
-        $this->pdo->beginTransaction();
+        // BEGIN IMMEDIATE takes the write lock up-front, so busy_timeout applies.
+        // A deferred BEGIN that upgrades read->write under WAL fails instantly with
+        // SQLITE_BUSY ("database is locked") — found by the concurrent persona simulation.
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                $this->pdo->exec('BEGIN IMMEDIATE');
+                break;
+            } catch (\PDOException $e) {
+                if ($attempt >= 5 || stripos($e->getMessage(), 'locked') === false) {
+                    throw $e;
+                }
+                usleep(50000 * $attempt);
+            }
+        }
+        self::$openTx[$key] = true;
         try {
             $result = $fn($this);
-            $this->pdo->commit();
+            $this->pdo->exec('COMMIT');
             return $result;
         } catch (Throwable $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
+            try {
+                $this->pdo->exec('ROLLBACK');
+            } catch (\PDOException) {
+                // already rolled back by SQLite
             }
             throw $e;
+        } finally {
+            unset(self::$openTx[$key]);
         }
     }
+
+    /** @var array<int, bool> open BEGIN IMMEDIATE transactions keyed by PDO object id */
+    private static array $openTx = [];
 
     /** @param array<string, scalar|null> $params */
     private function runScoped(string $sql, array $params): \PDOStatement
