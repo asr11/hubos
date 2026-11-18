@@ -107,8 +107,8 @@ final class App
     private static function securityHeaders(bool $https): void
     {
         header_remove('X-Powered-By');
-        header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; "
-            . "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; form-action 'self'; "
+        header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; "
+            . "font-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'self'; "
             . "frame-ancestors 'none'; base-uri 'none'; object-src 'none'");
         header('X-Content-Type-Options: nosniff');
         header('X-Frame-Options: DENY');
