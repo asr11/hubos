@@ -70,15 +70,21 @@ final class Provisioning
         }
 
         return $tenant->transaction(static function (Tenant $t) use ($email, $name, $role, $password, $actorUserId, $clientId): int {
-            $id = $t->insert('users', [
+            $isPartner = $role === 'partner' ? 1 : 0;
+            $dbRole = $isPartner === 1 ? 'client_viewer' : $role;
+            $row = [
                 'email'         => $email,
                 'name'          => $name,
-                'role'          => $role,
-                'client_id'     => $clientId,
+                'role'          => $dbRole,
+                'client_id'     => $isPartner === 1 ? null : $clientId,
                 'password_hash' => Auth::hashPassword($password),
-            ]);
-            Events::record($t, $actorUserId, 'user', $id, $clientId, 'user.created', null,
-                ['email' => $email, 'name' => $name, 'role' => $role, 'client_id' => $clientId]);
+            ];
+            if ($isPartner === 1) {
+                $row['is_partner'] = 1;
+            }
+            $id = $t->insert('users', $row);
+            Events::record($t, $actorUserId, 'user', $id, $isPartner === 1 ? null : $clientId, 'user.created', null,
+                ['email' => $email, 'name' => $name, 'role' => $role, 'client_id' => $isPartner === 1 ? null : $clientId]);
             return $id;
         });
     }

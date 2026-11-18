@@ -126,6 +126,9 @@ final class Auth
             DB::run($this->pdo, 'UPDATE users SET password_hash = ? WHERE id = ?', [self::hashPassword($password), (int) $row['id']]);
         }
         unset($row['password_hash']);
+        if ((int) ($row['is_partner'] ?? 0) === 1) {
+            $row['role'] = 'partner';
+        }
         return $row;
     }
 
@@ -220,8 +223,7 @@ final class Auth
         }
         $row = DB::run(
             $this->pdo,
-            'SELECT u.id, u.tenant_id, u.email, u.name, u.role, u.client_id, u.status,
-                    t.name AS tenant_name, t.status AS tenant_status
+            'SELECT u.*, t.name AS tenant_name, t.status AS tenant_status
                FROM users u JOIN tenants t ON t.id = u.tenant_id
               WHERE u.id = ? AND u.tenant_id = ?',
             [$uid, $tid]
@@ -229,6 +231,10 @@ final class Auth
         if (!is_array($row) || $row['status'] !== 'active' || $row['tenant_status'] !== 'active') {
             $this->logout();
             return null;
+        }
+        unset($row['password_hash']);
+        if ((int) ($row['is_partner'] ?? 0) === 1) {
+            $row['role'] = 'partner';
         }
         $_SESSION['last_seen'] = time();
         return $this->user = $row;

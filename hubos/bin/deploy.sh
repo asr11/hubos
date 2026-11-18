@@ -62,6 +62,8 @@ ls -1t "$RELEASES"/hubos_code_*.tgz | tail -n +6 | xargs -r rm -f   # keep last 
 
 rsync -a --exclude storage/ "$STAGE/" "$PROD/"
 chown -R hub-os:hub-os $(for p in $TOP; do echo "$PROD/$p"; done)
+su -s /bin/bash hub-os -c "sqlite3 '$PROD/storage/hubos.sqlite' \".backup '$PROD/storage/backups/pre_deploy_${TS}.sqlite'\""
+su -s /bin/bash hub-os -c "source /home/hub-os/.hubos_env 2>/dev/null || true; /usr/bin/php '$PROD/bin/migrate.php'"
 echo "$SHA $(date -Iseconds)" > "$PROD/REVISION" && chown hub-os:hub-os "$PROD/REVISION"
 
 smoke() {

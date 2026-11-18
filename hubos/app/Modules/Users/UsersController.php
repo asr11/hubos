@@ -13,7 +13,7 @@ use PDOException;
 
 final class UsersController
 {
-    private const USER_FIELDS = ['name', 'email', 'role', 'status', 'client_id', 'password'];
+    private const USER_FIELDS = ['name', 'email', 'role', 'status', 'client_id', 'commission_pct', 'password'];
 
     public function index(Context $ctx): Response
     {
@@ -27,17 +27,20 @@ final class UsersController
              FROM events e
              LEFT JOIN users u ON u.id = e.actor_user_id AND u.tenant_id = e.tenant_id
              WHERE e.tenant_id = :tenant_id
-               AND (e.entity_type IN ('user', 'tenant_module') OR e.action LIKE 'permission.%' OR e.action LIKE 'module.%' OR e.action LIKE 'user.%')
+               AND (e.entity_type IN ('user', 'tenant_module') OR e.action LIKE 'permission.%' OR e.action LIKE 'module.%' OR e.action LIKE 'user.%' OR e.action = 'client.partner_assigned')
              ORDER BY e.id DESC LIMIT 20"
         );
+        $saasSvc = new \HubOS\Modules\Saas\SaasService($ctx->pdo, $ctx->tenant());
 
         return $ctx->render('users/index', [
-            'title'       => 'משתמשים, תפקידים והרשאות',
-            'active'      => 'users',
-            'users'       => $service->list($user),
-            'modules'     => $service->modulesStatus($user),
-            'clients'     => $clients,
-            'auditEvents' => $auditEvents,
+            'title'           => 'משתמשים, תפקידים והרשאות',
+            'active'          => 'users',
+            'users'           => $service->list($user),
+            'modules'         => $service->modulesStatus($user),
+            'clients'         => $clients,
+            'auditEvents'     => $auditEvents,
+            'tenantMeta'      => $saasSvc->currentTenantMeta(),
+            'isPlatformOwner' => \HubOS\Modules\Saas\SaasService::isPlatformOwner($user),
         ]);
     }
 
@@ -96,6 +99,21 @@ final class UsersController
         try {
             $ctx->permissions()->setModule($user, $module, $enabled);
             $ctx->flash('סטטוס המודול עודכן ונרשם ביומן');
+        } catch (InvalidArgumentException|HttpException $e) {
+            $ctx->flashError($e->getMessage());
+        }
+        return Response::redirect('/settings/users');
+    }
+
+    public function assignPartner(Context $ctx): Response
+    {
+        $user = $ctx->requireUser();
+        $cid = (int) $ctx->input('client_id');
+        $pidRaw = trim($ctx->input('partner_user_id'));
+        $pid = $pidRaw !== '' ? (int) $pidRaw : null;
+        try {
+            $this->service($ctx)->assignPartnerToClient($user, $cid, $pid);
+            $ctx->flash('שיוך השותף לתיק הלקוח עודכן ונרשם ביומן');
         } catch (InvalidArgumentException|HttpException $e) {
             $ctx->flashError($e->getMessage());
         }

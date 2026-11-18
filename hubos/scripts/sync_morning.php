@@ -27,13 +27,30 @@ if (!file_exists($dbPath)) {
 
 $pdo = DB::connect($dbPath);
 $tenantId = 1;
+foreach ($argv ?? [] as $arg) {
+    if (preg_match('/^--tenant=(\d+)$/', (string) $arg, $m) === 1 && (int) $m[1] > 0) {
+        $tenantId = (int) $m[1];
+    }
+}
 $tenant = new Tenant($pdo, $tenantId);
 
-// 1. Load Morning credentials
-$keyId = getenv('MORNING_KEY_ID') ?: '';
-$keySecret = getenv('MORNING_KEY_SECRET') ?: '';
+// 1. Load Morning credentials (per-tenant AES-256-GCM encrypted settings first, then env fallback for tenant 1)
+$keyId = '';
+$keySecret = '';
+$tenantCreds = (new \HubOS\Modules\Saas\SaasService($pdo, $tenant))->getDecryptedMorningCredentials();
+if ($tenantCreds !== null) {
+    $keyId = $tenantCreds['key_id'];
+    $keySecret = $tenantCreds['key_secret'];
+} elseif ($tenantId === 1) {
+    $keyId = getenv('MORNING_KEY_ID') ?: '';
+    $keySecret = getenv('MORNING_KEY_SECRET') ?: '';
+}
 
 if ($keyId === '' || $keySecret === '') {
+    if ($tenantId !== 1) {
+        fwrite(STDERR, "❌ Error: Tenant #{$tenantId} has no encrypted Morning credentials configured in /settings/users\n");
+        exit(1);
+    }
     $envFiles = [
         __DIR__ . '/../../02_HUB_Dev/digital-ceo/.dev.vars',
         __DIR__ . '/../../02_HUB_Dev/digital-ceo/.env',

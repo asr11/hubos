@@ -37,8 +37,7 @@ final class UserService
     {
         $this->perms->authorize($actor, 'users.view');
         $users = $this->tenant->select(
-            'SELECT u.id, u.tenant_id, u.client_id, u.email, u.name, u.role, u.status, u.last_login_at, u.created_at, u.updated_at,
-                    c.name AS client_name
+            'SELECT u.*, c.name AS client_name
              FROM users u
              LEFT JOIN clients c ON c.tenant_id = u.tenant_id AND c.id = u.client_id
              WHERE u.tenant_id = :tenant_id
@@ -52,6 +51,10 @@ final class UserService
             $byUser[(int) $r['user_id']][(string) $r['permission']] = (int) $r['granted'] === 1;
         }
         foreach ($users as &$u) {
+            unset($u['password_hash']);
+            if ((int) ($u['is_partner'] ?? 0) === 1) {
+                $u['role'] = 'partner';
+            }
             $u['overrides'] = $byUser[(int) $u['id']] ?? [];
         }
         unset($u);
@@ -76,7 +79,10 @@ final class UserService
         if ($role === 'client_viewer' && ($clientId === null || $clientId <= 0)) {
             throw new InvalidArgumentException('משתמש צופה (לקוח) חייב להיות משויך ללקוח');
         }
-        return Provisioning::createUser(
+        if ($role === 'partner') {
+            $clientId = null;
+        }
+        $uid = Provisioning::createUser(
             $this->pdo,
             $this->tenant->id(),
             (string) ($input['email'] ?? ''),
@@ -86,6 +92,11 @@ final class UserService
             (int) $actor['id'],
             $clientId
         );
+        if ($role === 'partner' && isset($input['commission_pct']) && is_numeric($input['commission_pct'])) {
+            $pct = max(0.0, min(100.0, (float) $input['commission_pct']));
+            $this->tenant->update('users', $uid, ['commission_pct' => $pct]);
+        }
+        return $uid;
     }
 
     /**
@@ -99,7 +110,8 @@ final class UserService
         if ($before === null) {
             throw new HttpException(404, 'משתמש לא נמצא');
         }
-        if ($before['role'] === 'owner' && ($actor['role'] ?? '') !== 'owner') {
+        $beforeRole = ((int) ($before['is_partner'] ?? 0) === 1) ? 'partner' : (string) $before['role'];
+        if ($beforeRole === 'owner' && ($actor['role'] ?? '') !== 'owner') {
             throw new HttpException(403, 'רק בעלים יכול לערוך משתמש בעלים');
         }
 
@@ -107,7 +119,7 @@ final class UserService
         if ($name === '' || Str::len($name) > 120) {
             throw new InvalidArgumentException('שם המשתמש הוא שדה חובה (עד 120 תווים)');
         }
-        $role = array_key_exists('role', $input) ? Str::clean((string) $input['role']) : (string) $before['role'];
+        $role = array_key_exists('role', $input) ? Str::clean((string) $input['role']) : $beforeRole;
         if (!in_array($role, Permissions::ROLES, true)) {
             throw new InvalidArgumentException('תפקיד לא תקין');
         }
@@ -122,6 +134,9 @@ final class UserService
         $clientId = array_key_exists('client_id', $input)
             ? ($input['client_id'] !== null && $input['client_id'] !== '' ? (int) $input['client_id'] : null)
             : ($before['client_id'] !== null ? (int) $before['client_id'] : null);
+        if ($role === 'partner') {
+            $clientId = null;
+        }
         if ($clientId !== null && $this->tenant->find('clients', $clientId) === null) {
             throw new InvalidArgumentException('לקוח לא נמצא');
         }
@@ -129,7 +144,7 @@ final class UserService
             throw new InvalidArgumentException('משתמש צופה (לקוח) חייב להיות משויך ללקוח');
         }
 
-        if ($before['role'] === 'owner' && ($role !== 'owner' || $status !== 'active')) {
+        if ($beforeRole === 'owner' && ($role !== 'owner' || $status !== 'active')) {
             $activeOwners = (int) ($this->tenant->selectOne(
                 "SELECT COUNT(*) AS n FROM users WHERE tenant_id = :tenant_id AND role = 'owner' AND status = 'active' AND id != :uid",
                 ['uid' => $userId]
@@ -139,13 +154,20 @@ final class UserService
             }
         }
 
+        $isPartner = $role === 'partner' ? 1 : 0;
+        $dbRole = $isPartner === 1 ? 'client_viewer' : $role;
+
         $update = [
             'name'       => $name,
-            'role'       => $role,
+            'role'       => $dbRole,
+            'is_partner' => $isPartner,
             'status'     => $status,
             'client_id'  => $clientId,
             'updated_at' => gmdate('Y-m-d\TH:i:s\Z'),
         ];
+        if (array_key_exists('commission_pct', $input) && is_numeric($input['commission_pct'])) {
+            $update['commission_pct'] = max(0.0, min(100.0, (float) $input['commission_pct']));
+        }
         $passwordChanged = false;
         if (!empty($input['password'])) {
             $pw = (string) $input['password'];
@@ -156,22 +178,48 @@ final class UserService
             $passwordChanged = true;
         }
 
-        $this->tenant->transaction(function (Tenant $t) use ($actor, $userId, $before, $update, $clientId, $passwordChanged): void {
+        $this->tenant->transaction(function (Tenant $t) use ($actor, $userId, $before, $beforeRole, $role, $update, $clientId, $passwordChanged): void {
             $t->update('users', $userId, $update);
             $safeBefore = [
                 'name'      => $before['name'],
-                'role'      => $before['role'],
+                'role'      => $beforeRole,
                 'status'    => $before['status'],
                 'client_id' => $before['client_id'],
             ];
             $safeAfter = [
                 'name'             => $update['name'],
-                'role'             => $update['role'],
+                'role'             => $role,
                 'status'           => $update['status'],
                 'client_id'        => $update['client_id'],
                 'password_changed' => $passwordChanged,
             ];
             Events::record($t, (int) $actor['id'], 'user', $userId, $clientId, 'user.updated', $safeBefore, $safeAfter);
+        });
+    }
+
+    /**
+     * Link or unlink a client to a sales partner (`clients.partner_user_id`).
+     *
+     * @param array<string, mixed> $actor
+     */
+    public function assignPartnerToClient(array $actor, int $clientId, ?int $partnerUserId): void
+    {
+        $this->perms->authorize($actor, 'users.manage');
+        $client = $this->tenant->find('clients', $clientId);
+        if ($client === null) {
+            throw new HttpException(404, 'לקוח לא נמצא');
+        }
+        if ($partnerUserId !== null) {
+            $pUser = $this->tenant->find('users', $partnerUserId);
+            if ($pUser === null || (int) ($pUser['is_partner'] ?? 0) !== 1) {
+                throw new InvalidArgumentException('המשתמש שנבחר אינו מוגדר כשותף / סוכן מכירות');
+            }
+        }
+        $before = $client['partner_user_id'] ?? null;
+        $this->tenant->transaction(function (Tenant $t) use ($actor, $clientId, $before, $partnerUserId): void {
+            $t->update('clients', $clientId, ['partner_user_id' => $partnerUserId, 'updated_at' => gmdate('Y-m-d\TH:i:s\Z')]);
+            Events::record($t, (int) $actor['id'], 'client', $clientId, $clientId, 'client.partner_assigned',
+                ['partner_user_id' => $before], ['partner_user_id' => $partnerUserId]);
         });
     }
 

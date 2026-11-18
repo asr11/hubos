@@ -100,7 +100,7 @@ final class Client360Service
     /** @param array<string, mixed> $user */
     public static function isInternal(array $user): bool
     {
-        return ($user['role'] ?? '') !== 'client_viewer';
+        return !in_array($user['role'] ?? '', ['client_viewer', 'partner'], true);
     }
 
     /**

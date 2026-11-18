@@ -19,6 +19,15 @@ final class DashboardController
         $user = $ctx->requireUser();
         $svc = new DashboardService($ctx->tenant(), $ctx->permissions());
 
+        if (($user['role'] ?? '') === 'partner') {
+            $partner = (new \HubOS\Modules\Partners\PartnerService($ctx->tenant()))->portal($user);
+            return $ctx->render('dashboard/partner', [
+                'title'   => 'פורטל שותפים וסוכני מכירות',
+                'active'  => 'dashboard',
+                'partner' => $partner,
+            ]);
+        }
+
         if (($user['role'] ?? '') === 'client_viewer') {
             $portal = $svc->portal($user);
             return $ctx->render('dashboard/portal', [

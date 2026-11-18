@@ -12,13 +12,14 @@ use InvalidArgumentException;
  */
 final class Permissions
 {
-    public const ROLES = ['owner', 'admin', 'staff', 'agent', 'client_viewer'];
+    public const ROLES = ['owner', 'admin', 'staff', 'agent', 'partner', 'client_viewer'];
 
     public const ROLE_LABELS = [
         'owner'         => 'בעלים',
         'admin'         => 'מנהל',
         'staff'         => 'צוות',
-        'agent'         => 'סוכן',
+        'agent'         => 'סוכן AI (מנכ״ל דיגיטלי)',
+        'partner'       => 'שותף / סוכן מכירות',
         'client_viewer' => 'צופה (לקוח)',
     ];
 
@@ -37,6 +38,8 @@ final class Permissions
         'agent'         => ['dashboard.view', 'clients.view', 'clients.create', 'clients.update', 'events.view',
                             'time.view', 'time.track', 'work.view', 'work.create', 'work.update',
                             'assets.view', 'assets.create', 'assets.update', 'assets.inspect', 'vault.view', 'finance.view'],
+        // Isolated human sales partner (Level 2): own Partner Portal + lead submission ONLY; NEVER vault/finance/all-clients.
+        'partner'       => ['dashboard.view'],
         // Read-only, scoped to the linked client (client-visible tasks + time totals + own assets only; NEVER vault).
         'client_viewer' => ['dashboard.view', 'clients.view', 'time.view', 'work.view', 'assets.view'],
     ];
@@ -94,8 +97,12 @@ final class Permissions
         if ((int) ($user['tenant_id'] ?? 0) !== $this->tenant->id() || ($user['status'] ?? '') !== 'active') {
             return false;
         }
-        // Hard security invariant: client_viewer can NEVER access or reveal vault items.
-        if (($user['role'] ?? '') === 'client_viewer' && str_starts_with($permission, 'vault.')) {
+        // Hard security invariant: client_viewer and partner can NEVER access or reveal vault items.
+        if (in_array($user['role'] ?? '', ['client_viewer', 'partner'], true) && str_starts_with($permission, 'vault.')) {
+            return false;
+        }
+        // Hard security invariant: human partner is strictly confined to Partner Portal (dashboard.view), even against overrides.
+        if (($user['role'] ?? '') === 'partner' && $permission !== 'dashboard.view') {
             return false;
         }
         // Hard security invariant: finance data is strictly locked to role 'owner' (and 'agent' for CEO bot reporting).

@@ -43,6 +43,7 @@ simulation() {
     mkdir -m 700 "$D" "$D/sessions" "$D/logs" && chown -R "$APP_USER:$APP_USER" "$D"
     su -s /bin/bash "$APP_USER" -c "sqlite3 '$SRC_DB' \".backup '$D/hubos.sqlite'\"" || return 2
     local envs="HUBOS_DB_PATH=$D/hubos.sqlite HUBOS_SESSION_PATH=$D/sessions HUBOS_LOG_PATH=$D/logs HUBOS_COOKIE_SECURE=0 HUBOS_AGENT_TOKEN=$TOKEN"
+    su -s /bin/bash "$APP_USER" -c "env $envs $PHP '$APP/bin/migrate.php'" > /dev/null || return 2
     su -s /bin/bash "$APP_USER" -c "env $envs $PHP '$APP/tests/sim/setup.php'" > "$D/setup.json" || return 3
     su -s /bin/bash "$APP_USER" -c "cd '$APP' && env $envs PHP_CLI_SERVER_WORKERS=4 setsid nohup $PHP -S 127.0.0.1:$PORT -t public public/index.php > '$D/server.log' 2>&1 < /dev/null &"
     for _ in $(seq 1 30); do curl -s -o /dev/null "http://127.0.0.1:$PORT/login" && break; sleep 0.2; done

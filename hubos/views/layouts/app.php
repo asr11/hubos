@@ -24,6 +24,9 @@ $nav = [
     ['key' => 'vault',     'href' => '/vault',          'label' => 'כספת גישות',      'icon' => '🔒', 'perm' => 'vault.view'],
     ['key' => 'users',     'href' => '/settings/users', 'label' => 'משתמשים והרשאות', 'icon' => '⚙', 'perm' => 'users.view'],
 ];
+if ((int) ($user['tenant_id'] ?? 0) === 1 && ($user['role'] ?? '') === 'owner') {
+    $nav[] = ['key' => 'saas', 'href' => '/settings/saas', 'label' => 'ארגוני SaaS', 'icon' => '🏢', 'perm' => 'users.manage'];
+}
 $soon = [];
 $timerBox = $timerBox ?? null;
 $returnTo = (string) ($_SERVER['REQUEST_URI'] ?? '/');

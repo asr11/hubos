@@ -1756,6 +1756,92 @@ test('sqlite concurrency: Tenant::transaction takes the write lock up-front (BEG
     ok(!$a->inTransaction() && !$b->inTransaction(), 'write lock released after commit');
 });
 
+test('m8 partner isolation: 10% royalty ledger, lead submission & hard 403 lock against vault/finance/clients', function (): void {
+    $pdo = freshDb();
+    $tid = Provisioning::ensureTenant($pdo, 'zz-m8-partner', 'ZZ Partner Tenant');
+    $t = new Tenant($pdo, $tid);
+    $perms = new Permissions($t);
+    $userSvc = new \HubOS\Modules\Users\UserService($pdo, $t, $perms);
+
+    $ownerId = Provisioning::createUser($pdo, $tid, 'zz_owner_p@hubos.test', 'ZZ Owner', 'owner', 'zz-owner-pass-1234');
+    $owner = (new Auth($pdo, ['session_path' => sys_get_temp_dir(), 'cookie_secure' => '0', 'session_idle_seconds' => 3600]))->verifyCredentials('zz_owner_p@hubos.test', 'zz-owner-pass-1234');
+
+    $partnerId = $userSvc->create($owner, [
+        'name'           => 'ZZ Partner Sales',
+        'email'          => 'zz_partner@hubos.test',
+        'role'           => 'partner',
+        'commission_pct' => '10',
+        'password'       => 'zz-partner-pass-1234',
+    ]);
+    $partner = (new Auth($pdo, ['session_path' => sys_get_temp_dir(), 'cookie_secure' => '0', 'session_idle_seconds' => 3600]))->verifyCredentials('zz_partner@hubos.test', 'zz-partner-pass-1234');
+    eq('partner', $partner['role'], 'Auth hydrates role=partner');
+    ok(!Client360Service::isInternal($partner), 'partner is NEVER treated as internal user');
+
+    // Even if someone inserts a per-user override in user_permissions, Permissions::can blocks it
+    $perms->setUserPermission($owner, $partnerId, 'vault.view', true);
+    $perms->setUserPermission($owner, $partnerId, 'clients.view', true);
+    $perms->setUserPermission($owner, $partnerId, 'finance.view', true);
+    ok($perms->can($partner, 'dashboard.view'), 'partner can view own dashboard');
+    ok(!$perms->can($partner, 'vault.view'), 'partner NEVER accesses vault even with override');
+    ok(!$perms->can($partner, 'clients.view'), 'partner NEVER accesses global clients list');
+    ok(!$perms->can($partner, 'finance.view'), 'partner NEVER accesses company finance');
+
+    $myClient = $t->insert('clients', ['name' => 'ZZ Referred Client']);
+    $otherClient = $t->insert('clients', ['name' => 'ZZ Other Secret Client']);
+    $userSvc->assignPartnerToClient($owner, $myClient, $partnerId);
+
+    // Realized income on myClient (net 5000, gross 5900) vs proforma 300 (ignored) vs otherClient (ignored)
+    $t->insert('finance_documents', ['client_id' => $myClient, 'doc_type' => '320', 'amount' => 5900, 'vat' => 900, 'status' => 'paid', 'counts_as_income' => 1, 'doc_date' => '2026-11-10']);
+    $t->insert('finance_documents', ['client_id' => $myClient, 'doc_type' => '300', 'amount' => 5900, 'vat' => 900, 'status' => 'pending', 'counts_as_income' => 0, 'doc_date' => '2026-11-10']);
+    $t->insert('finance_documents', ['client_id' => $otherClient, 'doc_type' => '320', 'amount' => 50000, 'vat' => 7627, 'status' => 'paid', 'counts_as_income' => 1, 'doc_date' => '2026-11-10']);
+
+    $pSvc = new \HubOS\Modules\Partners\PartnerService($t);
+    $leadId = $pSvc->createLead($partner, ['name' => 'ZZ New Lead Ltd', 'phone' => '052-1234567', 'notes' => 'קטלוג B2B']);
+    ok($leadId > 0, 'partner lead created');
+
+    $portal = $pSvc->portal($partner);
+    eq(1, $portal['metrics']['clients_count'], 'partner sees ONLY own referred client');
+    eq(1, $portal['metrics']['leads_count'], 'partner sees own submitted lead');
+    eq(5000.0, $portal['metrics']['realized_net'], 'net realized income excludes VAT, 300 proformas, and other clients');
+    eq(500.0, $portal['metrics']['royalties_total'], '10% royalty accurately computed on net realized income');
+});
+
+test('m8 multi-tenant saas: isolated tenant provisioning, AES-256-GCM per-tenant Morning keys & signup gate', function (): void {
+    $pdo = freshDb();
+    $t1Id = Provisioning::ensureTenant($pdo, 'hub', 'HUB Core');
+    $t1 = new Tenant($pdo, $t1Id);
+    $t1->insert('clients', ['name' => 'ZZ Core Secret Client']);
+    $owner1Id = Provisioning::createUser($pdo, $t1Id, 'asher@hub.test', 'Asher', 'owner', 'zz-root-owner-1234');
+    $owner1 = ['id' => $owner1Id, 'tenant_id' => $t1Id, 'role' => 'owner', 'status' => 'active'];
+
+    $vault = HubOS\Core\Vault::fromKeyString(str_repeat('a', 64));
+    $saas1 = new \HubOS\Modules\Saas\SaasService($pdo, $t1, $vault);
+    ok(!$saas1->isPublicSignupEnabled(), 'public signup is locked by default');
+
+    $res = $saas1->provisionTenant($owner1, [
+        'company_name'   => 'ZZ Alpha Agency Ltd',
+        'slug'           => 'alpha-agency',
+        'owner_name'     => 'Alpha CEO',
+        'owner_email'    => 'ceo@alpha.test',
+        'owner_password' => 'zz-alpha-pass-1234',
+        'plan'           => 'pro',
+        'billing_url'    => 'https://mrng.to/zz-plan',
+    ]);
+    $t2 = new Tenant($pdo, $res['tenant_id']);
+    eq(0, $t2->count('clients'), 'new SaaS tenant has 0 access to Tenant #1 clients');
+
+    $owner2 = ['id' => $res['owner_user_id'], 'tenant_id' => $res['tenant_id'], 'role' => 'owner', 'status' => 'active'];
+    $saas2 = new \HubOS\Modules\Saas\SaasService($pdo, $t2, $vault);
+    eq(403, throws(fn () => $saas2->listTenants($owner2), HttpException::class)->status, 'external SaaS tenant owner cannot list platform tenants');
+
+    $saas2->saveMorningCredentials($owner2, 'zz-key-id-9999', 'zz-super-secret-morning-key');
+    $rawStored = $t2->selectOne("SELECT value FROM tenant_settings WHERE tenant_id = :tenant_id AND key = 'morning_secret_cipher'");
+    ok(!str_contains((string) $rawStored['value'], 'zz-super-secret'), 'Morning secret is encrypted in tenant_settings, never plaintext');
+    $dec = $saas2->getDecryptedMorningCredentials();
+    eq('zz-key-id-9999', $dec['key_id']);
+    eq('zz-super-secret-morning-key', $dec['key_secret']);
+});
+
 // ---------------------------------------------------------------- Run
 
 $pass = 0;

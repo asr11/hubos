@@ -216,6 +216,82 @@ $enabledModules = count(array_filter($modules, static fn (array $m): bool => $m[
     </div>
 </section>
 
+<?php
+$partners = array_values(array_filter($users, static fn (array $u): bool => ($u['role'] ?? '') === 'partner' && ($u['status'] ?? '') === 'active'));
+$isOwner = ($user['role'] ?? '') === 'owner';
+$tMeta = $tenantMeta ?? [];
+?>
+<?php if ($canManageUsers): ?>
+<section class="grid-2-wide">
+    <article class="card" aria-labelledby="partner-assign-title">
+        <div class="card-head">
+            <h2 id="partner-assign-title">שיוך לקוח לשותף / סוכן מכירות (תמלוגים)</h2>
+        </div>
+        <?php if ($partners === []): ?>
+            <p class="empty">צור תחילה משתמש בתפקיד "שותף / סוכן מכירות" למעלה כדי לשייך אליו לקוחות.</p>
+        <?php else: ?>
+            <form method="post" action="/settings/partners/assign-client" class="stack" id="partner-assign-form">
+                <?= Csrf::field() ?>
+                <label class="field">
+                    <span>בחר תיק לקוח</span>
+                    <select name="client_id" required>
+                        <option value="">— בחר לקוח —</option>
+                        <?php foreach ($clients as $c): ?>
+                            <option value="<?= e((int) $c['id']) ?>"><?= e($c['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>שייך לשותף מכירות</span>
+                    <select name="partner_user_id">
+                        <option value="">— ללא שותף (הסר שיוך) —</option>
+                        <?php foreach ($partners as $p): ?>
+                            <option value="<?= e((int) $p['id']) ?>"><?= e($p['name']) ?> (<?= e(number_format((float) ($p['commission_pct'] ?? 10), 0)) ?>%)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">שמור שיוך שותף</button>
+                </div>
+            </form>
+        <?php endif; ?>
+    </article>
+
+    <?php if ($isOwner): ?>
+    <article class="card" aria-labelledby="morning-integration-title">
+        <div class="card-head">
+            <h2 id="morning-integration-title">חיבור Morning לארגון (קריאה בלבד · מוצפן) ומנוי</h2>
+            <span class="pill <?= !empty($tMeta['morning_configured']) ? 'pill-ok' : 'pill-warn' ?>">
+                <?= !empty($tMeta['morning_configured']) ? 'מחובר (' . e((string) $tMeta['morning_key_id_masked']) . ')' : 'טרם הוגדר מפתח ארגוני' ?>
+            </span>
+        </div>
+        <p class="muted">חבילת ארגון נוכחית: <strong><?= e((string) ($tMeta['plan_label'] ?? 'Enterprise')) ?></strong>
+            <?php if (!empty($tMeta['billing_url'])): ?>
+                · <a href="<?= e((string) $tMeta['billing_url']) ?>" target="_blank" rel="noopener noreferrer">ניהול הוראת קבע / מנוי ↗</a>
+            <?php endif; ?>
+            <?php if (!empty($isPlatformOwner)): ?>
+                · <a href="/settings/saas">ניהול כלל ארגוני SaaS ←</a>
+            <?php endif; ?>
+        </p>
+        <form method="post" action="/settings/integrations/morning" class="stack mt-sm" id="morning-settings-form">
+            <?= Csrf::field() ?>
+            <label class="field">
+                <span>Morning API Key ID <abbr title="שדה חובה">*</abbr></span>
+                <input type="text" name="morning_key_id" required maxlength="120" dir="ltr" placeholder="מזהה מפתח מחשבונית ירוקה">
+            </label>
+            <label class="field">
+                <span>Morning API Secret (מוצפן ב-AES-256-GCM) <abbr title="שדה חובה">*</abbr></span>
+                <input type="password" name="morning_key_secret" required maxlength="250" dir="ltr" autocomplete="off">
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-sm" id="morning-save-submit">הצפן ושמור מפתח Morning לארגון</button>
+            </div>
+        </form>
+    </article>
+    <?php endif; ?>
+</section>
+<?php endif; ?>
+
 <section class="grid-2-wide">
     <article class="card" aria-labelledby="modules-title">
         <div class="card-head">

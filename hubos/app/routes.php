@@ -85,7 +85,18 @@ return static function (Router $r): void {
     $r->post('/settings/users/{id:\d+}', [UsersController::class, 'update'], ['auth' => true, 'perm' => 'users.manage']);
     $r->post('/settings/users/{id:\d+}/permissions', [UsersController::class, 'setPermission'], ['auth' => true, 'perm' => 'permissions.manage']);
     $r->post('/settings/modules', [UsersController::class, 'setModule'], ['auth' => true, 'perm' => 'permissions.manage']);
+    $r->post('/settings/partners/assign-client', [UsersController::class, 'assignPartner'], ['auth' => true, 'perm' => 'users.manage']);
+    $r->post('/settings/integrations/morning', [\HubOS\Modules\Saas\SaasController::class, 'saveMorning'], ['auth' => true, 'perm' => 'users.manage']);
     $r->post('/settings/sync-d1', [DashboardController::class, 'syncD1'], ['auth' => true, 'perm' => 'clients.update']);
+
+    // M8 — Isolated Partner Lead Submission & Multi-Tenant SaaS Onboarding
+    $r->get('/signup', [\HubOS\Modules\Saas\SaasController::class, 'showSignup']);
+    $r->post('/signup', [\HubOS\Modules\Saas\SaasController::class, 'signup']);
+    $r->post('/partner/leads', [\HubOS\Modules\Saas\SaasController::class, 'submitPartnerLead'], ['auth' => true, 'perm' => 'dashboard.view']);
+    $r->get('/settings/saas', [\HubOS\Modules\Saas\SaasController::class, 'index'], ['auth' => true, 'perm' => 'users.manage']);
+    $r->post('/settings/saas/tenants', [\HubOS\Modules\Saas\SaasController::class, 'storeTenant'], ['auth' => true, 'perm' => 'users.manage']);
+    $r->post('/settings/saas/tenants/{id:\d+}', [\HubOS\Modules\Saas\SaasController::class, 'updateTenant'], ['auth' => true, 'perm' => 'users.manage']);
+    $r->post('/settings/saas/signup-toggle', [\HubOS\Modules\Saas\SaasController::class, 'togglePublicSignup'], ['auth' => true, 'perm' => 'users.manage']);
 
     // M7 — Digital-CEO Agent API (Bearer token authenticated, read-only views + append-only event)
     $r->get('/api/agent/status', [AgentApiController::class, 'status'], ['api' => true]);
