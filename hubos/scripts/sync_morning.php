@@ -144,9 +144,18 @@ $nowDt = date('Y-m-d H:i:s');
 $clientUpsertCount = 0;
 $clientInsertCount = 0;
 
-$findClientStmt = $pdo->prepare(
+$findByLegacyStmt = $pdo->prepare(
     "SELECT id, parent_client_id, legacy_id, name, tax_id, status FROM clients
-     WHERE tenant_id = :tenant_id AND (legacy_id = :leg_id OR (tax_id IS NOT NULL AND tax_id != '' AND tax_id = :tax_id) OR name = :name)
+     WHERE tenant_id = :tenant_id AND (legacy_id = :leg_id OR legacy_id = ('gi_' || :leg_id))
+     ORDER BY CASE WHEN legacy_id = :leg_id THEN 0 ELSE 1 END
+     LIMIT 1"
+);
+
+$findUnlinkedClientStmt = $pdo->prepare(
+    "SELECT id, parent_client_id, legacy_id, name, tax_id, status FROM clients
+     WHERE tenant_id = :tenant_id
+       AND (legacy_id IS NULL OR legacy_id NOT GLOB '????????-????-????-????-????????????')
+       AND ((tax_id IS NOT NULL AND tax_id != '' AND tax_id = :tax_id) OR name = :name)
      LIMIT 1"
 );
 
@@ -157,7 +166,7 @@ $insertClientStmt = $pdo->prepare(
 
 $updateClientStmt = $pdo->prepare(
     "UPDATE clients SET
-        legacy_id = COALESCE(:leg_id, legacy_id),
+        legacy_id = :leg_id,
         name = :name,
         tax_id = COALESCE(:tax_id, tax_id),
         phone = COALESCE(:phone, phone),
@@ -186,20 +195,30 @@ foreach ($allClients as $mc) {
 
     if ($name === '') continue;
 
-    $findClientStmt->execute([
-        ':tenant_id' => $tenantId,
-        ':leg_id'    => $legId,
-        ':tax_id'    => $taxId,
-        ':name'      => $name,
-    ]);
-    $existing = $findClientStmt->fetch(PDO::FETCH_ASSOC);
+    $existing = false;
+    if ($legId !== '') {
+        $findByLegacyStmt->execute([
+            ':tenant_id' => $tenantId,
+            ':leg_id'    => $legId,
+        ]);
+        $existing = $findByLegacyStmt->fetch(PDO::FETCH_ASSOC);
+    }
+    if (!$existing) {
+        $findUnlinkedClientStmt->execute([
+            ':tenant_id' => $tenantId,
+            ':tax_id'    => $taxId,
+            ':name'      => $name,
+        ]);
+        $existing = $findUnlinkedClientStmt->fetch(PDO::FETCH_ASSOC);
+    }
 
     if ($existing) {
         $localId = (int) $existing['id'];
+        $newLegId = $legId !== '' ? $legId : ($existing['legacy_id'] ?? null);
         $updateClientStmt->execute([
             ':id'         => $localId,
             ':tenant_id'  => $tenantId,
-            ':leg_id'     => $legId,
+            ':leg_id'     => $newLegId,
             ':name'       => $name,
             ':tax_id'     => $taxId !== '' ? $taxId : null,
             ':phone'      => $phone !== '' ? $phone : null,
