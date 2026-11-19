@@ -15,8 +15,11 @@ $entries = $report['time_entries'];
 $tasks = $report['tasks'];
 $projects = $report['projects'];
 $assets = $report['assets'];
+$seoKeywords = $report['seo_keywords'] ?? [];
 $isInternalScope = ($report['scope'] ?? 'client') === 'internal';
 $familyRolled = !empty($report['family_rolled']);
+$isRetainerSeoReport = $banks === [] && $entries === [] && $seoKeywords !== [];
+$secNum = 0;
 
 $hm = static function (int $sec): string {
     $sec = max(0, $sec);
@@ -43,12 +46,16 @@ $assetKinds = AssetService::KINDS;
                 <span class="brand-mark report-brand-mark" aria-hidden="true">OS</span>
                 <div>
                     <p class="report-issuer">האב מערכות מתקדמות בע״מ · OS HUB</p>
-                    <h1 id="report-title">דוח סטטוס עבודה, שעות ונכסים דיגיטליים</h1>
+                    <h1 id="report-title"><?= $isRetainerSeoReport ? 'דוח סטטוס עבודה, קידום אורגני ונכסים דיגיטליים' : 'דוח סטטוס עבודה, שעות ונכסים דיגיטליים' ?></h1>
                 </div>
             </div>
             <div class="report-doc-meta">
                 <div><span class="report-meta-k">תאריך הפקה:</span> <bdi dir="ltr"><?= e($report['generated_at_il']) ?></bdi></div>
-                <div><span class="report-meta-k">תקופת שעות:</span> <strong><?= e($report['period_label']) ?></strong></div>
+                <?php if (!$isRetainerSeoReport): ?>
+                    <div><span class="report-meta-k">תקופת שעות:</span> <strong><?= e($report['period_label']) ?></strong></div>
+                <?php else: ?>
+                    <div><span class="report-meta-k">מסלול ליווי:</span> <strong>ריטיינר חודשי מנוהל</strong></div>
+                <?php endif; ?>
                 <?php if ($isInternalScope): ?>
                     <div><span class="report-meta-k">סיווג מסמך:</span> <strong>תצוגת עבודה פנימית</strong></div>
                 <?php endif; ?>
@@ -72,38 +79,65 @@ $assetKinds = AssetService::KINDS;
         </div>
 
         <p class="report-lead">
-            מסמך זה מרכז בשקיפות מלאה את מאזן השעות, בנקי השעות הפעילים, סטטוס המשימות והפרויקטים, ותקינות הנכסים הדיגיטליים המשויכים לתיק הלקוח נכון למועד ההפקה.
+            <?php if ($isRetainerSeoReport): ?>
+                מסמך זה מרכז בשקיפות מלאה את התקדמות הפרויקט ואבני הדרך, מילות המפתח המרכזיות בקידום אורגני (SEO &amp; GEO), ותקינות הנכסים הדיגיטליים ואבטחת ה-SSL המשויכים לתיק הלקוח נכון למועד ההפקה.
+            <?php else: ?>
+                מסמך זה מרכז בשקיפות מלאה את מאזן השעות, בנקי השעות הפעילים, סטטוס המשימות והפרויקטים, ותקינות הנכסים הדיגיטליים המשויכים לתיק הלקוח נכון למועד ההפקה.
+            <?php endif; ?>
         </p>
     </div>
 
     <section class="report-kpis" aria-label="מדדים מרכזיים">
+        <?php if ($isRetainerSeoReport): ?>
+        <div class="report-kpi">
+            <span class="report-kpi-label">התקדמות אבני דרך</span>
+            <strong class="report-kpi-val" id="report-kpi-tasks"><bdi dir="ltr"><?= e($ks['done']) ?> / <?= e($ks['total']) ?></bdi></strong>
+            <span class="report-kpi-sub">הושלמו (<bdi dir="ltr"><?= e($ks['completion_pct']) ?>%</bdi>) · בטיפול: <?= e($ks['doing'] + $ks['todo']) ?></span>
+        </div>
+        <div class="report-kpi">
+            <span class="report-kpi-label">מסלול שירות</span>
+            <strong class="report-kpi-val" id="report-kpi-bank">ריטיינר</strong>
+            <span class="report-kpi-sub">שירות חודשי מנוהל</span>
+        </div>
+        <div class="report-kpi">
+            <span class="report-kpi-label">מילות מפתח בקידום (SEO &amp; GEO)</span>
+            <strong class="report-kpi-val" id="report-kpi-hours"><?= e(count($seoKeywords)) ?></strong>
+            <span class="report-kpi-sub">ביטויי מפתח במעקב ואופטימיזציה</span>
+        </div>
+        <div class="report-kpi">
+            <span class="report-kpi-label">נכסים ואבטחת SSL</span>
+            <strong class="report-kpi-val" id="report-kpi-assets"><?= e(count($assets)) ?></strong>
+            <span class="report-kpi-sub"><?= e(count($projects)) ?> חבילות שירות פעילות בתיק</span>
+        </div>
+        <?php else: ?>
         <div class="report-kpi">
             <span class="report-kpi-label"><?= $report['selected_period'] === 'all' ? 'סה״כ שעות מדווחות' : 'שעות בתקופה שנבחרה' ?></span>
-            <strong class="report-kpi-val" id="report-kpi-hours" dir="ltr"><?= e(fmt_hours($ts['period_hours'])) ?>h</strong>
+            <strong class="report-kpi-val" id="report-kpi-hours"><bdi dir="ltr"><?= e(fmt_hours($ts['period_hours'])) ?>h</bdi></strong>
             <span class="report-kpi-sub"><?= e($ts['entries_count']) ?> רישומי עבודה · החודש: <bdi dir="ltr"><?= e(fmt_hours($ts['hours_this_month'])) ?>h</bdi></span>
         </div>
         <div class="report-kpi">
             <span class="report-kpi-label">יתרת בנק שעות</span>
-            <strong class="report-kpi-val" id="report-kpi-bank" dir="ltr">
-                <?= $ts['bank_remaining'] === null ? '—' : e(fmt_hours($ts['bank_remaining'])) . 'h' ?>
+            <strong class="report-kpi-val" id="report-kpi-bank">
+                <?= $ts['bank_remaining'] === null ? '—' : '<bdi dir="ltr">' . e(fmt_hours($ts['bank_remaining'])) . 'h</bdi>' ?>
             </strong>
             <span class="report-kpi-sub"><?= $ts['bank_remaining'] === null ? 'ללא בנק שעות פעיל' : e(count($banks)) . ' בנקי שעות בתיק' ?></span>
         </div>
         <div class="report-kpi">
             <span class="report-kpi-label">סטטוס משימות</span>
-            <strong class="report-kpi-val" id="report-kpi-tasks"><?= e($ks['done']) ?> / <?= e($ks['total']) ?></strong>
-            <span class="report-kpi-sub">הושלמו (<?= e($ks['completion_pct']) ?>%) · בטיפול: <?= e($ks['doing'] + $ks['todo']) ?></span>
+            <strong class="report-kpi-val" id="report-kpi-tasks"><bdi dir="ltr"><?= e($ks['done']) ?> / <?= e($ks['total']) ?></bdi></strong>
+            <span class="report-kpi-sub">הושלמו (<bdi dir="ltr"><?= e($ks['completion_pct']) ?>%</bdi>) · בטיפול: <?= e($ks['doing'] + $ks['todo']) ?></span>
         </div>
         <div class="report-kpi">
             <span class="report-kpi-label">נכסים ודומיינים</span>
             <strong class="report-kpi-val" id="report-kpi-assets"><?= e(count($assets)) ?></strong>
             <span class="report-kpi-sub"><?= e(count($projects)) ?> פרויקטים פעילים בתיק</span>
         </div>
+        <?php endif; ?>
     </section>
 
-    <?php if ($banks !== []): ?>
+    <?php if ($banks !== []): $secNum++; ?>
     <section class="report-section" aria-labelledby="report-banks-heading">
-        <h2 id="report-banks-heading">1. מאזן בנקי שעות (<?= e(count($banks)) ?>)</h2>
+        <h2 id="report-banks-heading"><?= $secNum ?>. מאזן בנקי שעות (<?= e(count($banks)) ?>)</h2>
         <div tabindex="0" role="region" aria-labelledby="report-banks-caption" class="report-table-wrap">
             <table class="report-table report-table-banks" id="report-banks-table">
                 <caption id="report-banks-caption" class="visually-hidden">פירוט בנקי שעות ללקוח <?= e($c['name']) ?></caption>
@@ -135,8 +169,9 @@ $assetKinds = AssetService::KINDS;
     </section>
     <?php endif; ?>
 
+    <?php if (!$isRetainerSeoReport): $secNum++; ?>
     <section class="report-section" aria-labelledby="report-time-heading">
-        <h2 id="report-time-heading"><?= $banks !== [] ? '2.' : '1.' ?> פירוט שעות עבודה — <?= e($report['period_label']) ?> (<?= e(count($entries)) ?>)</h2>
+        <h2 id="report-time-heading"><?= $secNum ?>. פירוט שעות עבודה — <?= e($report['period_label']) ?> (<?= e(count($entries)) ?>)</h2>
         <?php if ($entries === []): ?>
             <p class="report-empty">אין רישומי שעות בתקופה שנבחרה.</p>
         <?php else: ?>
@@ -172,12 +207,14 @@ $assetKinds = AssetService::KINDS;
             </div>
         <?php endif; ?>
     </section>
+    <?php endif; ?>
 
+    <?php $secNum++; ?>
     <section class="report-section" aria-labelledby="report-tasks-heading">
-        <h2 id="report-tasks-heading"><?= $banks !== [] ? '3.' : '2.' ?> סטטוס משימות ופרויקטים (<?= e(count($tasks)) ?>)</h2>
+        <h2 id="report-tasks-heading"><?= $secNum ?>. מפת התקדמות — מה עשינו, מה עושים ומה נעשה (<?= e(count($tasks)) ?>)</h2>
         <?php if ($projects !== []): ?>
             <p class="report-projects-line">
-                <strong>פרויקטים בתיק:</strong>
+                <strong>חבילות שירות ופרויקטים בתיק:</strong>
                 <?php foreach ($projects as $idx => $p): ?>
                     <?= $idx > 0 ? ' · ' : '' ?><?= fmt_inline_bidi((string) $p['name']) ?>
                     (<?= e($projStatusLabels[$p['status']] ?? $p['status']) ?>)
@@ -218,47 +255,9 @@ $assetKinds = AssetService::KINDS;
         <?php endif; ?>
     </section>
 
-    <section class="report-section" aria-labelledby="report-assets-heading">
-        <h2 id="report-assets-heading"><?= $banks !== [] ? '4.' : '3.' ?> נכסים דיגיטליים, דומיינים ותעודות אבטחה (<?= e(count($assets)) ?>)</h2>
-        <?php if ($assets === []): ?>
-            <p class="report-empty">אין נכסים דיגיטליים פעילים הרשומים בתיק זה.</p>
-        <?php else: ?>
-            <div tabindex="0" role="region" aria-labelledby="report-assets-caption" class="report-table-wrap">
-                <table class="report-table report-table-assets" id="report-assets-table">
-                    <caption id="report-assets-caption" class="visually-hidden">רשימת נכסים ודומיינים מנוטרים</caption>
-                    <thead>
-                        <tr>
-                            <th scope="col">דומיין / מזהה נכס</th>
-                            <th scope="col">סוג</th>
-                            <th scope="col">ספק / רשם</th>
-                            <th scope="col">אבטחת SSL</th>
-                            <th scope="col">תוקף חידוש</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($assets as $a): $ssl = (string) ($a['ssl_status'] ?? ''); ?>
-                        <tr>
-                            <th scope="row" dir="ltr"><?= e($a['domain'] ?? '—') ?></th>
-                            <td><?= e($assetKinds[$a['kind'] ?? 'other'] ?? ($a['kind'] ?? '')) ?></td>
-                            <td><?= implode(' · ', array_map(static fn (string $s): string => '<bdi>' . e($s) . '</bdi>', array_filter([$a['provider'] ?? null, $a['registrar'] ?? null]))) ?: '—' ?></td>
-                            <td>
-                                <?php if ($ssl !== ''): ?>
-                                    <span class="report-badge <?= $ssl === 'valid' ? 'is-ok' : ($ssl === 'expiring' ? 'is-doing' : 'is-warn') ?>">
-                                        <?= $ssl === 'valid' ? '✓ ' : '! ' ?><?= e($sslLabels[$ssl] ?? $ssl) ?>
-                                    </span>
-                                <?php else: ?>—<?php endif; ?>
-                            </td>
-                            <td dir="ltr"><?= e(fmt_date($a['expiry_date'] ?? null) ?: '—') ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
-    </section>
-    <?php $seoKeywords = $report['seo_keywords'] ?? []; if ($seoKeywords !== []): ?>
+    <?php if ($seoKeywords !== []): $secNum++; ?>
     <section class="report-section" aria-labelledby="report-seo-heading">
-        <h2 id="report-seo-heading"><?= $banks !== [] ? '5.' : '4.' ?> מילות מפתח מרכזיות בקידום אורגני (SEO &amp; GEO) (<?= e(count($seoKeywords)) ?>)</h2>
+        <h2 id="report-seo-heading"><?= $secNum ?>. מילות מפתח מרכזיות בקידום אורגני (SEO &amp; GEO) (<?= e(count($seoKeywords)) ?>)</h2>
         <div tabindex="0" role="region" aria-labelledby="report-seo-caption" class="report-table-wrap">
             <table class="report-table" id="report-seo-table">
                 <caption id="report-seo-caption" class="visually-hidden">מילות מפתח מרכזיות במעקב קידום אורגני</caption>
@@ -278,9 +277,9 @@ $assetKinds = AssetService::KINDS;
                 ?>
                     <tr>
                         <th scope="row"><?= e($kw['keyword']) ?></th>
-                        <td dir="ltr"><?= e($u !== '' ? urldecode((string) preg_replace('#^https?://#i', '', rtrim($u, '/'))) : '—') ?></td>
-                        <td><?= e(\HubOS\Modules\Clients\ClientSeoService::STAGES[$st] ?? $st) ?></td>
-                        <td dir="ltr"><?= $kw['current_rank'] !== null ? '#' . e((int) $kw['current_rank']) : 'במדידה' ?></td>
+                        <td><bdi dir="ltr" class="report-seo-url"><?= e($u !== '' ? urldecode((string) preg_replace('#^https?://#i', '', rtrim($u, '/'))) : '—') ?></bdi></td>
+                        <td><span class="report-badge kw-stage-<?= e($st) ?> seo-stage-pill"><?= e(\HubOS\Modules\Clients\ClientSeoService::STAGES[$st] ?? $st) ?></span></td>
+                        <td><?= $kw['current_rank'] !== null ? '<bdi dir="ltr">#' . e((int) $kw['current_rank']) . '</bdi>' : 'במדידה שוטפת' ?></td>
                         <td><?= e($kw['notes'] ?? '—') ?></td>
                     </tr>
                 <?php endforeach; ?>
@@ -289,4 +288,44 @@ $assetKinds = AssetService::KINDS;
         </div>
     </section>
     <?php endif; ?>
+
+    <?php $secNum++; ?>
+    <section class="report-section" aria-labelledby="report-assets-heading">
+        <h2 id="report-assets-heading"><?= $secNum ?>. נכסים דיגיטליים, דומיינים ותעודות אבטחה (<?= e(count($assets)) ?>)</h2>
+        <?php if ($assets === []): ?>
+            <p class="report-empty">אין נכסים דיגיטליים פעילים הרשומים בתיק זה.</p>
+        <?php else: ?>
+            <div tabindex="0" role="region" aria-labelledby="report-assets-caption" class="report-table-wrap">
+                <table class="report-table report-table-assets" id="report-assets-table">
+                    <caption id="report-assets-caption" class="visually-hidden">רשימת נכסים ודומיינים מנוטרים</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">דומיין / מזהה נכס</th>
+                            <th scope="col">סוג</th>
+                            <th scope="col">ספק / רשם</th>
+                            <th scope="col">אבטחת SSL</th>
+                            <th scope="col">תוקף חידוש</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($assets as $a): $ssl = (string) ($a['ssl_status'] ?? ''); ?>
+                        <tr>
+                            <th scope="row"><bdi dir="ltr"><?= e($a['domain'] ?? '—') ?></bdi></th>
+                            <td><?= e($assetKinds[$a['kind'] ?? 'other'] ?? ($a['kind'] ?? '')) ?></td>
+                            <td><?= implode(' · ', array_map(static fn (string $s): string => '<bdi>' . e($s) . '</bdi>', array_filter([$a['provider'] ?? null, $a['registrar'] ?? null]))) ?: '—' ?></td>
+                            <td>
+                                <?php if ($ssl !== ''): ?>
+                                    <span class="report-badge <?= $ssl === 'valid' ? 'is-ok' : ($ssl === 'expiring' ? 'is-doing' : 'is-warn') ?>">
+                                        <?= $ssl === 'valid' ? '✓ ' : '! ' ?><?= e($sslLabels[$ssl] ?? $ssl) ?>
+                                    </span>
+                                <?php else: ?>—<?php endif; ?>
+                            </td>
+                            <td dir="ltr"><?= e(fmt_date($a['expiry_date'] ?? null) ?: '—') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </section>
 </article>

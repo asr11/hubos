@@ -70,13 +70,17 @@ $widthBucket = static function (int $pct): string {
 <section class="stats" aria-label="נתוני פורטל לקוח">
     <article class="stat card">
         <span class="stat-label">התקדמות אבני דרך</span>
-        <strong class="stat-value" id="portal-stat-tasks" dir="ltr"><?= e($doneTasksCount) ?> / <?= e($totalTasksCount) ?></strong>
-        <span class="stat-hint">הושלמו (<b dir="ltr"><?= e($overallPct) ?>%</b>) · פעילות: <?= e(count($openTasks)) ?></span>
+        <strong class="stat-value" id="portal-stat-tasks"><bdi dir="ltr"><?= e($doneTasksCount) ?> / <?= e($totalTasksCount) ?></bdi></strong>
+        <span class="stat-hint">הושלמו (<bdi dir="ltr"><?= e($overallPct) ?>%</bdi>) · פעילות: <?= e(count($openTasks)) ?></span>
     </article>
     <article class="stat card">
         <span class="stat-label">מסלול שירות / בנק שעות</span>
-        <strong class="stat-value" id="portal-stat-bank" dir="ltr">
-            <?= ($metrics['bank_remaining'] ?? null) === null ? 'ריטיינר' : e(number_format((float) $metrics['bank_remaining'], 1)) . 'h' ?>
+        <strong class="stat-value" id="portal-stat-bank">
+            <?php if (($metrics['bank_remaining'] ?? null) === null): ?>
+                ריטיינר
+            <?php else: ?>
+                <bdi dir="ltr"><?= e(number_format((float) $metrics['bank_remaining'], 1)) ?>h</bdi>
+            <?php endif; ?>
         </strong>
         <span class="stat-hint"><?= count($banks) > 0 ? e(count($banks)) . ' בנקי שעות פעילים' : 'שירות חודשי מנוהל' ?></span>
     </article>
@@ -89,8 +93,8 @@ $widthBucket = static function (int $pct): string {
     <?php else: ?>
     <article class="stat card">
         <span class="stat-label">שעות מדווחות</span>
-        <strong class="stat-value" id="portal-stat-hours" dir="ltr"><?= e(number_format($hoursThisMonth, 1)) ?>h</strong>
-        <span class="stat-hint">סה״כ מצטבר: <b dir="ltr"><?= e(number_format($hoursTotal, 1)) ?>h</b></span>
+        <strong class="stat-value" id="portal-stat-hours"><bdi dir="ltr"><?= e(number_format($hoursThisMonth, 1)) ?>h</bdi></strong>
+        <span class="stat-hint">סה״כ מצטבר: <bdi dir="ltr"><?= e(number_format($hoursTotal, 1)) ?>h</bdi></span>
     </article>
     <?php endif; ?>
     <article class="stat card">
@@ -214,7 +218,7 @@ $widthBucket = static function (int $pct): string {
         <span class="muted">ביטויים ממוקדים בעמודי האתר הפעילים</span>
     </div>
     <div class="table-wrap">
-        <table class="table" id="portal-seo-table">
+        <table class="table table-mobile-cards" id="portal-seo-table">
             <thead>
                 <tr>
                     <th scope="col">מילת מפתח / ביטוי יעד</th>
@@ -233,28 +237,28 @@ $widthBucket = static function (int $pct): string {
                 $urlLabel = $url !== '' ? urldecode((string) preg_replace('#^https?://#i', '', rtrim($url, '/'))) : '—';
             ?>
                 <tr>
-                    <td><strong><?= e($kw['keyword']) ?></strong></td>
-                    <td dir="ltr">
+                    <td data-label="מילת מפתח"><strong><?= e($kw['keyword']) ?></strong></td>
+                    <td data-label="עמוד יעד">
                         <?php if ($url !== ''): ?>
-                            <a href="<?= e($url) ?>" target="_blank" rel="noopener noreferrer"><?= e($urlLabel) ?> ↗</a>
+                            <a class="seo-url-link" dir="ltr" href="<?= e($url) ?>" target="_blank" rel="noopener noreferrer"><?= e($urlLabel) ?> ↗</a>
                         <?php else: ?>
                             <span class="muted">—</span>
                         <?php endif; ?>
                     </td>
-                    <td><span class="pill kw-stage-<?= e($stage) ?>"><?= e(ClientSeoService::STAGES[$stage] ?? $stage) ?></span></td>
-                    <td>
+                    <td data-label="שלב קידום"><span class="pill seo-stage-pill kw-stage-<?= e($stage) ?>"><?= e(ClientSeoService::STAGES[$stage] ?? $stage) ?></span></td>
+                    <td data-label="מיקום בגוגל">
                         <?php if ($rank !== null): ?>
                             <strong dir="ltr">#<?= e($rank) ?></strong>
                             <?php if ($prev !== null && $prev > $rank): ?>
-                                <span class="pill pill-ok" dir="ltr">▲ +<?= e($prev - $rank) ?></span>
+                                <span class="pill pill-ok seo-stage-pill" dir="ltr">▲ +<?= e($prev - $rank) ?></span>
                             <?php elseif ($prev !== null && $prev < $rank): ?>
-                                <span class="pill pill-warn" dir="ltr">▼ -<?= e($rank - $prev) ?></span>
+                                <span class="pill pill-warn seo-stage-pill" dir="ltr">▼ -<?= e($rank - $prev) ?></span>
                             <?php endif; ?>
                         <?php else: ?>
                             <span class="muted">במדידה שוטפת</span>
                         <?php endif; ?>
                     </td>
-                    <td class="muted"><?= e($kw['notes'] ?? '—') ?></td>
+                    <td data-label="פעולת קידום" class="muted"><?= e($kw['notes'] ?? '—') ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -272,7 +276,7 @@ $widthBucket = static function (int $pct): string {
             <p class="empty">אין נכסים רשומים לתיק זה.</p>
         <?php else: ?>
             <div class="table-wrap">
-                <table class="table" id="portal-assets-table">
+                <table class="table table-mobile-cards" id="portal-assets-table">
                     <thead>
                         <tr>
                             <th scope="col">דומיין / נכס</th>
@@ -286,16 +290,16 @@ $widthBucket = static function (int $pct): string {
                         $sslOk = ($a['ssl_status'] ?? '') === 'valid';
                     ?>
                         <tr>
-                            <td dir="ltr"><strong><?= e($a['domain'] ?? '—') ?></strong></td>
-                            <td><bdi><?= e($a['provider'] ?? '—') ?></bdi></td>
-                            <td>
+                            <td data-label="דומיין / נכס"><strong dir="ltr"><?= e($a['domain'] ?? '—') ?></strong></td>
+                            <td data-label="ספק / תשתית"><bdi><?= e($a['provider'] ?? '—') ?></bdi></td>
+                            <td data-label="אבטחת SSL">
                                 <?php if ($sslOk): ?>
-                                    <span class="pill pill-ok">🔒 תקין<?= !empty($a['ssl_expiry_date']) ? ' עד ' . e(fmt_date((string) $a['ssl_expiry_date'])) : '' ?></span>
+                                    <span class="pill pill-ok seo-stage-pill">🔒 תקין<?= !empty($a['ssl_expiry_date']) ? ' עד ' . e(fmt_date((string) $a['ssl_expiry_date'])) : '' ?></span>
                                 <?php else: ?>
-                                    <span class="pill pill-warn"><?= e(AssetService::SSL_STATUSES[$a['ssl_status'] ?? ''] ?? 'בבדיקה') ?></span>
+                                    <span class="pill pill-warn seo-stage-pill"><?= e(AssetService::SSL_STATUSES[$a['ssl_status'] ?? ''] ?? 'בבדיקה') ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td dir="ltr"><?= e(fmt_date($a['expiry_date'] ?? null) ?: '—') ?></td>
+                            <td data-label="תוקף דומיין"><bdi dir="ltr"><?= e(fmt_date($a['expiry_date'] ?? null) ?: '—') ?></bdi></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
