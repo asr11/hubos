@@ -33,12 +33,12 @@ $metrics = $partner['metrics'] ?? [];
     </article>
     <article class="stat card">
         <span class="stat-label">מחזור עסקאות ששולם (לפני מע״מ)</span>
-        <strong class="stat-value" id="partner-stat-net" dir="ltr">₪<?= e(number_format((float) ($metrics['realized_net'] ?? 0), 0)) ?></strong>
+        <strong class="stat-value" id="partner-stat-net"><bdi dir="ltr">₪<?= e(number_format((float) ($metrics['realized_net'] ?? 0), 0)) ?></bdi></strong>
         <span class="stat-hint">מאומת מול מסמכי אמת</span>
     </article>
     <article class="stat card">
-        <span class="stat-label">סה״כ תמלוגים שנצברו (<span dir="ltr"><?= e(number_format($pct, 0)) ?>%</span>)</span>
-        <strong class="stat-value" id="partner-stat-royalties" dir="ltr">₪<?= e(number_format((float) ($metrics['royalties_total'] ?? 0), 0)) ?></strong>
+        <span class="stat-label">סה״כ תמלוגים שנצברו (<bdi dir="ltr"><?= e(number_format($pct, 0)) ?>%</bdi>)</span>
+        <strong class="stat-value" id="partner-stat-royalties"><bdi dir="ltr">₪<?= e(number_format((float) ($metrics['royalties_total'] ?? 0), 0)) ?></bdi></strong>
         <span class="stat-hint">מלקוחות משויכים ששילמו</span>
     </article>
 </section>
@@ -81,7 +81,7 @@ $metrics = $partner['metrics'] ?? [];
             <p class="empty">עדיין לא שויכו לקוחות משלמים לחשבון השותף שלך.</p>
         <?php else: ?>
             <div class="table-wrap">
-                <table class="table" id="partner-clients-table">
+                <table class="table table-mobile-cards" id="partner-clients-table">
                     <thead>
                         <tr>
                             <th scope="col">לקוח</th>
@@ -93,10 +93,10 @@ $metrics = $partner['metrics'] ?? [];
                     <tbody>
                     <?php foreach ($clients as $c): ?>
                         <tr>
-                            <td><strong><?= e($c['name']) ?></strong></td>
-                            <td dir="ltr"><?= e($c['domain'] ?? '—') ?></td>
-                            <td dir="ltr">₪<?= e(number_format((float) $c['realized_net'], 0)) ?></td>
-                            <td dir="ltr"><strong>₪<?= e(number_format((float) $c['royalty_amount'], 0)) ?></strong></td>
+                            <td data-label="לקוח"><strong><?= e($c['name']) ?></strong></td>
+                            <td data-label="דומיין"><bdi dir="ltr"><?= e($c['domain'] ?? '—') ?></bdi></td>
+                            <td data-label="שולם (נטו)"><bdi dir="ltr">₪<?= e(number_format((float) $c['realized_net'], 0)) ?></bdi></td>
+                            <td data-label="התמלוגים שלי"><strong dir="ltr">₪<?= e(number_format((float) $c['royalty_amount'], 0)) ?></strong></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -113,7 +113,7 @@ $metrics = $partner['metrics'] ?? [];
             <p class="empty">טרם הוגשו לידים. השתמש בטופס למעלה לרישום ליד ראשון.</p>
         <?php else: ?>
             <div class="table-wrap">
-                <table class="table" id="partner-leads-table">
+                <table class="table table-mobile-cards" id="partner-leads-table">
                     <thead>
                         <tr>
                             <th scope="col">שם ליד</th>
@@ -125,15 +125,15 @@ $metrics = $partner['metrics'] ?? [];
                     <tbody>
                     <?php foreach ($leads as $l): ?>
                         <tr>
-                            <td>
+                            <td data-label="שם ליד">
                                 <strong><?= e($l['name']) ?></strong>
                                 <?php if (!empty($l['notes'])): ?>
                                     <div class="muted"><?= e($l['notes']) ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td dir="ltr"><?= e($l['phone'] ?: ($l['email'] ?? '—')) ?></td>
-                            <td><span class="pill"><?= e(PartnerService::LEAD_STATUSES[$l['status']] ?? $l['status']) ?></span></td>
-                            <td dir="ltr"><?= e(fmt_date($l['created_at'] ?? null)) ?></td>
+                            <td data-label="טלפון / מייל"><bdi dir="ltr"><?= e($l['phone'] ?: ($l['email'] ?? '—')) ?></bdi></td>
+                            <td data-label="סטטוס"><span class="pill seo-stage-pill"><?= e(PartnerService::LEAD_STATUSES[$l['status']] ?? $l['status']) ?></span></td>
+                            <td data-label="תאריך"><bdi dir="ltr"><?= e(fmt_date($l['created_at'] ?? null)) ?></bdi></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

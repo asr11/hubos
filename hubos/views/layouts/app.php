@@ -12,8 +12,9 @@ use HubOS\Core\Str;
  */
 $active = $active ?? '';
 $isClientViewer = ($user['role'] ?? '') === 'client_viewer';
+$isPartner = ($user['role'] ?? '') === 'partner';
 $nav = [
-    ['key' => 'dashboard', 'href' => '/dashboard',      'label' => 'לוח בקרה',        'icon' => '◆', 'perm' => 'dashboard.view'],
+    ['key' => 'dashboard', 'href' => '/dashboard',      'label' => $isPartner ? 'פורטל שותפים' : 'לוח בקרה', 'icon' => '◆', 'perm' => 'dashboard.view'],
     ['key' => 'clients',   'href' => ($isClientViewer && !empty($user['client_id'])) ? '/clients/' . (int) $user['client_id'] : '/clients', 'label' => $isClientViewer ? 'תיק לקוח' : 'לקוחות', 'icon' => '◎', 'perm' => 'clients.view'],
     ['key' => 'time',      'href' => '/time',           'label' => 'שעות',            'icon' => '◷', 'perm' => 'time.view'],
     ['key' => 'tasks',     'href' => '/tasks',          'label' => 'משימות',          'icon' => '☑', 'perm' => 'work.view'],
@@ -67,6 +68,8 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
         <div class="sidebar-foot">
             <?php if ($isClientViewer): ?>
                 <span class="portal-pill">🔒 פורטל לקוח מאובטח</span>
+            <?php elseif ($isPartner): ?>
+                <span class="portal-pill">🤝 פורטל שותפים מאובטח</span>
             <?php else: ?>
                 <span class="phase-pill">OS HUB · סביבת ייצור</span>
             <?php endif; ?>
