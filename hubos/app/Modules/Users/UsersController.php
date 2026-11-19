@@ -117,6 +117,10 @@ final class UsersController
         } catch (InvalidArgumentException|HttpException $e) {
             $ctx->flashError($e->getMessage());
         }
+        $returnTo = $ctx->input('_return');
+        if ($returnTo !== '' && preg_match('#^/clients/\d+$#', $returnTo) === 1) {
+            return Response::redirect($returnTo);
+        }
         return Response::redirect('/settings/users');
     }
 

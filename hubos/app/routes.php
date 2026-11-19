@@ -95,6 +95,8 @@ return static function (Router $r): void {
     $r->get('/signup', [\HubOS\Modules\Saas\SaasController::class, 'showSignup']);
     $r->post('/signup', [\HubOS\Modules\Saas\SaasController::class, 'signup']);
     $r->post('/partner/leads', [\HubOS\Modules\Saas\SaasController::class, 'submitPartnerLead'], ['auth' => true, 'perm' => 'dashboard.view']);
+    $r->post('/partner/leads/{id:\d+}/status', [\HubOS\Modules\Saas\SaasController::class, 'updatePartnerLeadStatus'], ['auth' => true, 'perm' => 'clients.update']);
+    $r->post('/partner/leads/{id:\d+}/convert', [\HubOS\Modules\Saas\SaasController::class, 'convertPartnerLead'], ['auth' => true, 'perm' => 'clients.create']);
     $r->get('/settings/saas', [\HubOS\Modules\Saas\SaasController::class, 'index'], ['auth' => true, 'perm' => 'users.manage']);
     $r->post('/settings/saas/tenants', [\HubOS\Modules\Saas\SaasController::class, 'storeTenant'], ['auth' => true, 'perm' => 'users.manage']);
     $r->post('/settings/saas/tenants/{id:\d+}', [\HubOS\Modules\Saas\SaasController::class, 'updateTenant'], ['auth' => true, 'perm' => 'users.manage']);

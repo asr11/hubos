@@ -1484,5 +1484,29 @@ tr.is-task-done td.strong a {
     .table-mobile-cards .seo-url-link { white-space: normal; word-break: break-word; justify-content: flex-end; }
 }
 
+.client-partner-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0.5rem;
+}
+.client-partner-form select {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+    border-radius: 6px;
+}
+.partner-lead-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+.partner-lead-actions select {
+    padding: 0.25rem 0.45rem;
+    font-size: 0.82rem;
+    border-radius: 6px;
+}
+
 
 

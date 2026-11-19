@@ -110,6 +110,35 @@ final class SaasController
         return Response::redirect('/dashboard');
     }
 
+    /** @param array<string, string> $params */
+    public function updatePartnerLeadStatus(Context $ctx, array $params): Response
+    {
+        $user = $ctx->requireUser();
+        $id = (int) ($params['id'] ?? 0);
+        try {
+            (new PartnerService($ctx->tenant()))->updateLeadStatus($user, $ctx->permissions(), $id, $ctx->input('status'));
+            $ctx->flash('סטטוס הליד עודכן ונרשם ביומן');
+        } catch (InvalidArgumentException|HttpException $e) {
+            $ctx->flashError($e->getMessage());
+        }
+        return Response::redirect('/dashboard#sec-partner-leads');
+    }
+
+    /** @param array<string, string> $params */
+    public function convertPartnerLead(Context $ctx, array $params): Response
+    {
+        $user = $ctx->requireUser();
+        $id = (int) ($params['id'] ?? 0);
+        try {
+            $cid = (new PartnerService($ctx->tenant()))->convertLeadToClient($user, $ctx->permissions(), $id);
+            $ctx->flash('הליד הומר לתיק לקוח פעיל ושויך אוטומטית לשותף המפנה!');
+            return Response::redirect('/clients/' . $cid);
+        } catch (InvalidArgumentException|HttpException $e) {
+            $ctx->flashError($e->getMessage());
+            return Response::redirect('/dashboard#sec-partner-leads');
+        }
+    }
+
     public function showSignup(Context $ctx): Response
     {
         if ($ctx->user() !== null) {

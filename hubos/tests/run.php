@@ -1877,6 +1877,58 @@ test('m9 client seo keywords: store, rank trend tracking, delete & client portal
     eq(0, count($seo->listForClient($cid)), 'deleted keyword removed');
 });
 
+test('m9.3 partner lead lifecycle, 1-click conversion & client 360 partner attribution', function (): void {
+    $pdo = freshDb();
+    $tid = Provisioning::ensureTenant($pdo, 'zz-m93-partner', 'ZZ Partner Flow');
+    $t = new Tenant($pdo, $tid);
+    $perms = new Permissions($t);
+    $ownerId = Provisioning::createUser($pdo, $tid, 'zz_p_owner@hubos.test', 'ZZ Owner', 'owner', 'zz-owner-pass-1234');
+    $owner = ['id' => $ownerId, 'tenant_id' => $tid, 'role' => 'owner', 'status' => 'active'];
+    $partnerId = Provisioning::createUser($pdo, $tid, 'zz_p_sales@hubos.test', 'ZZ Liron', 'partner', 'zz-sales-pass-1234', $ownerId);
+    $partner = ['id' => $partnerId, 'tenant_id' => $tid, 'role' => 'partner', 'status' => 'active', 'commission_pct' => 10.0];
+
+    $pSvc = new \HubOS\Modules\Partners\PartnerService($t);
+    $leadId = $pSvc->createLead($partner, [
+        'name'  => 'ZZ Lead Corp',
+        'phone' => '050-1112233',
+        'email' => 'ceo@zzlead.test',
+        'notes' => 'שדרוג אתר + SEO',
+    ]);
+
+    // Partner cannot view all leads, update status, or convert leads
+    eq(403, throws(fn () => $pSvc->listAllPartnerLeads($partner, $perms), HttpException::class)->status, 'partner blocked from owner leads inbox');
+    eq(403, throws(fn () => $pSvc->updateLeadStatus($partner, $perms, $leadId, 'contacted'), HttpException::class)->status, 'partner blocked from updating lead status');
+    eq(403, throws(fn () => $pSvc->convertLeadToClient($partner, $perms, $leadId), HttpException::class)->status, 'partner blocked from converting lead');
+
+    // Owner sees lead in CEO dashboard and updates status
+    $ceo = (new \HubOS\Modules\Dashboard\DashboardService($t, $perms))->ceo($owner);
+    eq(1, count($ceo['partnerLeads']), 'owner sees partner lead in dashboard inbox');
+    eq('ZZ Liron', $ceo['partnerLeads'][0]['partner_name']);
+    $pSvc->updateLeadStatus($owner, $perms, $leadId, 'qualified');
+    eq('qualified', $pSvc->listAllPartnerLeads($owner, $perms)[0]['status']);
+
+    // 1-click convert creates active client attributed to partner and is idempotent
+    $cid = $pSvc->convertLeadToClient($owner, $perms, $leadId);
+    $cidAgain = $pSvc->convertLeadToClient($owner, $perms, $leadId);
+    eq($cid, $cidAgain, 'convertLeadToClient is idempotent');
+
+    // Client immediately appears in Partner portal & Client 360 shows partner to owner ONLY
+    $portal = $pSvc->portal($partner);
+    eq(1, count($portal['clients']), 'converted client appears in partner portal');
+    eq($cid, (int) $portal['clients'][0]['id']);
+
+    $c360Owner = (new Client360Service($t, $perms))->build($owner, $cid);
+    eq('ZZ Liron', $c360Owner['partner']['name'] ?? null, 'owner sees referring partner on Client 360');
+    eq(1, count($c360Owner['partners']), 'owner receives active partners list on Client 360');
+
+    $viewerId = Provisioning::createUser($pdo, $tid, 'zz_p_viewer@hubos.test', 'ZZ Client Viewer', 'client_viewer', 'zz-view-pass-1234', $ownerId, $cid);
+    $viewer = ['id' => $viewerId, 'tenant_id' => $tid, 'role' => 'client_viewer', 'client_id' => $cid, 'status' => 'active'];
+    $c360Viewer = (new Client360Service($t, $perms))->build($viewer, $cid);
+    eq(null, $c360Viewer['partner'], 'client_viewer never sees internal referring partner');
+    eq([], $c360Viewer['partners'], 'client_viewer never receives partners list');
+    ok(!array_key_exists('partner_user_id', $c360Viewer['client']), 'partner_user_id stripped for client_viewer');
+});
+
 // ---------------------------------------------------------------- Run
 
 $pass = 0;

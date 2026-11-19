@@ -51,6 +51,10 @@ final class Client360Service
         'client.created'                => 'תיק לקוח הוקם',
         'client.updated'                => 'פרטי לקוח עודכנו',
         'client.registry_applied'       => 'פרטי רשם החברות הוחלו',
+        'client.partner_assigned'       => 'שותף מפנה שויך ללקוח',
+        'partner.lead_submitted'        => 'ליד חדש הוגש ע״י שותף',
+        'partner.lead_status_updated'   => 'סטטוס ליד שותף עודכן',
+        'partner.lead_converted'        => 'ליד שותף הומר ללקוח',
         'hours_bank.created'            => 'בנק שעות הוקם',
         'hours_bank.threshold_crossed'  => 'חציית סף בבנק שעות',
         'hours_bank.settings_updated'   => 'הגדרות בנק שעות עודכנו',
@@ -293,10 +297,38 @@ final class Client360Service
             'timeline'     => count($timeline),
         ];
 
+        $partners = [];
+        $linkedPartner = null;
+        if ($internal) {
+            $partners = (new \HubOS\Modules\Partners\PartnerService($this->tenant))->listActivePartners();
+            $pid = isset($client['partner_user_id']) && $client['partner_user_id'] !== null ? (int) $client['partner_user_id'] : null;
+            if ($pid !== null) {
+                foreach ($partners as $pt) {
+                    if ((int) $pt['id'] === $pid) {
+                        $linkedPartner = $pt;
+                        break;
+                    }
+                }
+                if ($linkedPartner === null) {
+                    $pRow = $this->tenant->selectOne(
+                        'SELECT id, name, email, COALESCE(commission_pct, 10.0) AS commission_pct FROM users WHERE tenant_id = :tenant_id AND id = :id',
+                        ['id' => $pid]
+                    );
+                    if ($pRow !== null) {
+                        $linkedPartner = $pRow;
+                    }
+                }
+            }
+        } else {
+            unset($client['partner_user_id']);
+        }
+
         unset($client['data_json']);
         return [
             'provenance'   => $internal ? (new \HubOS\Modules\Import\SyncService($this->tenant, $this->perms))->latestProvenance($now) : null,
             'client'       => $client,
+            'partner'      => $linkedPartner,
+            'partners'     => $partners,
             'registry'     => $this->registryData($clientId),
             'scope'        => $internal ? 'family' : 'self',
             'internal'     => $internal,

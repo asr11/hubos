@@ -149,4 +149,138 @@ final class PartnerService
             return $id;
         });
     }
+
+    /**
+     * List active sales partners in the tenant (for Owner/Admin Client 360 selector and dashboard).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listActivePartners(): array
+    {
+        return $this->tenant->select(
+            "SELECT id, name, email, COALESCE(commission_pct, 10.0) AS commission_pct
+               FROM users
+              WHERE tenant_id = :tenant_id AND is_partner = 1 AND status = 'active'
+              ORDER BY name ASC"
+        );
+    }
+
+    /**
+     * List all partner-submitted leads for internal managers (Owner/Admin).
+     *
+     * @param array<string, mixed> $actor
+     * @return list<array<string, mixed>>
+     */
+    public function listAllPartnerLeads(array $actor, \HubOS\Core\Permissions $perms): array
+    {
+        if (!$perms->can($actor, 'clients.create') && !$perms->can($actor, 'users.manage')) {
+            throw new HttpException(403, 'אין הרשאה לצפות בלידים של שותפים');
+        }
+        $rows = $this->tenant->select(
+            'SELECT l.id, l.name, l.email, l.phone, l.status, l.partner_user_id, l.data_json, l.created_at,
+                    u.name AS partner_name, COALESCE(u.commission_pct, 10.0) AS commission_pct
+               FROM leads l
+          LEFT JOIN users u ON u.tenant_id = l.tenant_id AND u.id = l.partner_user_id
+              WHERE l.tenant_id = :tenant_id AND l.partner_user_id IS NOT NULL
+              ORDER BY CASE l.status WHEN \'new\' THEN 0 WHEN \'contacted\' THEN 1 WHEN \'qualified\' THEN 2 WHEN \'won\' THEN 3 ELSE 4 END,
+                       l.id DESC
+              LIMIT 50'
+        );
+        foreach ($rows as &$r) {
+            $dj = is_string($r['data_json'] ?? null) ? json_decode($r['data_json'], true) : [];
+            $r['notes'] = is_array($dj) && isset($dj['notes']) ? (string) $dj['notes'] : '';
+            $r['converted_client_id'] = is_array($dj) && isset($dj['converted_client_id']) ? (int) $dj['converted_client_id'] : null;
+            unset($r['data_json']);
+        }
+        unset($r);
+        return $rows;
+    }
+
+    /**
+     * Update a partner lead's status (internal managers only).
+     *
+     * @param array<string, mixed> $actor
+     */
+    public function updateLeadStatus(array $actor, \HubOS\Core\Permissions $perms, int $leadId, string $status): void
+    {
+        $perms->authorize($actor, 'clients.update');
+        $status = Str::clean($status);
+        if (!isset(self::LEAD_STATUSES[$status])) {
+            throw new \InvalidArgumentException('סטטוס ליד לא תקין');
+        }
+        $lead = $this->tenant->find('leads', $leadId);
+        if ($lead === null || empty($lead['partner_user_id'])) {
+            throw new HttpException(404, 'ליד שותף לא נמצא');
+        }
+        $before = (string) ($lead['status'] ?? 'new');
+        if ($before === $status) {
+            return;
+        }
+        $this->tenant->transaction(static function (Tenant $t) use ($actor, $leadId, $before, $status): void {
+            $t->update('leads', $leadId, ['status' => $status]);
+            Events::record($t, (int) $actor['id'], 'lead', $leadId, null, 'partner.lead_status_updated',
+                ['status' => $before], ['status' => $status]);
+        });
+    }
+
+    /**
+     * Convert a partner lead into an active client attributed to the referring partner (idempotent).
+     *
+     * @param array<string, mixed> $actor
+     */
+    public function convertLeadToClient(array $actor, \HubOS\Core\Permissions $perms, int $leadId): int
+    {
+        $perms->authorize($actor, 'clients.create');
+        $lead = $this->tenant->find('leads', $leadId);
+        if ($lead === null || empty($lead['partner_user_id'])) {
+            throw new HttpException(404, 'ליד שותף לא נמצא');
+        }
+        $meta = is_string($lead['data_json'] ?? null) ? json_decode($lead['data_json'], true) : [];
+        $meta = is_array($meta) ? $meta : [];
+        if (!empty($meta['converted_client_id'])) {
+            $existing = $this->tenant->find('clients', (int) $meta['converted_client_id']);
+            if ($existing !== null) {
+                return (int) $existing['id'];
+            }
+        }
+
+        $partnerId = (int) $lead['partner_user_id'];
+        $name = Str::clean((string) ($lead['name'] ?? ''));
+        $phone = Str::clean((string) ($lead['phone'] ?? ''));
+        $email = strtolower(trim((string) ($lead['email'] ?? '')));
+        $leadNotes = isset($meta['notes']) ? Str::clean((string) $meta['notes']) : '';
+        $partnerName = isset($meta['partner_name']) ? Str::clean((string) $meta['partner_name']) : '';
+        $notesParts = array_filter([
+            $leadNotes !== '' ? $leadNotes : null,
+            'הומר מליד שותף #' . $leadId . ($partnerName !== '' ? ' (' . $partnerName . ')' : ''),
+        ]);
+
+        return $this->tenant->transaction(static function (Tenant $t) use ($actor, $leadId, $partnerId, $name, $phone, $email, $notesParts, $meta): int {
+            $now = gmdate('Y-m-d\TH:i:s\Z');
+            $cid = $t->insert('clients', [
+                'name'            => $name !== '' ? $name : ('לקוח מליד #' . $leadId),
+                'phone'           => $phone !== '' ? $phone : null,
+                'email'           => $email !== '' ? $email : null,
+                'status'          => 'active',
+                'partner_user_id' => $partnerId,
+                'notes'           => implode(' · ', $notesParts),
+                'created_at'      => $now,
+                'updated_at'      => $now,
+            ]);
+            $meta['converted_client_id'] = $cid;
+            $meta['converted_at'] = $now;
+            $t->update('leads', $leadId, [
+                'status'    => 'won',
+                'data_json' => json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]);
+            Events::record($t, (int) $actor['id'], 'client', $cid, $cid, 'client.created', null, [
+                'name'            => $name,
+                'partner_user_id' => $partnerId,
+                'from_lead_id'    => $leadId,
+            ]);
+            Events::record($t, (int) $actor['id'], 'lead', $leadId, $cid, 'partner.lead_converted',
+                ['status' => 'new'], ['status' => 'won', 'client_id' => $cid, 'partner_user_id' => $partnerId]);
+            return $cid;
+        });
+    }
 }

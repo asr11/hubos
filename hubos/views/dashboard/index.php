@@ -20,6 +20,10 @@ $actionLabels = [
     'user.updated'                  => 'משתמש עודכן',
     'client.created'                => 'לקוח נוצר',
     'client.registry_applied'       => 'פרטי רשם החברות הוחלו',
+    'client.partner_assigned'       => 'שותף מפנה שויך ללקוח',
+    'partner.lead_submitted'        => 'ליד חדש הוגש ע״י שותף',
+    'partner.lead_status_updated'   => 'סטטוס ליד שותף עודכן',
+    'partner.lead_converted'        => 'ליד שותף הומר ללקוח',
     'auth.login'                    => 'כניסה למערכת',
     'auth.logout'                   => 'יציאה מהמערכת',
     'permission.granted'            => 'הרשאה ניתנה',
@@ -534,6 +538,102 @@ $care = $dailyCare ?? null;
         </div>
     </div>
 </section>
+
+<!-- ===================================================================== -->
+<!-- 4.5 לידים משותפים וסוכני מכירות (Partner Leads Inbox)                 -->
+<!-- ===================================================================== -->
+<?php if (!empty($canManagePartners)):
+    $pLeads = $partnerLeads ?? [];
+    $aPartners = $activePartners ?? [];
+    $openPLeads = count(array_filter($pLeads, static fn (array $l): bool => in_array((string) ($l['status'] ?? 'new'), ['new', 'contacted', 'qualified'], true)));
+    $leadStatuses = \HubOS\Modules\Partners\PartnerService::LEAD_STATUSES;
+?>
+<section class="card mt-lg" id="sec-partner-leads" aria-labelledby="partner-leads-inbox-title">
+    <div class="card-head">
+        <div>
+            <p class="eyebrow">🤝 משולש הערך · לידים והמרות בלחיצה</p>
+            <h2 id="partner-leads-inbox-title">לידים משותפים וסוכני מכירות (<?= e(count($pLeads)) ?>)</h2>
+        </div>
+        <div class="cluster">
+            <span class="pill pill-ok">שותפים פעילים: <?= e(count($aPartners)) ?></span>
+            <?php if ($openPLeads > 0): ?>
+                <span class="pill pill-warn">ממתינים לטיפול: <?= e($openPLeads) ?></span>
+            <?php endif; ?>
+            <a class="btn btn-sm btn-ghost" href="/settings/users">ניהול שותפים ←</a>
+        </div>
+    </div>
+
+    <?php if ($pLeads === []): ?>
+        <p class="empty">
+            <?php if ($aPartners !== []): ?>
+                שותפים פעילים במערכת: <strong><?= e(implode(' · ', array_map(static fn (array $p): string => (string) $p['name'] . ' (' . number_format((float) ($p['commission_pct'] ?? 10), 0) . '%)', $aPartners))) ?></strong>.
+                טרם הוגשו לידים — ברגע ששותף מגיש ליד מפורטל השותפים, הוא יופיע כאן להמרה ללקוח בלחיצת כפתור.
+            <?php else: ?>
+                אין עדיין שותפים פעילים או לידים משותפים. ניתן להקים שותף חדש ב<a href="/settings/users">משתמשים והרשאות</a>.
+            <?php endif; ?>
+        </p>
+    <?php else: ?>
+        <div class="table-wrap">
+            <table class="table table-mobile-cards" id="owner-partner-leads-table">
+                <thead>
+                    <tr>
+                        <th scope="col">ליד / בית עסק</th>
+                        <th scope="col">שותף מפנה</th>
+                        <th scope="col">טלפון / אימייל</th>
+                        <th scope="col">סטטוס ליד</th>
+                        <th scope="col">המרה ללקוח</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($pLeads as $pl):
+                    $lid = (int) $pl['id'];
+                    $st = (string) ($pl['status'] ?? 'new');
+                    $convCid = !empty($pl['converted_client_id']) ? (int) $pl['converted_client_id'] : null;
+                ?>
+                    <tr>
+                        <td data-label="ליד / בית עסק">
+                            <strong><?= e((string) $pl['name']) ?></strong>
+                            <?php if (!empty($pl['notes'])): ?>
+                                <div class="muted small"><?= e((string) $pl['notes']) ?></div>
+                            <?php endif; ?>
+                            <div class="muted small" dir="ltr"><?= e(fmt_date((string) ($pl['created_at'] ?? ''))) ?></div>
+                        </td>
+                        <td data-label="שותף מפנה">
+                            <span class="pill pill-sm seo-stage-pill"><?= e((string) ($pl['partner_name'] ?? 'שותף')) ?> (<bdi dir="ltr"><?= e(number_format((float) ($pl['commission_pct'] ?? 10), 0)) ?>%</bdi>)</span>
+                        </td>
+                        <td data-label="טלפון / אימייל">
+                            <?php if (!empty($pl['phone'])): ?><div><bdi dir="ltr"><?= e((string) $pl['phone']) ?></bdi></div><?php endif; ?>
+                            <?php if (!empty($pl['email'])): ?><div class="muted small"><bdi dir="ltr"><?= e((string) $pl['email']) ?></bdi></div><?php endif; ?>
+                        </td>
+                        <td data-label="סטטוס ליד">
+                            <form method="post" action="/partner/leads/<?= e($lid) ?>/status" class="partner-lead-actions">
+                                <?= \HubOS\Core\Csrf::field() ?>
+                                <select name="status" aria-label="סטטוס ליד <?= e((string) $pl['name']) ?>">
+                                    <?php foreach ($leadStatuses as $sKey => $sLabel): ?>
+                                        <option value="<?= e($sKey) ?>" <?= $st === $sKey ? 'selected' : '' ?>><?= e($sLabel) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-ghost btn-xs">עדכן</button>
+                            </form>
+                        </td>
+                        <td data-label="המרה ללקוח">
+                            <?php if ($convCid !== null): ?>
+                                <a class="btn btn-sm btn-ghost" href="/clients/<?= e($convCid) ?>">✔ תיק לקוח #<?= e($convCid) ?> ←</a>
+                            <?php else: ?>
+                                <form method="post" action="/partner/leads/<?= e($lid) ?>/convert" class="inline-form">
+                                    <?= \HubOS\Core\Csrf::field() ?>
+                                    <button type="submit" class="btn btn-sm btn-primary" id="convert-lead-<?= e($lid) ?>">המר ללקוח ←</button>
+                                </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
+</section>
+<?php endif; ?>
 
 <!-- ===================================================================== -->
 <!-- 5. פעילות אחרונה ביומן האירועים (Audit Trail)                         -->

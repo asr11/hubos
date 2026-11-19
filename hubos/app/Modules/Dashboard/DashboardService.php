@@ -311,12 +311,20 @@ final class DashboardService
             );
         }
 
+        $canManagePartners = $this->perms->can($user, 'clients.create') || $this->perms->can($user, 'users.manage');
+        $partnerSvc = new \HubOS\Modules\Partners\PartnerService($this->tenant);
+        $partnerLeads = $canManagePartners ? $partnerSvc->listAllPartnerLeads($user, $this->perms) : [];
+        $activePartners = $canManagePartners ? $partnerSvc->listActivePartners() : [];
+
         return [
             'provenance'         => (new \HubOS\Modules\Import\SyncService($this->tenant, $this->perms))->latestProvenance($now),
             'dailyCare'          => $this->latestDailyCare($now),
             'clientsCount'       => $canClients ? (new ClientService($this->tenant, $this->perms))->count($user) : null,
             'clientsActiveCount' => $canClients ? count((new ClientService($this->tenant, $this->perms))->list($user, 1000, 'active')) : null,
             'canFinance'         => $canFinance,
+            'canManagePartners'  => $canManagePartners,
+            'partnerLeads'       => $partnerLeads,
+            'activePartners'     => $activePartners,
             'eventsCount'        => $canEvents ? $this->tenant->count('events') : null,
             'modules'      => $this->tenant->all('tenant_modules', ['enabled' => 1], 'module', 'ASC'),
             'events'       => $canEvents ? Events::recent($this->tenant, 15) : [],

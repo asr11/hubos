@@ -71,8 +71,9 @@ final class ClientsController
             'active'        => 'clients',
             'card'          => $card,
             'tab'           => $tab,
-            'canEnrich'     => $card['internal'] && $ctx->can('clients.update'),
-            'suggestion'    => is_array($registry) ? $registry : null,
+            'canEnrich'        => $card['internal'] && $ctx->can('clients.update'),
+            'canAssignPartner' => $card['internal'] && $ctx->can('users.manage'),
+            'suggestion'       => is_array($registry) ? $registry : null,
             'registryError' => is_string($registryError) ? $registryError : null,
             // M3/M4: live timer + work actions on the card (never for client_viewer)
             'canTrack'      => $card['internal'] && $ctx->can('time.track'),

@@ -48,6 +48,9 @@ $origin = static function (array $row) use ($familyRolled): string {
             <span class="status status-<?= e($c['status']) ?>"><?= e($statusLabels[$c['status']] ?? $c['status']) ?></span>
             <?php if (!empty($c['city'])): ?><span><?= e($c['city']) ?></span><?php endif; ?>
             <?php if (!empty($c['domain'])): ?><span dir="ltr"><?= e($c['domain']) ?></span><?php endif; ?>
+            <?php if (!empty($card['internal']) && is_array($card['partner'] ?? null)): ?>
+                <span class="pill pill-ok pill-sm" id="client-partner-badge">🤝 שותף מפנה: <?= e((string) $card['partner']['name']) ?> (<bdi dir="ltr"><?= e(number_format((float) ($card['partner']['commission_pct'] ?? 10), 0)) ?>%</bdi>)</span>
+            <?php endif; ?>
         </p>
         <?php if ($card['internal'] && ($card['ancestors'] !== [] || $card['children'] !== [])): ?>
             <nav class="family" aria-label="משפחת חברות" id="client-family">
@@ -81,6 +84,23 @@ $origin = static function (array $row) use ($familyRolled): string {
             <div class="cluster small client-prov-banner">
                 <a class="btn btn-sm btn-ghost" id="client-report-link" href="/clients/<?= e($id) ?>/report">📄 הפקת דוח סטטוס ושעות (PDF / הדפסה)</a>
             </div>
+        <?php endif; ?>
+        <?php if (!empty($canAssignPartner) && ($card['partners'] ?? []) !== []): ?>
+            <form method="post" action="/settings/partners/assign-client" class="inline-form client-partner-form" id="client-partner-form">
+                <?= Csrf::field() ?>
+                <input type="hidden" name="client_id" value="<?= e($id) ?>">
+                <input type="hidden" name="_return" value="/clients/<?= e($id) ?>">
+                <label for="client-partner-select" class="muted small strong">🤝 שותף מפנה:</label>
+                <select name="partner_user_id" id="client-partner-select" aria-label="בחירת שותף מפנה ללקוח">
+                    <option value="">ללא שותף מפנה</option>
+                    <?php foreach ($card['partners'] as $pt): ?>
+                        <option value="<?= e((int) $pt['id']) ?>" <?= (int) ($c['partner_user_id'] ?? 0) === (int) $pt['id'] ? 'selected' : '' ?>>
+                            <?= e((string) $pt['name']) ?> (<?= e(number_format((float) ($pt['commission_pct'] ?? 10), 0)) ?>%)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="submit" class="btn btn-sm btn-ghost btn-xs" id="client-partner-save">שמור שיוך</button>
+            </form>
         <?php endif; ?>
     </div>
     <div class="kpis">
