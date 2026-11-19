@@ -32,6 +32,8 @@ return static function (Router $r): void {
     $r->get('/clients/{id:\d+}/report', [ClientsController::class, 'report'], ['auth' => true, 'perm' => 'clients.view']);
     $r->post('/clients/{id:\d+}/enrich', [ClientsController::class, 'enrich'], ['auth' => true, 'perm' => 'clients.update']);
     $r->post('/clients/{id:\d+}/enrich/apply', [ClientsController::class, 'applyEnrichment'], ['auth' => true, 'perm' => 'clients.update']);
+    $r->post('/clients/{id:\d+}/seo-keywords', [ClientsController::class, 'storeSeoKeyword'], ['auth' => true, 'perm' => 'clients.update']);
+    $r->post('/clients/{id:\d+}/seo-keywords/{kw:\d+}/delete', [ClientsController::class, 'deleteSeoKeyword'], ['auth' => true, 'perm' => 'clients.update']);
 
     // M3 — time, live timer, hours banks
     $r->get('/time', [TimeController::class, 'index'], ['auth' => true, 'perm' => 'time.view']);

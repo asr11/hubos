@@ -1,5 +1,6 @@
 <?php
 use HubOS\Modules\Assets\AssetService;
+use HubOS\Modules\Clients\ClientSeoService;
 use HubOS\Modules\Work\TaskService;
 
 /**
@@ -11,12 +12,30 @@ $tasks = $portal['tasks'] ?? [];
 $projects = $portal['projects'] ?? [];
 $banks = $portal['hours_banks'] ?? [];
 $assets = $portal['assets'] ?? [];
+$seoKeywords = $portal['seo_keywords'] ?? [];
 $metrics = $portal['metrics'] ?? [];
 $openTasks = $portal['open_tasks'] ?? [];
+
+$doneTasks = [];
+$doingTasks = [];
+$todoTasks = [];
+foreach ($tasks as $t) {
+    $st = TaskService::statusKey((string) ($t['status'] ?? 'todo'));
+    if ($st === 'done') {
+        $doneTasks[] = $t;
+    } elseif ($st === 'doing') {
+        $doingTasks[] = $t;
+    } else {
+        $todoTasks[] = $t;
+    }
+}
 $totalTasksCount = count($tasks);
-$doneTasksCount = count(array_filter($tasks, static fn (array $t): bool => TaskService::statusKey((string) ($t['status'] ?? '')) === 'done'));
+$doneTasksCount = count($doneTasks);
 $overallPct = $totalTasksCount > 0 ? (int) round(($doneTasksCount / $totalTasksCount) * 100) : 0;
 $validSslCount = count(array_filter($assets, static fn (array $a): bool => ($a['ssl_status'] ?? '') === 'valid'));
+$hoursTotal = (float) ($metrics['hours_total'] ?? 0.0);
+$hoursThisMonth = (float) ($metrics['hours_this_month'] ?? 0.0);
+$showSeoKpi = $banks === [] && $hoursTotal <= 0.0 && $seoKeywords !== [];
 
 $widthBucket = static function (int $pct): string {
     return match (true) {
@@ -35,7 +54,7 @@ $widthBucket = static function (int $pct): string {
         <p class="eyebrow">OS HUB · פורטל לקוח אישי (שקיפות מלאה בזמן אמת)</p>
         <h2 id="hero-title">שלום, <?= e($user['name']) ?></h2>
         <?php if ($client !== null): ?>
-            <p class="muted" id="portal-client-name">תיק לקוח: <strong><?= e($client['name']) ?></strong> · מעקב שקוף אחר חבילת השירות, התקדמות המשימות, תקינות האתר והנכסים הדיגיטליים.</p>
+            <p class="muted" id="portal-client-name">תיק לקוח: <strong><?= e($client['name']) ?></strong> · מעקב שקוף אחר חבילת השירות, התקדמות המשימות, מילות המפתח בגוגל ותקינות האתר.</p>
             <div class="portal-hero-actions">
                 <a class="btn btn-primary btn-sm" id="portal-report-link" href="/clients/<?= e((int) $client['id']) ?>/report">📄 הפקת דוח סטטוס והתקדמות (PDF / הדפסה)</a>
                 <a class="btn btn-ghost btn-sm" href="/clients/<?= e((int) $client['id']) ?>">פתיחת תיק לקוח מלא ←</a>
@@ -50,9 +69,9 @@ $widthBucket = static function (int $pct): string {
 <?php if ($client !== null): ?>
 <section class="stats" aria-label="נתוני פורטל לקוח">
     <article class="stat card">
-        <span class="stat-label">התקדמות משימות</span>
-        <strong class="stat-value" id="portal-stat-tasks"><?= e($doneTasksCount) ?> / <?= e($totalTasksCount) ?></strong>
-        <span class="stat-hint">הושלמו (<b dir="ltr"><?= e($overallPct) ?>%</b>) · בטיפול: <?= e(count($openTasks)) ?></span>
+        <span class="stat-label">התקדמות אבני דרך</span>
+        <strong class="stat-value" id="portal-stat-tasks" dir="ltr"><?= e($doneTasksCount) ?> / <?= e($totalTasksCount) ?></strong>
+        <span class="stat-hint">הושלמו (<b dir="ltr"><?= e($overallPct) ?>%</b>) · פעילות: <?= e(count($openTasks)) ?></span>
     </article>
     <article class="stat card">
         <span class="stat-label">מסלול שירות / בנק שעות</span>
@@ -61,11 +80,19 @@ $widthBucket = static function (int $pct): string {
         </strong>
         <span class="stat-hint"><?= count($banks) > 0 ? e(count($banks)) . ' בנקי שעות פעילים' : 'שירות חודשי מנוהל' ?></span>
     </article>
+    <?php if ($showSeoKpi): ?>
+    <article class="stat card">
+        <span class="stat-label">מילות מפתח בקידום (SEO &amp; GEO)</span>
+        <strong class="stat-value" id="portal-stat-hours"><?= e(count($seoKeywords)) ?></strong>
+        <span class="stat-hint">ביטויי מפתח במעקב ואופטימיזציה</span>
+    </article>
+    <?php else: ?>
     <article class="stat card">
         <span class="stat-label">שעות מדווחות</span>
-        <strong class="stat-value" id="portal-stat-hours" dir="ltr"><?= e(number_format((float) ($metrics['hours_this_month'] ?? 0), 1)) ?>h</strong>
-        <span class="stat-hint">סה״כ מצטבר: <b dir="ltr"><?= e(number_format((float) ($metrics['hours_total'] ?? 0), 1)) ?>h</b></span>
+        <strong class="stat-value" id="portal-stat-hours" dir="ltr"><?= e(number_format($hoursThisMonth, 1)) ?>h</strong>
+        <span class="stat-hint">סה״כ מצטבר: <b dir="ltr"><?= e(number_format($hoursTotal, 1)) ?>h</b></span>
     </article>
+    <?php endif; ?>
     <article class="stat card">
         <span class="stat-label">נכסים ואבטחת SSL</span>
         <strong class="stat-value" id="portal-stat-assets"><?= e(count($assets)) ?></strong>
@@ -85,7 +112,7 @@ $widthBucket = static function (int $pct): string {
         $pTasks = array_values(array_filter($tasks, static fn (array $t): bool => (int) ($t['project_id'] ?? 0) === $pid));
         $pTotal = count($pTasks);
         $pDone = count(array_filter($pTasks, static fn (array $t): bool => TaskService::statusKey((string) ($t['status'] ?? '')) === 'done'));
-        $pPct = $pTotal > 0 ? (int) round(($pDone / $pTotal) * 100) : ($overallPct);
+        $pPct = $pTotal > 0 ? (int) round(($pDone / $pTotal) * 100) : $overallPct;
     ?>
         <article class="card">
             <div class="card-head">
@@ -101,7 +128,7 @@ $widthBucket = static function (int $pct): string {
                 <div class="project-progress-track">
                     <span class="project-progress-fill <?= e($widthBucket($pPct)) ?>"></span>
                 </div>
-                <span class="muted">הושלמו <?= e($pDone) ?> מתוך <?= e($pTotal) ?> אבני דרך גלויות</span>
+                <span class="muted">הושלמו <?= e($pDone) ?> מתוך <?= e($pTotal) ?> אבני דרך</span>
             </div>
         </article>
     <?php endforeach; ?>
@@ -109,42 +136,132 @@ $widthBucket = static function (int $pct): string {
 </section>
 <?php endif; ?>
 
-<section class="card" aria-labelledby="portal-tasks-title">
-    <div class="card-head">
-        <h2 id="portal-tasks-title">פירוט משימות, אבני דרך והתקדמות (<?= e(count($tasks)) ?>)</h2>
-    </div>
-    <?php if ($tasks === []): ?>
-        <p class="empty">אין משימות גלויות להצגה כעת.</p>
-    <?php else: ?>
-        <div class="table-wrap">
-            <table class="table" id="portal-tasks-table">
-                <thead>
-                    <tr>
-                        <th scope="col">משימה ופירוט ביצוע</th>
-                        <th scope="col">חבילה / פרויקט</th>
-                        <th scope="col">סטטוס</th>
-                        <th scope="col">תאריך יעד</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($tasks as $t): $st = TaskService::statusKey((string) $t['status']); ?>
-                    <tr>
-                        <td>
-                            <a class="client-link" href="/tasks/<?= e((int) $t['id']) ?>"><strong><?= fmt_inline_bidi((string) $t['title']) ?></strong></a>
-                            <?php if (!empty($t['description'])): ?>
-                                <div class="muted"><?= fmt_inline_bidi((string) $t['description']) ?></div>
-                            <?php endif; ?>
-                        </td>
-                        <td><?= e($t['project_name'] ?? '—') ?></td>
-                        <td><span class="tstatus tstatus-<?= e($st) ?>"><?= e(TaskService::STATUSES[$st] ?? $t['status']) ?></span></td>
-                        <td dir="ltr"><?= e($t['due_at'] ? fmt_date((string) $t['due_at']) : '—') ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
+<section class="portal-roadmap-grid" id="portal-roadmap" aria-label="מפת התקדמות: מה עשינו, מה עושים ומה נעשה">
+    <article class="roadmap-col roadmap-col-done">
+        <div class="roadmap-col-head">
+            <h3>✅ מה עשינו (הושלם)</h3>
+            <span class="pill pill-ok"><?= e(count($doneTasks)) ?></span>
         </div>
-    <?php endif; ?>
+        <?php if ($doneTasks === []): ?>
+            <p class="empty">טרם סומנו אבני דרך שהושלמו.</p>
+        <?php else: ?>
+            <ul class="roadmap-list">
+            <?php foreach ($doneTasks as $t): ?>
+                <li class="roadmap-item">
+                    <a class="roadmap-item-title" href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a>
+                    <?php if (!empty($t['description'])): ?>
+                        <p class="roadmap-item-desc"><?= fmt_inline_bidi((string) $t['description']) ?></p>
+                    <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </article>
+
+    <article class="roadmap-col roadmap-col-doing">
+        <div class="roadmap-col-head">
+            <h3>⚡ מה עושים עכשיו (בביצוע)</h3>
+            <span class="pill pill-warn"><?= e(count($doingTasks)) ?></span>
+        </div>
+        <?php if ($doingTasks === []): ?>
+            <p class="empty">אין משימות פתוחות בביצוע כרגע.</p>
+        <?php else: ?>
+            <ul class="roadmap-list">
+            <?php foreach ($doingTasks as $t): ?>
+                <li class="roadmap-item">
+                    <a class="roadmap-item-title" href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a>
+                    <?php if (!empty($t['description'])): ?>
+                        <p class="roadmap-item-desc"><?= fmt_inline_bidi((string) $t['description']) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($t['due_at'])): ?>
+                        <div class="roadmap-item-meta">יעד חודשי: <b dir="ltr"><?= e(fmt_date((string) $t['due_at'])) ?></b></div>
+                    <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </article>
+
+    <article class="roadmap-col roadmap-col-todo">
+        <div class="roadmap-col-head">
+            <h3>📅 מה נעשה בהמשך (מתוכנן)</h3>
+            <span class="pill"><?= e(count($todoTasks)) ?></span>
+        </div>
+        <?php if ($todoTasks === []): ?>
+            <p class="empty">אין משימות עתידיות מתוכננות כרגע.</p>
+        <?php else: ?>
+            <ul class="roadmap-list">
+            <?php foreach ($todoTasks as $t): ?>
+                <li class="roadmap-item">
+                    <a class="roadmap-item-title" href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a>
+                    <?php if (!empty($t['description'])): ?>
+                        <p class="roadmap-item-desc"><?= fmt_inline_bidi((string) $t['description']) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($t['due_at'])): ?>
+                        <div class="roadmap-item-meta">מתוכנן ל: <b dir="ltr"><?= e(fmt_date((string) $t['due_at'])) ?></b></div>
+                    <?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </article>
 </section>
+
+<?php if ($seoKeywords !== []): ?>
+<section class="card" id="portal-seo-keywords" aria-labelledby="portal-seo-title">
+    <div class="card-head">
+        <h2 id="portal-seo-title">🔍 מילות מפתח מרכזיות בקידום אורגני — Google SEO &amp; AI Search (<?= e(count($seoKeywords)) ?>)</h2>
+        <span class="muted">ביטויים ממוקדים בעמודי האתר הפעילים</span>
+    </div>
+    <div class="table-wrap">
+        <table class="table" id="portal-seo-table">
+            <thead>
+                <tr>
+                    <th scope="col">מילת מפתח / ביטוי יעד</th>
+                    <th scope="col">עמוד יעד באתר</th>
+                    <th scope="col">שלב קידום</th>
+                    <th scope="col">מיקום מאומת בגוגל</th>
+                    <th scope="col">פעולת קידום</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($seoKeywords as $kw):
+                $stage = (string) ($kw['stage'] ?? 'optimizing');
+                $rank = $kw['current_rank'] !== null ? (int) $kw['current_rank'] : null;
+                $prev = $kw['previous_rank'] !== null ? (int) $kw['previous_rank'] : null;
+                $url = (string) ($kw['target_url'] ?? '');
+                $urlLabel = $url !== '' ? urldecode((string) preg_replace('#^https?://#i', '', rtrim($url, '/'))) : '—';
+            ?>
+                <tr>
+                    <td><strong><?= e($kw['keyword']) ?></strong></td>
+                    <td dir="ltr">
+                        <?php if ($url !== ''): ?>
+                            <a href="<?= e($url) ?>" target="_blank" rel="noopener noreferrer"><?= e($urlLabel) ?> ↗</a>
+                        <?php else: ?>
+                            <span class="muted">—</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><span class="pill kw-stage-<?= e($stage) ?>"><?= e(ClientSeoService::STAGES[$stage] ?? $stage) ?></span></td>
+                    <td>
+                        <?php if ($rank !== null): ?>
+                            <strong dir="ltr">#<?= e($rank) ?></strong>
+                            <?php if ($prev !== null && $prev > $rank): ?>
+                                <span class="pill pill-ok" dir="ltr">▲ +<?= e($prev - $rank) ?></span>
+                            <?php elseif ($prev !== null && $prev < $rank): ?>
+                                <span class="pill pill-warn" dir="ltr">▼ -<?= e($rank - $prev) ?></span>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <span class="muted">במדידה שוטפת</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="muted"><?= e($kw['notes'] ?? '—') ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+<?php endif; ?>
 
 <section class="grid-2-wide">
     <article class="card" aria-labelledby="portal-assets-title">
@@ -192,7 +309,7 @@ $widthBucket = static function (int $pct): string {
             <h2 id="portal-banks-title">בנקי שעות ומסלול ליווי (<?= e(count($banks)) ?>)</h2>
         </div>
         <?php if ($banks === []): ?>
-            <p class="muted">התיק מנוהל במסלול פרויקט / ריטיינר חודשי קבוע (אחסון, אבטחה וקידום שוטף) ללא הגבלת בנק שעות נפרד. ניתן להפיק דוח התקדמות מלא בלחיצה על כפתור ה-PDF למעלה.</p>
+            <p class="muted">התיק מנוהל במסלול פרויקט / ריטיינר חודשי קבוע (אחסון, אבטחה וקידום אורגני שוטף) ללא הגבלת בנק שעות נפרד. ניתן להפיק דוח התקדמות מלא בלחיצה על כפתור ה-PDF למעלה.</p>
         <?php else: ?>
             <table class="table" id="portal-banks-table">
                 <thead>

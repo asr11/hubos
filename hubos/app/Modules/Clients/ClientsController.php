@@ -139,6 +139,41 @@ final class ClientsController
         return Response::redirect('/clients/' . $id);
     }
 
+    /** @param array<string, string> $params */
+    public function storeSeoKeyword(Context $ctx, array $params): Response
+    {
+        $user = $ctx->requireUser();
+        $id = (int) $params['id'];
+        try {
+            (new ClientSeoService($ctx->tenant(), $ctx->permissions()))->store($user, $id, [
+                'keyword'      => $ctx->input('keyword'),
+                'target_url'   => $ctx->input('target_url'),
+                'stage'        => $ctx->input('stage'),
+                'current_rank' => $ctx->input('current_rank'),
+                'notes'        => $ctx->input('notes'),
+            ]);
+            $ctx->flash('מילת המפתח נשמרה ותוצג בפורטל הלקוח');
+        } catch (\InvalidArgumentException|\HubOS\Core\HttpException $e) {
+            $ctx->flashError($e->getMessage());
+        }
+        return Response::redirect('/clients/' . $id . '#seo-keywords-card');
+    }
+
+    /** @param array<string, string> $params */
+    public function deleteSeoKeyword(Context $ctx, array $params): Response
+    {
+        $user = $ctx->requireUser();
+        $id = (int) $params['id'];
+        $kwId = (int) $params['kw'];
+        try {
+            (new ClientSeoService($ctx->tenant(), $ctx->permissions()))->delete($user, $id, $kwId);
+            $ctx->flash('מילת המפתח הוסרה ממעקב הלקוח');
+        } catch (\HubOS\Core\HttpException $e) {
+            $ctx->flashError($e->getMessage());
+        }
+        return Response::redirect('/clients/' . $id . '#seo-keywords-card');
+    }
+
     /**
      * @param array<string, string> $errors
      * @param array<string, string> $old

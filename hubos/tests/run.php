@@ -1842,6 +1842,41 @@ test('m8 multi-tenant saas: isolated tenant provisioning, AES-256-GCM per-tenant
     eq('zz-super-secret-morning-key', $dec['key_secret']);
 });
 
+test('m9 client seo keywords: store, rank trend tracking, delete & client portal exposure', function (): void {
+    $pdo = freshDb();
+    $tid = Provisioning::ensureTenant($pdo, 'zz-m9-seo', 'ZZ SEO Tenant');
+    $t = new Tenant($pdo, $tid);
+    $perms = new Permissions($t);
+    $ownerId = Provisioning::createUser($pdo, $tid, 'zz_seo_owner@hubos.test', 'ZZ Owner', 'owner', 'zz-owner-pass-1234');
+    $owner = ['id' => $ownerId, 'tenant_id' => $tid, 'role' => 'owner', 'status' => 'active'];
+    $cid = $t->insert('clients', ['name' => 'ZZ SEO Client']);
+    $viewerId = Provisioning::createUser($pdo, $tid, 'zz_seo_viewer@hubos.test', 'ZZ Viewer', 'client_viewer', 'zz-viewer-pass-1234', $ownerId, $cid);
+    $viewer = ['id' => $viewerId, 'tenant_id' => $tid, 'role' => 'client_viewer', 'client_id' => $cid, 'status' => 'active'];
+
+    $seo = new \HubOS\Modules\Clients\ClientSeoService($t, $perms);
+    eq(403, throws(fn () => $seo->store($viewer, $cid, ['keyword' => 'zz']), HttpException::class)->status, 'client_viewer cannot mutate SEO keywords');
+
+    $kwId = $seo->store($owner, $cid, [
+        'keyword'      => 'קבלן תשתיות תקשורת',
+        'target_url'   => 'https://zz.test/',
+        'stage'        => 'tracking',
+        'current_rank' => '12',
+        'notes'        => 'אופטימיזציית H1',
+    ]);
+    $seo->store($owner, $cid, [
+        'keyword'      => 'קבלן תשתיות תקשורת',
+        'stage'        => 'top10',
+        'current_rank' => '6',
+    ]);
+    $portal = (new \HubOS\Modules\Dashboard\DashboardService($t, $perms))->portal($viewer);
+    eq(1, count($portal['seo_keywords']), 'Client Portal exposes tracked SEO keywords');
+    eq(6, (int) $portal['seo_keywords'][0]['current_rank']);
+    eq(12, (int) $portal['seo_keywords'][0]['previous_rank'], 'previous_rank preserves rank trend');
+
+    $seo->delete($owner, $cid, $kwId);
+    eq(0, count($seo->listForClient($cid)), 'deleted keyword removed');
+});
+
 // ---------------------------------------------------------------- Run
 
 $pass = 0;

@@ -256,4 +256,37 @@ $assetKinds = AssetService::KINDS;
             </div>
         <?php endif; ?>
     </section>
+    <?php $seoKeywords = $report['seo_keywords'] ?? []; if ($seoKeywords !== []): ?>
+    <section class="report-section" aria-labelledby="report-seo-heading">
+        <h2 id="report-seo-heading"><?= $banks !== [] ? '5.' : '4.' ?> מילות מפתח מרכזיות בקידום אורגני (SEO &amp; GEO) (<?= e(count($seoKeywords)) ?>)</h2>
+        <div tabindex="0" role="region" aria-labelledby="report-seo-caption" class="report-table-wrap">
+            <table class="report-table" id="report-seo-table">
+                <caption id="report-seo-caption" class="visually-hidden">מילות מפתח מרכזיות במעקב קידום אורגני</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">ביטוי / מילת מפתח</th>
+                        <th scope="col">עמוד יעד</th>
+                        <th scope="col">שלב קידום</th>
+                        <th scope="col">מיקום מאומת</th>
+                        <th scope="col">פעולת קידום</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($seoKeywords as $kw):
+                    $st = (string) ($kw['stage'] ?? 'optimizing');
+                    $u = (string) ($kw['target_url'] ?? '');
+                ?>
+                    <tr>
+                        <th scope="row"><?= e($kw['keyword']) ?></th>
+                        <td dir="ltr"><?= e($u !== '' ? urldecode((string) preg_replace('#^https?://#i', '', rtrim($u, '/'))) : '—') ?></td>
+                        <td><?= e(\HubOS\Modules\Clients\ClientSeoService::STAGES[$st] ?? $st) ?></td>
+                        <td dir="ltr"><?= $kw['current_rank'] !== null ? '#' . e((int) $kw['current_rank']) : 'במדידה' ?></td>
+                        <td><?= e($kw['notes'] ?? '—') ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <?php endif; ?>
 </article>

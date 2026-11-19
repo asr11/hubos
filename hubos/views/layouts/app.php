@@ -43,7 +43,7 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
     <meta name="color-scheme" content="light">
     <link rel="preload" href="/assets/fonts/heebo-hebrew.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-    <link rel="stylesheet" href="/assets/app.css?v=13">
+    <link rel="stylesheet" href="/assets/app.css?v=14">
     <script src="/assets/timer.js?v=7" defer></script>
 </head>
 <body class="app-body">

@@ -320,6 +320,7 @@ final class Client360Service
             'leads'        => $leads,
             'quotes'       => $quotes,
             'assets'       => $assets,
+            'seo_keywords' => (new ClientSeoService($this->tenant, $this->perms))->listForClient($clientId),
             'vault'        => $vault,
             'events'       => $events,
             'timeline'     => $timeline,
@@ -504,6 +505,7 @@ final class Client360Service
                 'completion_pct' => $completionPct,
             ],
             'hours_banks'           => $banks,
+            'seo_keywords'          => $card['seo_keywords'] ?? [],
             'time_entries'          => $filteredEntries,
             'time_summary'          => [
                 'period_seconds'   => $periodSeconds,

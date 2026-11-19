@@ -26,6 +26,8 @@ final class Tenant
         'recurring_task_templates',
         // M7 (005_data_provenance.sql)
         'sync_runs',
+        // M9 (007_client_seo_keywords.sql)
+        'client_seo_keywords',
     ];
 
     public function __construct(private PDO $pdo, private int $tenantId)

@@ -28,7 +28,7 @@ $hiddenInternal = (int) ($report['hidden_internal_tasks'] ?? 0);
     <meta name="color-scheme" content="light">
     <link rel="preload" href="/assets/fonts/heebo-hebrew.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-    <link rel="stylesheet" href="/assets/app.css?v=13">
+    <link rel="stylesheet" href="/assets/app.css?v=14">
     <script src="/assets/timer.js?v=7" defer></script>
 </head>
 <body class="report-body">

@@ -223,6 +223,85 @@ $origin = static function (array $row) use ($familyRolled): string {
         </div>
     </div>
 
+    <?php $seoKws = $card['seo_keywords'] ?? []; if ($seoKws !== [] || $canEnrich): ?>
+    <div class="mt-md" id="seo-keywords-card">
+        <div class="card-head">
+            <h3>🔍 מילות מפתח בקידום אורגני — SEO &amp; GEO (<?= e(count($seoKws)) ?>)</h3>
+            <span class="muted">מוצג בשקיפות בפורטל הלקוח ובדוח ה-PDF</span>
+        </div>
+        <?php if ($seoKws !== []): ?>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">מילת מפתח</th>
+                            <th scope="col">עמוד יעד</th>
+                            <th scope="col">שלב</th>
+                            <th scope="col">מיקום מאומת</th>
+                            <th scope="col">הערת קידום</th>
+                            <?php if ($canEnrich): ?><th scope="col">פעולה</th><?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($seoKws as $kw): $st = (string) ($kw['stage'] ?? 'optimizing'); $u = (string) ($kw['target_url'] ?? ''); ?>
+                        <tr>
+                            <td class="strong"><?= e($kw['keyword']) ?></td>
+                            <td dir="ltr"><?= $u !== '' ? '<a href="' . e($u) . '" target="_blank" rel="noopener noreferrer">' . e(urldecode((string) preg_replace('#^https?://#i', '', rtrim($u, '/')))) . ' ↗</a>' : '—' ?></td>
+                            <td><span class="pill kw-stage-<?= e($st) ?>"><?= e(\HubOS\Modules\Clients\ClientSeoService::STAGES[$st] ?? $st) ?></span></td>
+                            <td dir="ltr"><?= $kw['current_rank'] !== null ? '#' . e((int) $kw['current_rank']) : 'במדידה' ?></td>
+                            <td class="muted"><?= e($kw['notes'] ?? '—') ?></td>
+                            <?php if ($canEnrich): ?>
+                            <td>
+                                <form method="post" action="/clients/<?= e($id) ?>/seo-keywords/<?= e((int) $kw['id']) ?>/delete" class="inline-form">
+                                    <?= Csrf::field() ?>
+                                    <button type="submit" class="btn btn-ghost btn-sm">הסר</button>
+                                </form>
+                            </td>
+                            <?php endif; ?>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+        <?php if ($canEnrich): ?>
+        <details class="mt-sm">
+            <summary class="btn btn-ghost btn-sm">+ הוספת / עדכון מילת מפתח ללקוח</summary>
+            <form method="post" action="/clients/<?= e($id) ?>/seo-keywords" class="form-grid mt-sm" id="seo-keyword-form">
+                <?= Csrf::field() ?>
+                <label class="field">
+                    <span>מילת מפתח / ביטוי יעד *</span>
+                    <input type="text" name="keyword" required maxlength="200" placeholder="לדוגמה: קבלן תשתיות תקשורת">
+                </label>
+                <label class="field">
+                    <span>עמוד יעד (URL)</span>
+                    <input type="text" name="target_url" dir="ltr" maxlength="400" placeholder="https://ashercom.com/...">
+                </label>
+                <label class="field">
+                    <span>שלב קידום</span>
+                    <select name="stage">
+                        <?php foreach (\HubOS\Modules\Clients\ClientSeoService::STAGES as $sk => $sl): ?>
+                            <option value="<?= e($sk) ?>" <?= $sk === 'optimizing' ? 'selected' : '' ?>><?= e($sl) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>מיקום מאומת בגוגל (אופציונלי, 1–100)</span>
+                    <input type="number" name="current_rank" min="1" max="100" dir="ltr" placeholder="ריק = במדידה">
+                </label>
+                <label class="field">
+                    <span>פעולת קידום / הערה ללקוח</span>
+                    <input type="text" name="notes" maxlength="500" placeholder="אופטימיזציית כותרות, קישורים פנימיים...">
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">שמירת מילת מפתח</button>
+                </div>
+            </form>
+        </details>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
 <?php elseif ($tab === 'contacts'): ?>
     <?php if ($card['contacts'] === []): ?><p class="empty">אין אנשי קשר.</p><?php else: ?>
     <div class="table-wrap"><table class="table" id="contacts-table">
