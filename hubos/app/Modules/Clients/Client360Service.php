@@ -91,6 +91,7 @@ final class Client360Service
         'vault.metadata_viewed'         => 'צפייה ברשימת גישות בכספת',
         'user.created'                  => 'משתמש פורטל נוצר',
         'user.updated'                  => 'משתמש פורטל עודכן',
+        'user.password_changed'         => 'סיסמה הוחלפה (עצמאית)',
         'auth.login'                    => 'כניסה לפורטל',
         'auth.logout'                   => 'יציאה מהפורטל',
     ];

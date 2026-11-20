@@ -44,7 +44,7 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
     <meta name="color-scheme" content="light">
     <link rel="preload" href="/assets/fonts/heebo-hebrew.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-    <link rel="stylesheet" href="/assets/app.css?v=16">
+    <link rel="stylesheet" href="/assets/app.css?v=17">
     <script src="/assets/timer.js?v=7" defer></script>
 </head>
 <body class="app-body">
@@ -117,12 +117,26 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
                 <?php endif; ?>
             </div>
             <?php endif; ?>
+            <?php if (!$isClientViewer && !$isPartner && $ctx->can('clients.create')):
+                $newPartnerLeads = 0;
+                try {
+                    $newPartnerLeads = (new \HubOS\Modules\Auth\AccountService($ctx->pdo, $ctx->tenant()))->newPartnerLeadsCount();
+                } catch (\Throwable) {
+                    $newPartnerLeads = 0;
+                }
+                if ($newPartnerLeads > 0): ?>
+                <a class="bell-link" id="partner-leads-bell" href="/dashboard#sec-partner-leads"
+                   aria-label="<?= e($newPartnerLeads) ?> לידים חדשים מהשותפים ממתינים לטיפול">
+                    <span aria-hidden="true">🔔</span> <span class="bell-count"><?= e($newPartnerLeads) ?></span> <span class="bell-text">ליד חדש משותף</span>
+                </a>
+            <?php endif; endif; ?>
             <div class="user-chip">
                 <span class="avatar" aria-hidden="true"><?= e(Str::first((string) ($user['name'] ?? '?'))) ?></span>
                 <span class="user-meta">
                     <strong><?= e($user['name'] ?? '') ?></strong>
                     <small><?= e(Permissions::ROLE_LABELS[$user['role'] ?? ''] ?? '') ?></small>
                 </span>
+                <a class="btn btn-ghost btn-sm" id="account-password-link" href="/account/password">🔑 סיסמה</a>
                 <form method="post" action="/logout" class="logout-form">
                     <?= Csrf::field() ?>
                     <button type="submit" class="btn btn-ghost btn-sm" id="logout-button">יציאה</button>

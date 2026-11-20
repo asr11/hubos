@@ -25,6 +25,7 @@ $actionLabels = [
     'partner.lead_status_updated'   => 'סטטוס ליד שותף עודכן',
     'partner.lead_converted'        => 'ליד שותף הומר ללקוח',
     'auth.login'                    => 'כניסה למערכת',
+    'user.password_changed'         => 'סיסמה הוחלפה (עצמאית)',
     'auth.logout'                   => 'יציאה מהמערכת',
     'permission.granted'            => 'הרשאה ניתנה',
     'permission.revoked'            => 'הרשאה נשללה',

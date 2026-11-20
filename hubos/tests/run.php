@@ -1929,6 +1929,52 @@ test('m9.3 partner lead lifecycle, 1-click conversion & client 360 partner attri
     ok(!array_key_exists('partner_user_id', $c360Viewer['client']), 'partner_user_id stripped for client_viewer');
 });
 
+test('m10 self-service password change for every role + live partner-leads bell counter', function (): void {
+    $r = new Router();
+    (require HUBOS_ROOT . '/app/routes.php')($r);
+    $m = $r->match('POST', '/account/password');
+    eq(200, $m['status'], 'POST /account/password route registered');
+    eq(true, $m['opts']['auth'] ?? false, 'password route requires login');
+    ok(!isset($m['opts']['perm']), 'password route has no extra permission, so partner and client_viewer can use it');
+
+    $pdo = freshDb();
+    $tid = Provisioning::ensureTenant($pdo, 'zz-m10', 'ZZ M10');
+    $t = new Tenant($pdo, $tid);
+    $ownerId = Provisioning::createUser($pdo, $tid, 'zz_m10_owner@hubos.test', 'ZZ Owner', 'owner', 'zz-owner-pass-1234');
+    $partnerId = Provisioning::createUser($pdo, $tid, 'zz_m10_partner@hubos.test', 'ZZ Partner', 'partner', 'zz-old-partner-pass-1', $ownerId);
+    $partner = ['id' => $partnerId, 'tenant_id' => $tid, 'role' => 'partner', 'status' => 'active', 'client_id' => null];
+    $svc = new \HubOS\Modules\Auth\AccountService($pdo, $t);
+
+    eq(false, $svc->changePassword($partner, 'wrong-current-pass', 'zz-brand-new-pass-99', 'zz-brand-new-pass-99'), 'wrong current password is rejected (returns false)');
+    $v1 = throws(fn () => $svc->changePassword($partner, 'zz-old-partner-pass-1', 'short', 'short'), \HubOS\Core\ValidationException::class);
+    ok(isset($v1->errors['new_password']), 'new password shorter than the minimum is rejected');
+    $v2 = throws(fn () => $svc->changePassword($partner, 'zz-old-partner-pass-1', 'zz-brand-new-pass-99', 'zz-different-confirm-1'), \HubOS\Core\ValidationException::class);
+    ok(isset($v2->errors['confirm_password']), 'mismatching confirmation is rejected');
+    $v3 = throws(fn () => $svc->changePassword($partner, 'zz-old-partner-pass-1', 'zz-old-partner-pass-1', 'zz-old-partner-pass-1'), \HubOS\Core\ValidationException::class);
+    ok(isset($v3->errors['new_password']), 'reusing the same password is rejected');
+
+    eq(true, $svc->changePassword($partner, 'zz-old-partner-pass-1', 'zz-brand-new-pass-99', 'zz-brand-new-pass-99'), 'valid change succeeds');
+    $hash = (string) DB::run($pdo, 'SELECT password_hash FROM users WHERE id = ?', [$partnerId])->fetchColumn();
+    ok(\HubOS\Core\Auth::verifyPassword('zz-brand-new-pass-99', $hash), 'new password verifies');
+    ok(!\HubOS\Core\Auth::verifyPassword('zz-old-partner-pass-1', $hash), 'old password no longer works');
+    ok(!str_contains($hash, 'zz-brand-new-pass-99'), 'hash is not plaintext');
+
+    $evt = DB::run($pdo, "SELECT before_json, after_json FROM events WHERE action = 'user.password_changed' AND entity_id = ?", [$partnerId])->fetch();
+    ok(is_array($evt), 'password change is written to the append-only events table');
+    ok(!str_contains(json_encode($evt, JSON_UNESCAPED_UNICODE), 'zz-brand-new-pass-99'), 'event never contains the password');
+
+    // Live bell counter: only partner leads with status new
+    eq(0, $svc->newPartnerLeadsCount(), 'no new partner leads initially');
+    $owner = ['id' => $ownerId, 'tenant_id' => $tid, 'role' => 'owner', 'status' => 'active'];
+    $pSvc = new \HubOS\Modules\Partners\PartnerService($t);
+    $perms = new Permissions($t);
+    $lead1 = $pSvc->createLead($partner + ['name' => 'ZZ Partner'], ['name' => 'ZZ Bell Lead 1', 'phone' => '050-0000001']);
+    $pSvc->createLead($partner + ['name' => 'ZZ Partner'], ['name' => 'ZZ Bell Lead 2', 'phone' => '050-0000002']);
+    eq(2, $svc->newPartnerLeadsCount(), 'bell counts both new partner leads');
+    $pSvc->updateLeadStatus($owner, $perms, $lead1, 'contacted');
+    eq(1, $svc->newPartnerLeadsCount(), 'bell drops once a lead is handled');
+});
+
 // ---------------------------------------------------------------- Run
 
 $pass = 0;

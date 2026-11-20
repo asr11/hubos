@@ -23,6 +23,8 @@ return static function (Router $r): void {
     $r->get('/login', [AuthController::class, 'showLogin']);
     $r->post('/login', [AuthController::class, 'login']);
     $r->post('/logout', [AuthController::class, 'logout'], ['auth' => true]);
+    $r->get('/account/password', [\HubOS\Modules\Auth\AccountController::class, 'showPassword'], ['auth' => true]);
+    $r->post('/account/password', [\HubOS\Modules\Auth\AccountController::class, 'changePassword'], ['auth' => true]);
 
     $r->get('/dashboard', [DashboardController::class, 'index'], ['auth' => true, 'perm' => 'dashboard.view']);
 

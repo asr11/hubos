@@ -1507,6 +1507,30 @@ tr.is-task-done td.strong a {
     font-size: 0.82rem;
     border-radius: 6px;
 }
+.bell-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-inline-start: auto;
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    color: #9a3412;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+.bell-link:hover { background: #ffedd5; }
+.bell-count {
+    min-width: 1.4rem;
+    text-align: center;
+    padding: 0 0.4rem;
+    border-radius: 999px;
+    background: #ea580c;
+    color: #ffffff;
+}
+.bell-link + .user-chip { margin-inline-start: 0.75rem; }
 
 
 
