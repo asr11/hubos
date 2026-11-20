@@ -36,6 +36,11 @@ return static function (Router $r): void {
     $r->post('/clients/{id:\d+}/enrich/apply', [ClientsController::class, 'applyEnrichment'], ['auth' => true, 'perm' => 'clients.update']);
     $r->post('/clients/{id:\d+}/seo-keywords', [ClientsController::class, 'storeSeoKeyword'], ['auth' => true, 'perm' => 'clients.update']);
     $r->post('/clients/{id:\d+}/seo-keywords/{kw:\d+}/delete', [ClientsController::class, 'deleteSeoKeyword'], ['auth' => true, 'perm' => 'clients.update']);
+    $r->post('/clients/{id:\d+}/services', [ClientsController::class, 'storeService'], ['auth' => true, 'perm' => 'clients.update']);
+    $r->post('/clients/{id:\d+}/services/{svc:\d+}/delete', [ClientsController::class, 'deleteService'], ['auth' => true, 'perm' => 'clients.update']);
+    $r->post('/clients/{id:\d+}/analytics', [ClientsController::class, 'saveAnalytics'], ['auth' => true, 'perm' => 'clients.update']);
+    $r->post('/clients/{id:\d+}/analytics/sync', [ClientsController::class, 'syncAnalytics'], ['auth' => true, 'perm' => 'clients.update']);
+    $r->post('/settings/integrations/google', [ClientsController::class, 'saveGoogleIntegration'], ['auth' => true, 'perm' => 'users.manage']);
 
     // M3 — time, live timer, hours banks
     $r->get('/time', [TimeController::class, 'index'], ['auth' => true, 'perm' => 'time.view']);

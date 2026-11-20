@@ -243,6 +243,236 @@ $origin = static function (array $row) use ($familyRolled): string {
         </div>
     </div>
 
+    <?php if ($card['internal'] && $canEnrich):
+        $clientSvcs = $card['client_services'] ?? [];
+        $gaAdmin = $card['analytics_admin'] ?? null;
+        $gaConn = is_array($gaAdmin['connection'] ?? null) ? $gaAdmin['connection'] : [];
+    ?>
+    <!-- Admin-Only 1: Universal Modular Client Services Manager -->
+    <div class="mt-md admin-portal-box" id="admin-client-services-card">
+        <div class="card-head">
+            <div>
+                <p class="eyebrow">🧩 ניהול פורטל הלקוח (פנימי למנהלים בלבד)</p>
+                <h3>חבילות שירות פעילות שמוצגות ללקוח (<?= e(count($clientSvcs)) ?>)</h3>
+            </div>
+            <span class="muted small">רק המסכים של השירותים שתגדירו כאן יופיעו בפורטל הלקוח</span>
+        </div>
+
+        <?php if ($clientSvcs !== []): ?>
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">חבילת שירות בפורטל</th>
+                            <th scope="col">תכולה מוצגת ללקוח</th>
+                            <th scope="col">מתכונת</th>
+                            <th scope="col">מסכים פעילים</th>
+                            <th scope="col">סטטוס</th>
+                            <th scope="col">פעולה</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($clientSvcs as $sv): ?>
+                        <tr>
+                            <td><strong><?= e($sv['icon'] ?? '') ?> <?= e($sv['title']) ?></strong></td>
+                            <td class="muted small"><?= e($sv['scope_summary'] ?? '—') ?></td>
+                            <td><span class="badge"><?= e($sv['cycle_label'] ?? '') ?></span></td>
+                            <td class="small">
+                                <?php foreach (($sv['widgets'] ?? []) as $wk): ?>
+                                    <span class="badge"><?= e(explode(' (', \HubOS\Modules\Clients\ClientServicesEngine::WIDGETS[$wk] ?? $wk)[0]) ?></span>
+                                <?php endforeach; ?>
+                            </td>
+                            <td><span class="pill <?= ($sv['status'] ?? '') === 'active' ? 'pill-ok' : '' ?> seo-stage-pill"><?= e($sv['status_label'] ?? '') ?></span></td>
+                            <td>
+                                <form method="post" action="/clients/<?= e($id) ?>/services/<?= e((int) $sv['id']) ?>/delete" class="inline-form">
+                                    <?= Csrf::field() ?>
+                                    <button type="submit" class="btn btn-ghost btn-sm">הסר</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php else: ?>
+            <p class="muted small">טרם הוגדרו חבילות שירות ייעודיות — בחרו שירות מהרשימה למטה כדי לפתוח ללקוח את המסך המדויק עבורו.</p>
+        <?php endif; ?>
+
+        <details class="mt-sm">
+            <summary class="btn btn-primary btn-sm">+ הוספת שירות לפורטל הלקוח (מתוך 12 תבניות או שירות מותאם)</summary>
+            <form method="post" action="/clients/<?= e($id) ?>/services" class="form-grid mt-sm" id="client-service-form">
+                <?= Csrf::field() ?>
+                <label class="field">
+                    <span>בחירת שירות מתוך הקטלוג האוניברסלי *</span>
+                    <select name="service_type" required>
+                        <?php foreach (\HubOS\Modules\Clients\ClientServicesEngine::CATALOG as $sKey => $sDef): ?>
+                            <option value="<?= e($sKey) ?>"><?= e($sDef['icon'] . ' ' . $sDef['label']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>שם השירות כפי שיוצג ללקוח (ריק = שם ברירת מחדל)</span>
+                    <input type="text" name="title" maxlength="200" placeholder="לדוגמה: קידום אורגני בגוגל (SEO)">
+                </label>
+                <label class="field">
+                    <span>מתכונת השירות</span>
+                    <select name="billing_cycle">
+                        <?php foreach (\HubOS\Modules\Clients\ClientServicesEngine::CYCLES as $cKey => $cLabel): ?>
+                            <option value="<?= e($cKey) ?>"><?= e($cLabel) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>סטטוס</span>
+                    <select name="status">
+                        <?php foreach (\HubOS\Modules\Clients\ClientServicesEngine::STATUSES as $stKey => $stLabel): ?>
+                            <option value="<?= e($stKey) ?>"><?= e($stLabel) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label class="field field-wide">
+                    <span>תיאור תכולת השירות המדויקת ללקוח</span>
+                    <input type="text" name="scope_summary" maxlength="1000" placeholder="תיאור נקי ומאומת של מה שהשירות כולל עבור הלקוח">
+                </label>
+                <label class="field">
+                    <span>קישור חי לתוצר / מערכת / כרטיס (אופציונלי)</span>
+                    <input type="url" name="live_url" dir="ltr" maxlength="300" placeholder="https://...">
+                </label>
+                <label class="field">
+                    <span>מדד ייעודי 1 — תווית (למשל: לידים החודש)</span>
+                    <input type="text" name="metric_1_label" maxlength="80" placeholder="אופציונלי">
+                </label>
+                <label class="field">
+                    <span>מדד ייעודי 1 — ערך (למשל: 42)</span>
+                    <input type="text" name="metric_1_value" dir="ltr" maxlength="80" placeholder="אופציונלי">
+                </label>
+                <fieldset class="field field-wide widgets-fieldset">
+                    <legend class="small strong muted">מסכי מידע להצגה בפורטל (אם לא מסמנים — נבחרים אוטומטית לפי סוג השירות):</legend>
+                    <div class="widgets-checkbox-grid">
+                        <?php foreach (\HubOS\Modules\Clients\ClientServicesEngine::WIDGETS as $wKey => $wLabel): ?>
+                            <label class="checkbox-pill">
+                                <input type="checkbox" name="widgets[]" value="<?= e($wKey) ?>">
+                                <span><?= e($wLabel) ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                </fieldset>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">שמירת שירות בפורטל הלקוח</button>
+                </div>
+            </form>
+        </details>
+    </div>
+
+    <!-- Admin-Only 2: Google Search Console & Google Analytics (GA4) Connection -->
+    <div class="mt-md admin-portal-box" id="admin-google-analytics-card">
+        <div class="card-head">
+            <div>
+                <p class="eyebrow">📊 חיבור מדידה חיצוני (גלוי למנהלים בלבד)</p>
+                <h3>חיבור Google Search Console &amp; Google Analytics (GA4)</h3>
+            </div>
+            <div class="cluster">
+                <?php if (($gaConn['status'] ?? '') === 'connected'): ?>
+                    <span class="pill pill-ok seo-stage-pill">✔ מחובר ומסונכרן</span>
+                <?php elseif (($gaConn['status'] ?? '') === 'error'): ?>
+                    <span class="pill pill-warn seo-stage-pill">שגיאת סנכרון</span>
+                <?php else: ?>
+                    <span class="pill seo-stage-pill">ממתין לסנכרון ראשוני</span>
+                <?php endif; ?>
+                <?php if (!empty($gaConn['gsc_site_url']) || !empty($gaConn['ga4_property_id'])): ?>
+                    <form method="post" action="/clients/<?= e($id) ?>/analytics/sync" class="inline-form">
+                        <?= Csrf::field() ?>
+                        <button type="submit" class="btn btn-primary btn-sm" id="btn-sync-google">משוך נתונים מגוגל ↻</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if (!empty($gaConn['last_error'])): ?>
+            <p class="alert alert-danger small mt-sm"><?= e((string) $gaConn['last_error']) ?></p>
+        <?php endif; ?>
+
+        <form method="post" action="/clients/<?= e($id) ?>/analytics" class="form-grid mt-sm" id="client-analytics-form">
+            <?= Csrf::field() ?>
+            <label class="field">
+                <span>נכס Google Search Console (דומיין או כתובת)</span>
+                <input type="text" name="gsc_site_url" dir="ltr" maxlength="255"
+                       value="<?= e((string) ($gaConn['gsc_site_url'] ?? (!empty($c['domain']) ? 'sc-domain:' . $c['domain'] : ''))) ?>"
+                       placeholder="sc-domain:example.com או https://example.com/">
+            </label>
+            <label class="field">
+                <span>GA4 Property ID (מספר הנכס באנליטיקס לשליפת דוחות)</span>
+                <input type="text" name="ga4_property_id" dir="ltr" inputmode="numeric" maxlength="40"
+                       value="<?= e((string) ($gaConn['ga4_property_id'] ?? '')) ?>"
+                       placeholder="לדוגמה: 412345678">
+            </label>
+            <label class="field">
+                <span>GA4 Measurement ID (מזהה הקוד באתר)</span>
+                <input type="text" name="ga4_measurement_id" dir="ltr" maxlength="24"
+                       value="<?= e((string) ($gaConn['ga4_measurement_id'] ?? '')) ?>"
+                       placeholder="G-XXXXXXXXXX">
+            </label>
+            <label class="field">
+                <span>שיטת אימות מול גוגל</span>
+                <select name="auth_mode">
+                    <option value="service_account" <?= ($gaConn['auth_mode'] ?? 'service_account') === 'service_account' ? 'selected' : '' ?>>
+                        חשבון שירות של הסוכנות (Service Account<?= !empty($gaAdmin['has_service_account']) ? ' · מוגדר ✔' : '' ?>)
+                    </option>
+                    <option value="oauth" <?= ($gaConn['auth_mode'] ?? '') === 'oauth' ? 'selected' : '' ?>>
+                        חיבור OAuth 2.0 של מנהל<?= !empty($gaAdmin['has_oauth']) ? ' · מוגדר ✔' : '' ?>
+                    </option>
+                </select>
+            </label>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-ghost btn-sm">שמירת מזהי נכס ללקוח</button>
+            </div>
+        </form>
+
+        <?php if (!empty($gaAdmin['service_account_email'])): ?>
+            <p class="muted small mt-sm">
+                💡 לשליפת נתונים אוטומטית, ודאו שהאימייל <code dir="ltr"><?= e((string) $gaAdmin['service_account_email']) ?></code> מוגדר כצופה (Viewer / Restricted) ב-Search Console וב-Analytics של הלקוח.
+            </p>
+        <?php endif; ?>
+
+        <?php if (!empty($canAssignPartner)): ?>
+        <details class="mt-sm">
+            <summary class="btn btn-ghost btn-sm">⚙️ הגדרת מפתח Google מרכזי של הסוכנות (Service Account JSON או OAuth — מוצפן AES-256-GCM)</summary>
+            <div class="grid-2 mt-sm">
+                <form method="post" action="/settings/integrations/google" class="stack">
+                    <?= Csrf::field() ?>
+                    <input type="hidden" name="mode" value="service_account">
+                    <input type="hidden" name="_return" value="/clients/<?= e($id) ?>">
+                    <label class="field">
+                        <span>אפשרות א׳ (מומלצת): הדבקת קובץ Google Service Account JSON</span>
+                        <textarea name="sa_json" rows="4" dir="ltr" placeholder='{"type":"service_account","client_email":"...","private_key":"-----BEGIN PRIVATE KEY-----..."}'></textarea>
+                    </label>
+                    <div><button type="submit" class="btn btn-primary btn-sm">הצפן ושמור Service Account</button></div>
+                </form>
+
+                <form method="post" action="/settings/integrations/google" class="stack">
+                    <?= Csrf::field() ?>
+                    <input type="hidden" name="mode" value="oauth">
+                    <input type="hidden" name="_return" value="/clients/<?= e($id) ?>">
+                    <label class="field">
+                        <span>אפשרות ב׳ (OAuth 2.0): Google Client ID</span>
+                        <input type="text" name="client_id" dir="ltr" placeholder="...apps.googleusercontent.com">
+                    </label>
+                    <label class="field">
+                        <span>Google Client Secret</span>
+                        <input type="password" name="client_secret" dir="ltr" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span>OAuth Refresh Token (עם הרשאות webmasters.readonly ו-analytics.readonly)</span>
+                        <input type="password" name="refresh_token" dir="ltr" autocomplete="off">
+                    </label>
+                    <div><button type="submit" class="btn btn-ghost btn-sm">הצפן ושמור OAuth</button></div>
+                </form>
+            </div>
+        </details>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <?php $seoKws = $card['seo_keywords'] ?? []; if ($seoKws !== [] || $canEnrich): ?>
     <div class="mt-md" id="seo-keywords-card">
         <div class="card-head">

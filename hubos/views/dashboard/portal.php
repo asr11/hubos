@@ -1,63 +1,74 @@
 <?php
 use HubOS\Modules\Assets\AssetService;
 use HubOS\Modules\Clients\ClientSeoService;
-use HubOS\Modules\Work\TaskService;
+use HubOS\Modules\Clients\ClientServicesEngine;
 
 /**
+ * M11 — Modular Service-Driven Client Portal.
+ *
+ * Design Invariants:
+ *  - ZERO online tasks / internal work boards exposed to clients.
+ *  - ZERO "פתיחת תיק לקוח מלא" button.
+ *  - ZERO "על מה משלמים" wording -> clean "חבילות שירות פעילות".
+ *  - ZERO Hours Bank unless the client actually has the 'hours_bank' service enabled (or an active hours bank when no services configured yet).
+ *  - Friendly, human-readable Google Search Console & Google Analytics (GA4) experience.
+ *
  * @var array<string, mixed> $user
  * @var array<string, mixed> $portal
  */
 $client = $portal['client'] ?? null;
-$tasks = $portal['tasks'] ?? [];
+$services = $portal['client_services'] ?? [];
 $projects = $portal['projects'] ?? [];
 $banks = $portal['hours_banks'] ?? [];
 $assets = $portal['assets'] ?? [];
 $seoKeywords = $portal['seo_keywords'] ?? [];
+$analytics = $portal['analytics_portal'] ?? null;
 $metrics = $portal['metrics'] ?? [];
-$openTasks = $portal['open_tasks'] ?? [];
 
-$doneTasks = [];
-$doingTasks = [];
-$todoTasks = [];
-foreach ($tasks as $t) {
-    $st = TaskService::statusKey((string) ($t['status'] ?? 'todo'));
-    if ($st === 'done') {
-        $doneTasks[] = $t;
-    } elseif ($st === 'doing') {
-        $doingTasks[] = $t;
-    } else {
-        $todoTasks[] = $t;
+$activeServices = array_values(array_filter($services, static fn (array $s): bool => ($s['status'] ?? 'active') === 'active'));
+$completedServices = array_values(array_filter($services, static fn (array $s): bool => ($s['status'] ?? '') === 'completed'));
+
+if ($services !== []) {
+    $widgets = $portal['active_widgets'] ?? ClientServicesEngine::activeWidgets($services);
+} else {
+    // Fallback for legacy clients whose services haven't been explicitly assigned yet
+    $widgets = [];
+    if ($seoKeywords !== [] || $analytics !== null) {
+        $widgets[] = 'gsc_ga4';
+        $widgets[] = 'seo_keywords';
+    }
+    if ($assets !== []) {
+        $widgets[] = 'domain_ssl';
+    }
+    if ($banks !== []) {
+        $widgets[] = 'hours_bank';
     }
 }
-$totalTasksCount = count($tasks);
-$doneTasksCount = count($doneTasks);
-$overallPct = $totalTasksCount > 0 ? (int) round(($doneTasksCount / $totalTasksCount) * 100) : 0;
-$validSslCount = count(array_filter($assets, static fn (array $a): bool => ($a['ssl_status'] ?? '') === 'valid'));
-$hoursTotal = (float) ($metrics['hours_total'] ?? 0.0);
-$hoursThisMonth = (float) ($metrics['hours_this_month'] ?? 0.0);
-$showSeoKpi = $banks === [] && $hoursTotal <= 0.0 && $seoKeywords !== [];
+$hasWidget = static fn (string $w): bool => in_array($w, $widgets, true);
 
-$widthBucket = static function (int $pct): string {
-    return match (true) {
-        $pct >= 100 => 'w-100',
-        $pct >= 75  => 'w-75',
-        $pct >= 60  => 'w-67',
-        $pct >= 45  => 'w-50',
-        $pct >= 28  => 'w-33',
-        $pct >= 10  => 'w-25',
-        default     => 'w-0',
-    };
+$gsc = is_array($analytics['metrics']['gsc'] ?? null) ? $analytics['metrics']['gsc'] : null;
+$ga4 = is_array($analytics['metrics']['ga4'] ?? null) ? $analytics['metrics']['ga4'] : null;
+$validSslCount = count(array_filter($assets, static fn (array $a): bool => ($a['ssl_status'] ?? '') === 'valid'));
+
+$trendBadge = static function (int $cur, int $prev): string {
+    if ($prev <= 0 || $cur === $prev) {
+        return '';
+    }
+    $pct = (int) round((($cur - $prev) / $prev) * 100);
+    if ($pct > 0) {
+        return '<span class="pill pill-ok seo-stage-pill" dir="ltr">▲ +' . e($pct) . '%</span>';
+    }
+    return '<span class="pill pill-warn seo-stage-pill" dir="ltr">▼ ' . e($pct) . '%</span>';
 };
 ?>
 <section class="hero card" id="client-portal-hero" aria-labelledby="hero-title">
     <div>
-        <p class="eyebrow">OS HUB · פורטל לקוח אישי (שקיפות מלאה בזמן אמת)</p>
+        <p class="eyebrow">OS HUB · פורטל לקוח אישי</p>
         <h2 id="hero-title">שלום, <?= e($user['name']) ?></h2>
         <?php if ($client !== null): ?>
-            <p class="muted" id="portal-client-name">תיק לקוח: <strong><?= e($client['name']) ?></strong> · מעקב שקוף אחר חבילת השירות, התקדמות המשימות, מילות המפתח בגוגל ותקינות האתר.</p>
+            <p class="muted" id="portal-client-name">תיק לקוח: <strong><?= e($client['name']) ?></strong> · תמונת מצב שקופה וידידותית של חבילות השירות הפעילות, ביצועי החיפוש והתנועה לאתר ותקינות התשתית.</p>
             <div class="portal-hero-actions">
-                <a class="btn btn-primary btn-sm" id="portal-report-link" href="/clients/<?= e((int) $client['id']) ?>/report">📄 הפקת דוח סטטוס והתקדמות (PDF / הדפסה)</a>
-                <a class="btn btn-ghost btn-sm" href="/clients/<?= e((int) $client['id']) ?>">פתיחת תיק לקוח מלא ←</a>
+                <a class="btn btn-primary btn-sm" id="portal-report-link" href="/clients/<?= e((int) $client['id']) ?>/report">📄 הפקת דוח תקופתי (PDF / הדפסה)</a>
             </div>
         <?php else: ?>
             <p class="muted">המשתמש אינו משויך ללקוח פעיל.</p>
@@ -67,155 +78,195 @@ $widthBucket = static function (int $pct): string {
 </section>
 
 <?php if ($client !== null): ?>
-<section class="stats" aria-label="נתוני פורטל לקוח">
-    <article class="stat card">
-        <span class="stat-label">התקדמות אבני דרך</span>
-        <strong class="stat-value" id="portal-stat-tasks"><bdi dir="ltr"><?= e($doneTasksCount) ?> / <?= e($totalTasksCount) ?></bdi></strong>
-        <span class="stat-hint">הושלמו (<bdi dir="ltr"><?= e($overallPct) ?>%</bdi>) · פעילות: <?= e(count($openTasks)) ?></span>
-    </article>
-    <article class="stat card">
-        <span class="stat-label">מסלול שירות / בנק שעות</span>
-        <strong class="stat-value" id="portal-stat-bank">
-            <?php if (($metrics['bank_remaining'] ?? null) === null): ?>
-                ריטיינר
-            <?php else: ?>
-                <bdi dir="ltr"><?= e(number_format((float) $metrics['bank_remaining'], 1)) ?>h</bdi>
-            <?php endif; ?>
-        </strong>
-        <span class="stat-hint"><?= count($banks) > 0 ? e(count($banks)) . ' בנקי שעות פעילים' : 'שירות חודשי מנוהל' ?></span>
-    </article>
-    <?php if ($showSeoKpi): ?>
-    <article class="stat card">
-        <span class="stat-label">מילות מפתח בקידום (SEO &amp; GEO)</span>
-        <strong class="stat-value" id="portal-stat-hours"><?= e(count($seoKeywords)) ?></strong>
-        <span class="stat-hint">ביטויי מפתח במעקב ואופטימיזציה</span>
-    </article>
-    <?php else: ?>
-    <article class="stat card">
-        <span class="stat-label">שעות מדווחות</span>
-        <strong class="stat-value" id="portal-stat-hours"><bdi dir="ltr"><?= e(number_format($hoursThisMonth, 1)) ?>h</bdi></strong>
-        <span class="stat-hint">סה״כ מצטבר: <bdi dir="ltr"><?= e(number_format($hoursTotal, 1)) ?>h</bdi></span>
-    </article>
-    <?php endif; ?>
-    <article class="stat card">
-        <span class="stat-label">נכסים ואבטחת SSL</span>
-        <strong class="stat-value" id="portal-stat-assets"><?= e(count($assets)) ?></strong>
-        <span class="stat-hint"><?= $validSslCount > 0 ? '🔒 ' . e($validSslCount) . ' מאומתים בתעודת SSL תקינה' : 'משויכים לתיק הלקוח' ?></span>
-    </article>
-</section>
 
-<?php if ($projects !== []): ?>
+<!-- 1. חבילות שירות פעילות -->
 <section class="card" id="portal-services-scope" aria-labelledby="portal-scope-title">
     <div class="card-head">
-        <h2 id="portal-scope-title">על מה משלמים · חבילות שירות פעילות והתקדמות (<?= e(count($projects)) ?>)</h2>
-        <span class="pill pill-ok">מעודכן בזמן אמת</span>
+        <h2 id="portal-scope-title">חבילות שירות פעילות (<?= e($services !== [] ? count($activeServices) : count($projects)) ?>)</h2>
+        <span class="pill pill-ok">מוגדר לתיק הלקוח</span>
     </div>
-    <div class="stack">
-    <?php foreach ($projects as $p):
-        $pid = (int) ($p['id'] ?? 0);
-        $pTasks = array_values(array_filter($tasks, static fn (array $t): bool => (int) ($t['project_id'] ?? 0) === $pid));
-        $pTotal = count($pTasks);
-        $pDone = count(array_filter($pTasks, static fn (array $t): bool => TaskService::statusKey((string) ($t['status'] ?? '')) === 'done'));
-        $pPct = $pTotal > 0 ? (int) round(($pDone / $pTotal) * 100) : $overallPct;
-    ?>
-        <article class="card">
-            <div class="card-head">
-                <div>
-                    <strong><?= fmt_inline_bidi((string) ($p['name'] ?? '')) ?></strong>
+    <?php if ($services !== []): ?>
+        <div class="service-cards-grid">
+            <?php foreach ($services as $svc):
+                $isCompleted = ($svc['status'] ?? '') === 'completed';
+            ?>
+                <article class="service-module-card <?= $isCompleted ? 'is-completed' : 'is-active' ?>">
+                    <div class="card-head">
+                        <div class="service-module-title">
+                            <span aria-hidden="true"><?= e($svc['icon'] ?? '✨') ?></span>
+                            <strong><?= fmt_inline_bidi((string) $svc['title']) ?></strong>
+                        </div>
+                        <div class="cluster">
+                            <span class="pill <?= $isCompleted ? '' : 'pill-ok' ?> seo-stage-pill"><?= e($svc['status_label'] ?? 'פעיל') ?></span>
+                            <span class="badge"><?= e($svc['cycle_label'] ?? '') ?></span>
+                        </div>
+                    </div>
+                    <?php if (!empty($svc['scope_summary'])): ?>
+                        <p class="muted m-0"><?= fmt_inline_bidi((string) $svc['scope_summary']) ?></p>
+                    <?php endif; ?>
+                    <?php
+                    $sm = $svc['metrics'] ?? [];
+                    $hasCustomMetrics = !empty($sm['metric_1_label']) || !empty($sm['metric_2_label']) || !empty($sm['metric_3_label']) || !empty($sm['live_url']);
+                    if ($hasCustomMetrics):
+                    ?>
+                        <div class="service-custom-kpis">
+                            <?php for ($mi = 1; $mi <= 3; $mi++):
+                                if (!empty($sm["metric_{$mi}_label"]) && isset($sm["metric_{$mi}_value"])): ?>
+                                <div class="service-mini-kpi">
+                                    <span class="muted small"><?= e((string) $sm["metric_{$mi}_label"]) ?></span>
+                                    <strong dir="ltr"><?= e((string) $sm["metric_{$mi}_value"]) ?></strong>
+                                </div>
+                            <?php endif; endfor; ?>
+                            <?php if (!empty($sm['live_url'])): ?>
+                                <a class="btn btn-ghost btn-sm" href="<?= e((string) $sm['live_url']) ?>" target="_blank" rel="noopener noreferrer">פתיחת קישור חי ↗</a>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php elseif ($projects !== []): ?>
+        <div class="stack">
+            <?php foreach ($projects as $p): ?>
+                <article class="card">
+                    <div class="card-head">
+                        <strong><?= fmt_inline_bidi((string) ($p['name'] ?? '')) ?></strong>
+                        <span class="pill pill-ok">פעיל</span>
+                    </div>
                     <?php if (!empty($p['description'])): ?>
                         <div class="muted mt-sm"><?= fmt_rich_text((string) $p['description']) ?></div>
                     <?php endif; ?>
-                </div>
-                <span class="pill pill-ok" dir="ltr"><?= e($pPct) ?>%</span>
-            </div>
-            <div class="project-progress-wrap" aria-label="התקדמות חבילת השירות">
-                <div class="project-progress-track">
-                    <span class="project-progress-fill <?= e($widthBucket($pPct)) ?>"></span>
-                </div>
-                <span class="muted">הושלמו <?= e($pDone) ?> מתוך <?= e($pTotal) ?> אבני דרך</span>
-            </div>
-        </article>
-    <?php endforeach; ?>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <p class="muted m-0">חבילות השירות של התיק מעודכנות על ידי מנהל התיק.</p>
+    <?php endif; ?>
+</section>
+
+<!-- 2. מסך קידום אורגני: Google Search Console & Google Analytics (חוויה ידידותית) -->
+<?php if ($hasWidget('gsc_ga4')): ?>
+<section class="card" id="portal-google-insights" aria-labelledby="portal-google-title">
+    <div class="card-head">
+        <div>
+            <p class="eyebrow">📊 נתוני חיפוש ותנועה בזמן אמת (28 ימים אחרונים)</p>
+            <h2 id="portal-google-title">מה באמת קורה באתר שלך בגוגל — Search Console &amp; Analytics</h2>
+        </div>
+        <?php if (!empty($analytics['last_synced_at'])): ?>
+            <span class="pill pill-ok seo-stage-pill">עודכן מגוגל: <bdi dir="ltr"><?= e(fmt_date((string) $analytics['last_synced_at'])) ?></bdi></span>
+        <?php else: ?>
+            <span class="pill seo-stage-pill">מוכן לסנכרון נתוני גוגל</span>
+        <?php endif; ?>
     </div>
+
+    <?php if ($gsc !== null || $ga4 !== null): ?>
+        <div class="stats mt-sm" aria-label="מדדי גוגל ואנליטיקס">
+            <?php if ($gsc !== null): ?>
+                <article class="stat card">
+                    <span class="stat-label">חשיפות בחיפוש גוגל</span>
+                    <strong class="stat-value"><bdi dir="ltr"><?= e(number_format((int) $gsc['impressions'])) ?></bdi></strong>
+                    <span class="stat-hint">כמה פעמים העסק הופיע בגוגל <?= $trendBadge((int) $gsc['impressions'], (int) ($gsc['prev_impressions'] ?? 0)) ?></span>
+                </article>
+                <article class="stat card">
+                    <span class="stat-label">כניסות אורגניות מגוגל</span>
+                    <strong class="stat-value"><bdi dir="ltr"><?= e(number_format((int) $gsc['clicks'])) ?></bdi></strong>
+                    <span class="stat-hint">גולשים שלחצו ונכנסו לאתר <?= $trendBadge((int) $gsc['clicks'], (int) ($gsc['prev_clicks'] ?? 0)) ?></span>
+                </article>
+                <article class="stat card">
+                    <span class="stat-label">מיקום ממוצע בגוגל</span>
+                    <strong class="stat-value"><bdi dir="ltr"><?= (float) $gsc['avg_position'] > 0 ? '#' . e(number_format((float) $gsc['avg_position'], 1)) : '—' ?></bdi></strong>
+                    <span class="stat-hint">יחס הקלקה (CTR): <bdi dir="ltr"><?= e(number_format((float) $gsc['ctr_pct'], 1)) ?>%</bdi></span>
+                </article>
+            <?php endif; ?>
+            <?php if ($ga4 !== null): ?>
+                <article class="stat card">
+                    <span class="stat-label">מבקרים באתר (Analytics)</span>
+                    <strong class="stat-value"><bdi dir="ltr"><?= e(number_format((int) $ga4['users'])) ?></bdi></strong>
+                    <span class="stat-hint"><bdi dir="ltr"><?= e(number_format((int) $ga4['page_views'])) ?></bdi> צפיות בעמודים <?= $trendBadge((int) $ga4['users'], (int) ($ga4['prev_users'] ?? 0)) ?></span>
+                </article>
+            <?php endif; ?>
+        </div>
+
+        <?php if (!empty($gsc['top_queries']) || !empty($gsc['top_pages']) || !empty($ga4['top_pages'])): ?>
+            <div class="grid-2-wide mt-md">
+                <?php if (!empty($gsc['top_queries'])): ?>
+                <div>
+                    <h3>ביטויים שאנשים חיפשו בגוגל ומצאו אותך</h3>
+                    <div class="table-wrap">
+                        <table class="table table-mobile-cards" id="portal-gsc-queries-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">ביטוי חיפוש</th>
+                                    <th scope="col">קליקים</th>
+                                    <th scope="col">חשיפות</th>
+                                    <th scope="col">מיקום ממוצע</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($gsc['top_queries'] as $qr): ?>
+                                <tr>
+                                    <td data-label="ביטוי חיפוש"><strong><?= e((string) $qr['query']) ?></strong></td>
+                                    <td data-label="קליקים"><bdi dir="ltr"><?= e((int) $qr['clicks']) ?></bdi></td>
+                                    <td data-label="חשיפות"><bdi dir="ltr"><?= e(number_format((int) $qr['impressions'])) ?></bdi></td>
+                                    <td data-label="מיקום ממוצע"><bdi dir="ltr">#<?= e(number_format((float) $qr['position'], 1)) ?></bdi></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if (!empty($gsc['top_pages'])): ?>
+                <div>
+                    <h3>העמודים המובילים באתר בכניסות מגוגל</h3>
+                    <div class="table-wrap">
+                        <table class="table table-mobile-cards" id="portal-gsc-pages-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">עמוד באתר</th>
+                                    <th scope="col">קליקים</th>
+                                    <th scope="col">חשיפות</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($gsc['top_pages'] as $pg):
+                                $pUrl = (string) ($pg['url'] ?? '');
+                                $pLabel = urldecode((string) preg_replace('#^https?://#i', '', rtrim($pUrl, '/')));
+                            ?>
+                                <tr>
+                                    <td data-label="עמוד באתר"><a class="seo-url-link" dir="ltr" href="<?= e($pUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e($pLabel) ?> ↗</a></td>
+                                    <td data-label="קליקים"><bdi dir="ltr"><?= e((int) $pg['clicks']) ?></bdi></td>
+                                    <td data-label="חשיפות"><bdi dir="ltr"><?= e(number_format((int) $pg['impressions'])) ?></bdi></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+    <?php else: ?>
+        <div class="google-friendly-ready">
+            <p class="m-0">
+                <strong>חיבור ישיר ל-Google Search Console ול-Google Analytics מוכן להפעלה בתיק שלך</strong>
+                <?php if (!empty($analytics['ga4_measurement_id'])): ?>
+                    (מזהה מדידה פעיל באתר: <code dir="ltr"><?= e((string) $analytics['ga4_measurement_id']) ?></code>).
+                <?php endif; ?>
+                ברגע שהרשאת הצפייה מאושרת מול גוגל, יוצגו כאן אוטומטית החשיפות, הכניסות מהחיפוש, המבקרים באתר והביטויים המובילים בתצוגה פשוטה וברורה.
+            </p>
+        </div>
+    <?php endif; ?>
 </section>
 <?php endif; ?>
 
-<section class="portal-roadmap-grid" id="portal-roadmap" aria-label="מפת התקדמות: מה עשינו, מה עושים ומה נעשה">
-    <article class="roadmap-col roadmap-col-done">
-        <div class="roadmap-col-head">
-            <h3>✅ מה עשינו (הושלם)</h3>
-            <span class="pill pill-ok"><?= e(count($doneTasks)) ?></span>
-        </div>
-        <?php if ($doneTasks === []): ?>
-            <p class="empty">טרם סומנו אבני דרך שהושלמו.</p>
-        <?php else: ?>
-            <ul class="roadmap-list">
-            <?php foreach ($doneTasks as $t): ?>
-                <li class="roadmap-item">
-                    <a class="roadmap-item-title" href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a>
-                    <?php if (!empty($t['description'])): ?>
-                        <p class="roadmap-item-desc"><?= fmt_inline_bidi((string) $t['description']) ?></p>
-                    <?php endif; ?>
-                </li>
-            <?php endforeach; ?>
-            </ul>
-        <?php endif; ?>
-    </article>
-
-    <article class="roadmap-col roadmap-col-doing">
-        <div class="roadmap-col-head">
-            <h3>⚡ מה עושים עכשיו (בביצוע)</h3>
-            <span class="pill pill-warn"><?= e(count($doingTasks)) ?></span>
-        </div>
-        <?php if ($doingTasks === []): ?>
-            <p class="empty">אין משימות פתוחות בביצוע כרגע.</p>
-        <?php else: ?>
-            <ul class="roadmap-list">
-            <?php foreach ($doingTasks as $t): ?>
-                <li class="roadmap-item">
-                    <a class="roadmap-item-title" href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a>
-                    <?php if (!empty($t['description'])): ?>
-                        <p class="roadmap-item-desc"><?= fmt_inline_bidi((string) $t['description']) ?></p>
-                    <?php endif; ?>
-                    <?php if (!empty($t['due_at'])): ?>
-                        <div class="roadmap-item-meta">יעד חודשי: <b dir="ltr"><?= e(fmt_date((string) $t['due_at'])) ?></b></div>
-                    <?php endif; ?>
-                </li>
-            <?php endforeach; ?>
-            </ul>
-        <?php endif; ?>
-    </article>
-
-    <article class="roadmap-col roadmap-col-todo">
-        <div class="roadmap-col-head">
-            <h3>📅 מה נעשה בהמשך (מתוכנן)</h3>
-            <span class="pill"><?= e(count($todoTasks)) ?></span>
-        </div>
-        <?php if ($todoTasks === []): ?>
-            <p class="empty">אין משימות עתידיות מתוכננות כרגע.</p>
-        <?php else: ?>
-            <ul class="roadmap-list">
-            <?php foreach ($todoTasks as $t): ?>
-                <li class="roadmap-item">
-                    <a class="roadmap-item-title" href="/tasks/<?= e((int) $t['id']) ?>"><?= fmt_inline_bidi((string) $t['title']) ?></a>
-                    <?php if (!empty($t['description'])): ?>
-                        <p class="roadmap-item-desc"><?= fmt_inline_bidi((string) $t['description']) ?></p>
-                    <?php endif; ?>
-                    <?php if (!empty($t['due_at'])): ?>
-                        <div class="roadmap-item-meta">מתוכנן ל: <b dir="ltr"><?= e(fmt_date((string) $t['due_at'])) ?></b></div>
-                    <?php endif; ?>
-                </li>
-            <?php endforeach; ?>
-            </ul>
-        <?php endif; ?>
-    </article>
-</section>
-
-<?php if ($seoKeywords !== []): ?>
+<!-- 3. טבלת מילות מפתח ממוקדות בקידום אורגני (SEO & GEO) -->
+<?php if ($hasWidget('seo_keywords') && $seoKeywords !== []): ?>
 <section class="card" id="portal-seo-keywords" aria-labelledby="portal-seo-title">
     <div class="card-head">
-        <h2 id="portal-seo-title">🔍 מילות מפתח מרכזיות בקידום אורגני — Google SEO &amp; AI Search (<?= e(count($seoKeywords)) ?>)</h2>
-        <span class="muted">ביטויים ממוקדים בעמודי האתר הפעילים</span>
+        <h2 id="portal-seo-title">🔍 ביטויי מפתח ממוקדים בקידום אורגני (<?= e(count($seoKeywords)) ?>)</h2>
+        <span class="muted">עמודי יעד מרכזיים המקודמים באתר</span>
     </div>
     <div class="table-wrap">
         <table class="table table-mobile-cards" id="portal-seo-table">
@@ -223,9 +274,8 @@ $widthBucket = static function (int $pct): string {
                 <tr>
                     <th scope="col">מילת מפתח / ביטוי יעד</th>
                     <th scope="col">עמוד יעד באתר</th>
-                    <th scope="col">שלב קידום</th>
-                    <th scope="col">מיקום מאומת בגוגל</th>
-                    <th scope="col">פעולת קידום</th>
+                    <th scope="col">סטטוס קידום</th>
+                    <th scope="col">מיקום בגוגל</th>
                 </tr>
             </thead>
             <tbody>
@@ -245,7 +295,7 @@ $widthBucket = static function (int $pct): string {
                             <span class="muted">—</span>
                         <?php endif; ?>
                     </td>
-                    <td data-label="שלב קידום"><span class="pill seo-stage-pill kw-stage-<?= e($stage) ?>"><?= e(ClientSeoService::STAGES[$stage] ?? $stage) ?></span></td>
+                    <td data-label="סטטוס קידום"><span class="pill seo-stage-pill kw-stage-<?= e($stage) ?>"><?= e(ClientSeoService::STAGES[$stage] ?? $stage) ?></span></td>
                     <td data-label="מיקום בגוגל">
                         <?php if ($rank !== null): ?>
                             <strong dir="ltr">#<?= e($rank) ?></strong>
@@ -255,10 +305,9 @@ $widthBucket = static function (int $pct): string {
                                 <span class="pill pill-warn seo-stage-pill" dir="ltr">▼ -<?= e($rank - $prev) ?></span>
                             <?php endif; ?>
                         <?php else: ?>
-                            <span class="muted">במדידה שוטפת</span>
+                            <span class="muted">מתעדכן מ-Search Console</span>
                         <?php endif; ?>
                     </td>
-                    <td data-label="פעולת קידום" class="muted"><?= e($kw['notes'] ?? '—') ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -267,75 +316,81 @@ $widthBucket = static function (int $pct): string {
 </section>
 <?php endif; ?>
 
-<section class="grid-2-wide">
-    <article class="card" aria-labelledby="portal-assets-title">
-        <div class="card-head">
-            <h2 id="portal-assets-title">נכסים, דומיינים ואבטחת SSL (<?= e(count($assets)) ?>)</h2>
-        </div>
-        <?php if ($assets === []): ?>
-            <p class="empty">אין נכסים רשומים לתיק זה.</p>
-        <?php else: ?>
-            <div class="table-wrap">
-                <table class="table table-mobile-cards" id="portal-assets-table">
-                    <thead>
-                        <tr>
-                            <th scope="col">דומיין / נכס</th>
-                            <th scope="col">ספק / תשתית</th>
-                            <th scope="col">אבטחת SSL</th>
-                            <th scope="col">תוקף דומיין</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($assets as $a):
-                        $sslOk = ($a['ssl_status'] ?? '') === 'valid';
-                    ?>
-                        <tr>
-                            <td data-label="דומיין / נכס"><strong dir="ltr"><?= e($a['domain'] ?? '—') ?></strong></td>
-                            <td data-label="ספק / תשתית"><bdi><?= e($a['provider'] ?? '—') ?></bdi></td>
-                            <td data-label="אבטחת SSL">
-                                <?php if ($sslOk): ?>
-                                    <span class="pill pill-ok seo-stage-pill">🔒 תקין<?= !empty($a['ssl_expiry_date']) ? ' עד ' . e(fmt_date((string) $a['ssl_expiry_date'])) : '' ?></span>
-                                <?php else: ?>
-                                    <span class="pill pill-warn seo-stage-pill"><?= e(AssetService::SSL_STATUSES[$a['ssl_status'] ?? ''] ?? 'בבדיקה') ?></span>
-                                <?php endif; ?>
-                            </td>
-                            <td data-label="תוקף דומיין"><bdi dir="ltr"><?= e(fmt_date($a['expiry_date'] ?? null) ?: '—') ?></bdi></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
+<!-- 4. תקינות אתר, דומיינים ואבטחת SSL (מוצג רק לבעלי שירות אחסון/תשתית/נכס) -->
+<?php if ($hasWidget('domain_ssl') && $assets !== []): ?>
+<section class="card" id="portal-assets-section" aria-labelledby="portal-assets-title">
+    <div class="card-head">
+        <h2 id="portal-assets-title">🛡️ תקינות אתר, דומיינים ואבטחת SSL (<?= e(count($assets)) ?>)</h2>
+        <?php if ($validSslCount > 0): ?>
+            <span class="pill pill-ok seo-stage-pill">🔒 תעודת SSL תקינה ומאומתת</span>
         <?php endif; ?>
-    </article>
-
-    <article class="card" aria-labelledby="portal-banks-title">
-        <div class="card-head">
-            <h2 id="portal-banks-title">בנקי שעות ומסלול ליווי (<?= e(count($banks)) ?>)</h2>
-        </div>
-        <?php if ($banks === []): ?>
-            <p class="muted">התיק מנוהל במסלול פרויקט / ריטיינר חודשי קבוע (אחסון, אבטחה וקידום אורגני שוטף) ללא הגבלת בנק שעות נפרד. ניתן להפיק דוח התקדמות מלא בלחיצה על כפתור ה-PDF למעלה.</p>
-        <?php else: ?>
-            <table class="table" id="portal-banks-table">
-                <thead>
-                    <tr>
-                        <th scope="col">שם בנק</th>
-                        <th scope="col">הקצאה</th>
-                        <th scope="col">נוצל</th>
-                        <th scope="col">יתרה</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($banks as $b): ?>
-                    <tr>
-                        <td><strong><?= fmt_inline_bidi((string) $b['name']) ?></strong></td>
-                        <td dir="ltr"><?= e(number_format((float) $b['allowance_hours'], 1)) ?>h</td>
-                        <td dir="ltr"><?= e(number_format((float) $b['used_hours'], 1)) ?>h (<?= e((int) $b['pct']) ?>%)</td>
-                        <td dir="ltr"><strong><?= e(number_format((float) $b['remaining_hours'], 1)) ?>h</strong></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </article>
+    </div>
+    <div class="table-wrap">
+        <table class="table table-mobile-cards" id="portal-assets-table">
+            <thead>
+                <tr>
+                    <th scope="col">דומיין / אתר</th>
+                    <th scope="col">תשתית הגשה ואבטחה</th>
+                    <th scope="col">אבטחת SSL</th>
+                    <th scope="col">תוקף רישום דומיין</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($assets as $a):
+                $sslOk = ($a['ssl_status'] ?? '') === 'valid';
+            ?>
+                <tr>
+                    <td data-label="דומיין / אתר">
+                        <?php if (!empty($a['domain'])): ?>
+                            <a class="seo-url-link" dir="ltr" href="https://<?= e((string) $a['domain']) ?>" target="_blank" rel="noopener noreferrer"><strong><?= e((string) $a['domain']) ?></strong> ↗</a>
+                        <?php else: ?>—<?php endif; ?>
+                    </td>
+                    <td data-label="תשתית הגשה ואבטחה"><bdi><?= e($a['provider'] ?? '—') ?></bdi></td>
+                    <td data-label="אבטחת SSL">
+                        <?php if ($sslOk): ?>
+                            <span class="pill pill-ok seo-stage-pill">🔒 תקין<?= !empty($a['ssl_expiry_date']) ? ' עד ' . e(fmt_date((string) $a['ssl_expiry_date'])) : '' ?></span>
+                        <?php else: ?>
+                            <span class="pill pill-warn seo-stage-pill"><?= e(AssetService::SSL_STATUSES[$a['ssl_status'] ?? ''] ?? 'בבדיקה') ?></span>
+                        <?php endif; ?>
+                    </td>
+                    <td data-label="תוקף רישום דומיין"><bdi dir="ltr"><?= e(fmt_date($a['expiry_date'] ?? null) ?: '—') ?></bdi></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 </section>
+<?php endif; ?>
+
+<!-- 5. בנק שעות (מוצג אך ורק ללקוח שהוגדר לו שירות בנק שעות!) -->
+<?php if ($hasWidget('hours_bank') && $banks !== []): ?>
+<section class="card" id="portal-banks-section" aria-labelledby="portal-banks-title">
+    <div class="card-head">
+        <h2 id="portal-banks-title">⏱️ מאזן בנק שעות (<?= e(count($banks)) ?>)</h2>
+    </div>
+    <div class="table-wrap">
+        <table class="table table-mobile-cards" id="portal-banks-table">
+            <thead>
+                <tr>
+                    <th scope="col">שם בנק השעות</th>
+                    <th scope="col">מכסת שעות</th>
+                    <th scope="col">נוצל בפועל</th>
+                    <th scope="col">יתרה זמינה</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($banks as $b): ?>
+                <tr>
+                    <td data-label="שם בנק"><strong><?= fmt_inline_bidi((string) $b['name']) ?></strong></td>
+                    <td data-label="מכסה"><bdi dir="ltr"><?= e(number_format((float) $b['allowance_hours'], 1)) ?>h</bdi></td>
+                    <td data-label="נוצל"><bdi dir="ltr"><?= e(number_format((float) $b['used_hours'], 1)) ?>h (<?= e((int) $b['pct']) ?>%)</bdi></td>
+                    <td data-label="יתרה זמינה"><strong dir="ltr"><?= e(number_format((float) $b['remaining_hours'], 1)) ?>h</strong></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+<?php endif; ?>
+
 <?php endif; ?>

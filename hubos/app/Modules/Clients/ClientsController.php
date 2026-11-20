@@ -48,6 +48,19 @@ final class ClientsController
     {
         $user = $ctx->requireUser();
         $id = (int) ($params['id'] ?? 0);
+        $service = new Client360Service($ctx->tenant(), $ctx->permissions());
+
+        // M11: client_viewer NEVER opens the internal 11-tab Client 360 card; render clean Service Portal ( while preserving 403/404 on foreign clients)
+        if (($user['role'] ?? '') === 'client_viewer') {
+            $card = $service->build($user, $id);
+            $card['vault'] = [];
+            return $ctx->render('dashboard/portal', [
+                'title'  => 'פורטל לקוח · ' . (string) ($card['client']['name'] ?? ''),
+                'active' => 'dashboard',
+                'portal' => $card,
+            ]);
+        }
+
         $tab = is_string($_GET['tab'] ?? null) ? $_GET['tab'] : 'overview';
         if (!array_key_exists($tab, Client360Service::TABS)) {
             $tab = 'overview';
@@ -55,7 +68,6 @@ final class ClientsController
         if (in_array($tab, ['finance', 'collection'], true) && ($user['role'] ?? '') !== 'owner') {
             $tab = 'overview';
         }
-        $service = new Client360Service($ctx->tenant(), $ctx->permissions());
         $card = $service->build($user, $id);
 
         if ($tab === 'access' && $card['internal']) {
@@ -67,19 +79,19 @@ final class ClientsController
         unset($_SESSION['_registry_error'][$id]);
 
         return $ctx->render('clients/show', [
-            'title'         => (string) $card['client']['name'],
-            'active'        => 'clients',
-            'card'          => $card,
-            'tab'           => $tab,
+            'title'            => (string) $card['client']['name'],
+            'active'           => 'clients',
+            'card'             => $card,
+            'tab'              => $tab,
             'canEnrich'        => $card['internal'] && $ctx->can('clients.update'),
             'canAssignPartner' => $card['internal'] && $ctx->can('users.manage'),
             'suggestion'       => is_array($registry) ? $registry : null,
-            'registryError' => is_string($registryError) ? $registryError : null,
+            'registryError'    => is_string($registryError) ? $registryError : null,
             // M3/M4: live timer + work actions on the card (never for client_viewer)
-            'canTrack'      => $card['internal'] && $ctx->can('time.track'),
-            'canWork'       => $card['internal'] && $ctx->can('work.create'),
-            'canUpdateTask' => $card['internal'] && $ctx->can('work.update'),
-            'timer'         => $card['internal'] && $ctx->can('time.track')
+            'canTrack'         => $card['internal'] && $ctx->can('time.track'),
+            'canWork'          => $card['internal'] && $ctx->can('work.create'),
+            'canUpdateTask'    => $card['internal'] && $ctx->can('work.update'),
+            'timer'            => $card['internal'] && $ctx->can('time.track')
                 ? (new TimerService($ctx->tenant(), $ctx->permissions()))->current($user) : null,
         ]);
     }
@@ -173,6 +185,112 @@ final class ClientsController
             $ctx->flashError($e->getMessage());
         }
         return Response::redirect('/clients/' . $id . '#seo-keywords-card');
+    }
+
+    /** @param array<string, string> $params */
+    public function storeService(Context $ctx, array $params): Response
+    {
+        $user = $ctx->requireUser();
+        $id = (int) $params['id'];
+        $widgets = $_POST['widgets'] ?? [];
+        try {
+            (new ClientServicesEngine($ctx->tenant(), $ctx->permissions()))->store($user, $id, [
+                'service_id'     => $ctx->input('service_id'),
+                'service_type'   => $ctx->input('service_type'),
+                'title'          => $ctx->input('title'),
+                'scope_summary'  => $ctx->input('scope_summary'),
+                'billing_cycle'  => $ctx->input('billing_cycle'),
+                'status'         => $ctx->input('status'),
+                'widgets'        => is_array($widgets) ? $widgets : [],
+                'live_url'       => $ctx->input('live_url'),
+                'metric_1_label' => $ctx->input('metric_1_label'),
+                'metric_1_value' => $ctx->input('metric_1_value'),
+                'metric_2_label' => $ctx->input('metric_2_label'),
+                'metric_2_value' => $ctx->input('metric_2_value'),
+                'metric_3_label' => $ctx->input('metric_3_label'),
+                'metric_3_value' => $ctx->input('metric_3_value'),
+                'note'           => $ctx->input('note'),
+            ]);
+            $ctx->flash('חבילת השירות נשמרה ועודכנה בפורטל הלקוח');
+        } catch (\InvalidArgumentException|HttpException $e) {
+            $ctx->flashError($e->getMessage());
+        }
+        return Response::redirect('/clients/' . $id . '#admin-client-services-card');
+    }
+
+    /** @param array<string, string> $params */
+    public function deleteService(Context $ctx, array $params): Response
+    {
+        $user = $ctx->requireUser();
+        $id = (int) $params['id'];
+        $svcId = (int) $params['svc'];
+        try {
+            (new ClientServicesEngine($ctx->tenant(), $ctx->permissions()))->delete($user, $id, $svcId);
+            $ctx->flash('חבילת השירות הוסרה מפורטל הלקוח');
+        } catch (HttpException $e) {
+            $ctx->flashError($e->getMessage());
+        }
+        return Response::redirect('/clients/' . $id . '#admin-client-services-card');
+    }
+
+    /** @param array<string, string> $params */
+    public function saveAnalytics(Context $ctx, array $params): Response
+    {
+        $user = $ctx->requireUser();
+        $id = (int) $params['id'];
+        try {
+            (new GoogleAnalyticsService($ctx->tenant(), $ctx->permissions()))->saveClientConnection($user, $id, [
+                'gsc_site_url'       => $ctx->input('gsc_site_url'),
+                'ga4_property_id'    => $ctx->input('ga4_property_id'),
+                'ga4_measurement_id' => $ctx->input('ga4_measurement_id'),
+                'auth_mode'          => $ctx->input('auth_mode'),
+            ]);
+            $ctx->flash('הגדרות Search Console ו-Analytics נשמרו לתיק הלקוח');
+        } catch (\InvalidArgumentException|HttpException $e) {
+            $ctx->flashError($e->getMessage());
+        }
+        return Response::redirect('/clients/' . $id . '#admin-google-analytics-card');
+    }
+
+    /** @param array<string, string> $params */
+    public function syncAnalytics(Context $ctx, array $params): Response
+    {
+        $user = $ctx->requireUser();
+        $id = (int) $params['id'];
+        try {
+            $res = (new GoogleAnalyticsService($ctx->tenant(), $ctx->permissions()))->syncClient($user, $id);
+            if ($res['ok']) {
+                $ctx->flash($res['message']);
+            } else {
+                $ctx->flashError($res['message']);
+            }
+        } catch (\InvalidArgumentException|HttpException $e) {
+            $ctx->flashError($e->getMessage());
+        }
+        return Response::redirect('/clients/' . $id . '#admin-google-analytics-card');
+    }
+
+    public function saveGoogleIntegration(Context $ctx): Response
+    {
+        $user = $ctx->requireUser();
+        $mode = $ctx->input('mode');
+        $returnTo = $ctx->input('_return');
+        $ga = new GoogleAnalyticsService($ctx->tenant(), $ctx->permissions());
+        try {
+            if ($mode === 'oauth') {
+                $ga->saveOAuthCredentials($user, $ctx->input('client_id'), $ctx->input('client_secret'), $ctx->input('refresh_token'));
+                $ctx->flash('פרטי Google OAuth הוצפנו ב-AES-256-GCM ונשמרו בהצלחה');
+            } else {
+                $email = $ga->saveServiceAccountJson($user, $ctx->input('sa_json'));
+                $ctx->flash('מפתח Google Service Account הוצפן ונשמר (' . $email . ') — הוסיפו אימייל זה כצופה בקונסול/אנליטיקס של הלקוח');
+            }
+        } catch (\InvalidArgumentException|HttpException $e) {
+            $ctx->flashError($e->getMessage());
+        }
+        if ($returnTo !== '' && preg_match('#^/clients/\d+$#', $returnTo) === 1) {
+            return Response::redirect($returnTo . '#admin-google-analytics-card');
+        }
+        return Response::redirect('/settings/users');
     }
 
     /**

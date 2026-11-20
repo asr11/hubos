@@ -13,18 +13,24 @@ use HubOS\Core\Str;
 $active = $active ?? '';
 $isClientViewer = ($user['role'] ?? '') === 'client_viewer';
 $isPartner = ($user['role'] ?? '') === 'partner';
-$nav = [
-    ['key' => 'dashboard', 'href' => '/dashboard',      'label' => $isPartner ? 'פורטל שותפים' : 'לוח בקרה', 'icon' => '◆', 'perm' => 'dashboard.view'],
-    ['key' => 'clients',   'href' => ($isClientViewer && !empty($user['client_id'])) ? '/clients/' . (int) $user['client_id'] : '/clients', 'label' => $isClientViewer ? 'תיק לקוח' : 'לקוחות', 'icon' => '◎', 'perm' => 'clients.view'],
-    ['key' => 'time',      'href' => '/time',           'label' => 'שעות',            'icon' => '◷', 'perm' => 'time.view'],
-    ['key' => 'tasks',     'href' => '/tasks',          'label' => 'משימות',          'icon' => '☑', 'perm' => 'work.view'],
-    ['key' => 'projects',  'href' => '/projects',       'label' => 'פרויקטים',        'icon' => '▣', 'perm' => 'work.view'],
-    ['key' => 'linking',   'href' => '/work/linking',   'label' => 'ממתין לשיוך',     'icon' => '⇄', 'perm' => 'work.link'],
-    ['key' => 'recurring', 'href' => '/work/recurring', 'label' => 'תחזוקה חודשית',   'icon' => '↻', 'perm' => 'work.create'],
-    ['key' => 'assets',    'href' => '/assets',         'label' => 'נכסים ודומיינים', 'icon' => '🌐', 'perm' => 'assets.view'],
-    ['key' => 'vault',     'href' => '/vault',          'label' => 'כספת גישות',      'icon' => '🔒', 'perm' => 'vault.view'],
-    ['key' => 'users',     'href' => '/settings/users', 'label' => 'משתמשים והרשאות', 'icon' => '⚙', 'perm' => 'users.view'],
-];
+if ($isClientViewer) {
+    $nav = [
+        ['key' => 'dashboard', 'href' => '/dashboard', 'label' => 'לוח בקרה', 'icon' => '◆', 'perm' => 'dashboard.view'],
+    ];
+} else {
+    $nav = [
+        ['key' => 'dashboard', 'href' => '/dashboard',      'label' => $isPartner ? 'פורטל שותפים' : 'לוח בקרה', 'icon' => '◆', 'perm' => 'dashboard.view'],
+        ['key' => 'clients',   'href' => '/clients',        'label' => 'לקוחות',          'icon' => '◎', 'perm' => 'clients.view'],
+        ['key' => 'time',      'href' => '/time',           'label' => 'שעות',            'icon' => '◷', 'perm' => 'time.view'],
+        ['key' => 'tasks',     'href' => '/tasks',          'label' => 'משימות',          'icon' => '☑', 'perm' => 'work.view'],
+        ['key' => 'projects',  'href' => '/projects',       'label' => 'פרויקטים',        'icon' => '▣', 'perm' => 'work.view'],
+        ['key' => 'linking',   'href' => '/work/linking',   'label' => 'ממתין לשיוך',     'icon' => '⇄', 'perm' => 'work.link'],
+        ['key' => 'recurring', 'href' => '/work/recurring', 'label' => 'תחזוקה חודשית',   'icon' => '↻', 'perm' => 'work.create'],
+        ['key' => 'assets',    'href' => '/assets',         'label' => 'נכסים ודומיינים', 'icon' => '🌐', 'perm' => 'assets.view'],
+        ['key' => 'vault',     'href' => '/vault',          'label' => 'כספת גישות',      'icon' => '🔒', 'perm' => 'vault.view'],
+        ['key' => 'users',     'href' => '/settings/users', 'label' => 'משתמשים והרשאות', 'icon' => '⚙', 'perm' => 'users.view'],
+    ];
+}
 if ((int) ($user['tenant_id'] ?? 0) === 1 && ($user['role'] ?? '') === 'owner') {
     $nav[] = ['key' => 'saas', 'href' => '/settings/saas', 'label' => 'ארגוני SaaS', 'icon' => '🏢', 'perm' => 'users.manage'];
 }
@@ -44,7 +50,7 @@ $returnTo = preg_match('#^/(?!/)[A-Za-z0-9/_\-?=&%.\#]*$#', $returnTo) === 1 ? $
     <meta name="color-scheme" content="light">
     <link rel="preload" href="/assets/fonts/heebo-hebrew.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
-    <link rel="stylesheet" href="/assets/app.css?v=17">
+    <link rel="stylesheet" href="/assets/app.css?v=18">
     <script src="/assets/timer.js?v=7" defer></script>
 </head>
 <body class="app-body">

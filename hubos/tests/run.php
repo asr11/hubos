@@ -1332,7 +1332,7 @@ test('dashboard & portal: CEO morning screen 5 sections + Client Portal strict i
     eq([$tOverdue], array_map('intval', array_column($portal['tasks'], 'id')), 'portal shows only client_visible=1 tasks');
     eq([], $portal['vault'], 'portal never includes vault items');
     $portalHtml = (new View(HUBOS_ROOT . '/views'))->render('dashboard/portal', ['user' => $w['viewer'], 'portal' => $portal]);
-    ok(str_contains($portalHtml, 'ZZ_OverdueVisible'));
+    ok(!str_contains($portalHtml, 'ZZ_OverdueVisible'), 'M11: online tasks are intentionally hidden from client portal HTML');
     ok(!str_contains($portalHtml, 'ZZ_InternalSecretTask'), 'internal task never rendered in portal');
     ok(!str_contains($portalHtml, 'ZZ_RootSSH') && !str_contains($portalHtml, 'ZZ_CIPHER'), 'vault never rendered in portal');
 });
@@ -1973,6 +1973,78 @@ test('m10 self-service password change for every role + live partner-leads bell 
     eq(2, $svc->newPartnerLeadsCount(), 'bell counts both new partner leads');
     $pSvc->updateLeadStatus($owner, $perms, $lead1, 'contacted');
     eq(1, $svc->newPartnerLeadsCount(), 'bell drops once a lead is handled');
+});
+
+test('m11 universal client services engine, zero client task/hours leak & admin-only Google Search Console/GA4 integration', function (): void {
+    $pdo = freshDb();
+    $tid = Provisioning::ensureTenant($pdo, 'zz-m11-svc', 'ZZ Universal Services');
+    $t = new Tenant($pdo, $tid);
+    $perms = new Permissions($t);
+    $ownerId = Provisioning::createUser($pdo, $tid, 'zz_m11_owner@hubos.test', 'ZZ Owner', 'owner', 'zz-owner-pass-1234');
+    $owner = ['id' => $ownerId, 'tenant_id' => $tid, 'role' => 'owner', 'status' => 'active'];
+    $cid = $t->insert('clients', ['name' => 'ZZ Asher Com', 'domain' => 'ashercom.com']);
+    $viewerId = Provisioning::createUser($pdo, $tid, 'zz_m11_viewer@hubos.test', 'ZZ Client', 'client_viewer', 'zz-client-pass-1234', $ownerId, $cid);
+    $viewer = ['id' => $viewerId, 'tenant_id' => $tid, 'role' => 'client_viewer', 'client_id' => $cid, 'status' => 'active', 'name' => 'ZZ Client'];
+
+    // Create an internal/visible task and verify it NEVER leaks into the new M11 Client Portal or modular PDF report!
+    $t->insert('tasks', ['client_id' => $cid, 'title' => 'ZZ_HiddenOnlineTaskName', 'status' => 'doing', 'client_visible' => 1]);
+    $t->insert('assets', ['client_id' => $cid, 'kind' => 'domain', 'domain' => 'ashercom.com', 'provider' => 'Cloudflare Edge', 'ssl_status' => 'valid', 'status' => 'active']);
+
+    $engine = new \HubOS\Modules\Clients\ClientServicesEngine($t, $perms);
+    eq(13, count(\HubOS\Modules\Clients\ClientServicesEngine::CATALOG), 'all 12 historical families + custom preset registered');
+    eq(403, throws(fn () => $engine->store($viewer, $cid, ['service_type' => 'seo_organic']), HttpException::class)->status, 'client_viewer blocked from mutating services');
+
+    $s1 = $engine->store($owner, $cid, [
+        'service_type'  => 'seo_organic',
+        'title'         => 'קידום אורגני בגוגל (SEO)',
+        'scope_summary' => 'אופטימיזציה ומעקב Search Console',
+        'billing_cycle' => 'monthly',
+    ]);
+    $s2 = $engine->store($owner, $cid, [
+        'service_type'  => 'hosting_infra',
+        'title'         => 'אחסון אתר והגנת Cloudflare',
+        'scope_summary' => 'תשתית HTML מהירה ו-SSL פעיל',
+        'billing_cycle' => 'monthly',
+    ]);
+    ok($s1 > 0 && $s2 > 0, 'services created');
+
+    // Admin configures Google Search Console & GA4 connection; client_viewer strictly blocked (403)
+    $gaSvc = new \HubOS\Modules\Clients\GoogleAnalyticsService($t, $perms);
+    eq(403, throws(fn () => $gaSvc->saveClientConnection($viewer, $cid, ['gsc_site_url' => 'sc-domain:ashercom.com']), HttpException::class)->status, 'client_viewer blocked from configuring analytics');
+    eq(403, throws(fn () => $gaSvc->adminConnectionState($viewer, $cid), HttpException::class)->status, 'client_viewer blocked from reading admin analytics state');
+
+    $gaSvc->saveClientConnection($owner, $cid, [
+        'gsc_site_url'       => 'sc-domain:ashercom.com',
+        'ga4_property_id'    => '412345678',
+        'ga4_measurement_id' => 'G-JFHDTVX9D6',
+        'auth_mode'          => 'service_account',
+    ]);
+
+    // Render Client Portal HTML and verify: 'חבילות שירות פעילות' present, ZERO 'על מה משלמים', ZERO 'פתיחת תיק לקוח מלא', ZERO tasks, ZERO hours bank!
+    $portalData = (new \HubOS\Modules\Dashboard\DashboardService($t, $perms))->portal($viewer);
+    eq(null, $portalData['analytics_admin'], 'analytics_admin never exposed in portal payload');
+    $portalHtml = (new View(HUBOS_ROOT . '/views'))->render('dashboard/portal', [
+        'user'   => $viewer,
+        'portal' => $portalData,
+    ]);
+
+    ok(str_contains($portalHtml, 'חבילות שירות פעילות'), 'portal uses clean חבילות שירות פעילות heading');
+    ok(!str_contains($portalHtml, 'על מה משלמים'), 'portal never says על מה משלמים');
+    ok(!str_contains($portalHtml, 'פתיחת תיק לקוח מלא'), 'portal removes full client card button');
+    ok(!str_contains($portalHtml, 'ZZ_HiddenOnlineTaskName'), 'portal never exposes online tasks');
+    ok(!str_contains($portalHtml, 'בנקי שעות'), 'portal hides hours bank when client did not purchase hours');
+    ok(str_contains($portalHtml, 'G-JFHDTVX9D6'), 'portal displays friendly GA4 connection readiness');
+
+    // Render modular client PDF report and verify tasks & hours are also hidden
+    $repData = (new Client360Service($t, $perms))->buildReport($viewer, $cid);
+    $repHtml = (new View(HUBOS_ROOT . '/views'))->render('clients/report', [
+        'title'   => 'דוח תקופתי',
+        'appName' => 'OS HUB',
+        'report'  => $repData,
+    ], 'layouts/report');
+    ok(str_contains($repHtml, 'חבילות שירות פעילות'), 'modular PDF report lists active service packages');
+    ok(!str_contains($repHtml, 'ZZ_HiddenOnlineTaskName'), 'modular PDF report hides online tasks');
+    ok(!str_contains($repHtml, '0.00h'), 'modular PDF report hides empty hours');
 });
 
 // ---------------------------------------------------------------- Run

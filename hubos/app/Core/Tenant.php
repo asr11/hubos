@@ -28,6 +28,8 @@ final class Tenant
         'sync_runs',
         // M9 (007_client_seo_keywords.sql)
         'client_seo_keywords',
+        // M11 (008_client_services_and_analytics.sql)
+        'client_services', 'client_analytics_connections',
     ];
 
     public function __construct(private PDO $pdo, private int $tenantId)
