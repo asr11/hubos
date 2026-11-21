@@ -162,14 +162,14 @@ $clientUpsertCount = 0;
 $clientInsertCount = 0;
 
 $findByLegacyStmt = $pdo->prepare(
-    "SELECT id, parent_client_id, legacy_id, name, tax_id, status FROM clients
+    "SELECT id, parent_client_id, legacy_id, name, tax_id, status, data_json FROM clients
      WHERE tenant_id = :tenant_id AND (legacy_id = :leg_id OR legacy_id = ('gi_' || :leg_id))
      ORDER BY CASE WHEN legacy_id = :leg_id THEN 0 ELSE 1 END
      LIMIT 1"
 );
 
 $findUnlinkedClientStmt = $pdo->prepare(
-    "SELECT id, parent_client_id, legacy_id, name, tax_id, status FROM clients
+    "SELECT id, parent_client_id, legacy_id, name, tax_id, status, data_json FROM clients
      WHERE tenant_id = :tenant_id
        AND (legacy_id IS NULL OR legacy_id NOT GLOB '????????-????-????-????-????????????')
        AND ((tax_id IS NOT NULL AND tax_id != '' AND tax_id = :tax_id) OR name = :name)
@@ -229,8 +229,16 @@ foreach ($allClients as $mc) {
         $existing = $findUnlinkedClientStmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    $routedClientId = null;
     if ($existing) {
         $localId = (int) $existing['id'];
+        $meta = is_string($existing['data_json'] ?? null) ? (json_decode($existing['data_json'], true) ?: []) : [];
+        if (!empty($meta['manual_archive']) || !empty($meta['merged_into_client_id'])) {
+            $status = 'inactive';
+        }
+        if (!empty($meta['merged_into_client_id'])) {
+            $routedClientId = (int) $meta['merged_into_client_id'];
+        }
         $newLegId = $legId !== '' ? $legId : ($existing['legacy_id'] ?? null);
         $updateClientStmt->execute([
             ':id'         => $localId,
@@ -265,7 +273,7 @@ foreach ($allClients as $mc) {
         $clientInsertCount++;
     }
     if ($legId !== '') {
-        $morningToLocalClientId[$legId] = $localId;
+        $morningToLocalClientId[$legId] = $routedClientId ?? $localId;
     }
 }
 $pdo->commit();
@@ -470,6 +478,28 @@ echo "✔ Documents sync complete: {$docInsertCount} added, {$docUpsertCount} up
 echo "⚖️ Recalculating Accounting Document Law (Zero Double Count)...\n";
 $recalcCount = AccountingRule::recalculate($pdo, $tenantId);
 echo "✔ Accounting recalculation finished ({$recalcCount} rows classified).\n";
+
+// 7b. Auto-archive empty Morning shell cards (0 documents, 0 quotes, 0 banks, 0 projects, 0 tasks, 0 assets, 0 vault, 0 users)
+$demoteShellsStmt = $pdo->prepare("
+    UPDATE clients
+    SET status = 'inactive', updated_at = :now
+    WHERE tenant_id = :tenant_id
+      AND source_system = 'morning_api_v1'
+      AND status = 'active'
+      AND NOT EXISTS (SELECT 1 FROM finance_documents fd WHERE fd.client_id = clients.id)
+      AND NOT EXISTS (SELECT 1 FROM quotes q WHERE q.client_id = clients.id)
+      AND NOT EXISTS (SELECT 1 FROM hours_banks hb WHERE hb.client_id = clients.id)
+      AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.client_id = clients.id)
+      AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.client_id = clients.id)
+      AND NOT EXISTS (SELECT 1 FROM assets a WHERE a.client_id = clients.id)
+      AND NOT EXISTS (SELECT 1 FROM vault_items v WHERE v.client_id = clients.id)
+      AND NOT EXISTS (SELECT 1 FROM users u WHERE u.client_id = clients.id)
+");
+$demoteShellsStmt->execute([':tenant_id' => $tenantId, ':now' => $nowDt]);
+$demotedShells = $demoteShellsStmt->rowCount();
+if ($demotedShells > 0) {
+    echo "✔ Auto-archived {$demotedShells} empty Morning draft shells (0 documents & 0 linked records).\n";
+}
 
 // 8. Record Sync Event
 Events::record($tenant, 1, 'sync', null, null, 'sync.completed', null, [
